@@ -235,7 +235,7 @@ export function AgentHud(props: Props) {
                 {props.steps && props.steps.length > 0 && (
                   <ol className="live-steps">
                     {props.steps.map((s) => (
-                      <li key={s.n}><span className={s.status === 'COMPLETE' ? 'ok' : s.status === 'RUNNING' || s.status === 'WORKING' ? 'warn' : 'notes'}>{s.status === 'COMPLETE' ? '✓' : s.status === 'WAITING' || s.status === 'NOT_CHECKED' ? '○' : '●'}</span> {s.name} <small>{s.status}{s.note ? ` · ${s.note}` : ''}</small></li>
+                      <li key={s.n}><span className={s.status === 'COMPLETE' ? 'ok' : s.status === 'RUNNING' || s.status === 'WORKING' ? 'run' : 'notes'}>{s.status === 'COMPLETE' ? '✓' : s.status === 'WAITING' || s.status === 'NOT_CHECKED' ? '○' : '●'}</span> {s.name} <small>{s.status}{s.note ? ` · ${s.note}` : ''}</small></li>
                     ))}
                   </ol>
                 )}
@@ -247,7 +247,15 @@ export function AgentHud(props: Props) {
             {tab === 'AGENTS' && AGENTS.map(([id, name]) => (
               <div className="agent-row" key={id}>
                 <b>{name}</b>
-                <span className={id === 'cad-designer' && props.working ? 'warn' : id === active && props.proposal ? 'warn' : 'ok'}>
+                <span
+                  className={
+                    id === 'cad-designer' && props.working
+                      ? 'tone-agent'
+                      : id === active && props.proposal
+                        ? 'tone-agent'
+                        : 'idle'
+                  }
+                >
                   {id === 'cad-designer' && props.working ? 'WORKING' : id === active && props.proposal ? 'PROPOSING' : 'IDLE'}
                 </span>
               </div>
@@ -268,11 +276,13 @@ export function AgentHud(props: Props) {
             )}
             {tab === 'PROPOSAL' && props.proposal && (
               <div className="proposal">
-                <h3>{props.proposal.transaction.status} · {props.proposal.transaction.transaction_id}</h3>
-                <div>{props.proposal.transaction.intent}</div>
+                <h3>PROPOSAL · {props.proposal.transaction.status}</h3>
+                <div className="intent">{props.proposal.transaction.intent}</div>
                 <div className="notes">{props.proposal.transaction.reason}</div>
-                <div>Affected req: {props.proposal.transaction.requirements.join(', ') || '—'}</div>
-                {props.propReach != null && <div>Derived reach: {props.reachMm} → {props.propReach} mm (DERIVED)</div>}
+                <div>Affected {props.proposal.transaction.requirements.length ? props.proposal.transaction.requirements.map((r) => <span key={r} className="req"> {r}</span>) : ' —'}</div>
+                {props.propReach != null && (
+                  <div className="delta">{props.reachMm} → {props.propReach} mm <span className="tone-prov">DERIVED</span></div>
+                )}
                 <div className="row">
                   <button className="primary" onClick={props.onApprove}>APPROVE</button>
                   <button className="danger" onClick={props.onReject}>REJECT</button>
@@ -296,7 +306,7 @@ export function AgentHud(props: Props) {
             ))}
           </div>
           <form className="agent-hud__cmd" onSubmit={(e) => { e.preventDefault(); props.onSend(props.msg); }}>
-            <input value={props.msg} onChange={(e) => props.setMsg(e.target.value)} placeholder="engineering command…" />
+            <input value={props.msg} onChange={(e) => props.setMsg(e.target.value)} placeholder="ASK ARCHEON…" />
             <button className="primary" disabled={props.busy}>SEND</button>
             {props.working && <button type="button" className="danger" onClick={() => props.onStop?.()}>STOP</button>}
           </form>

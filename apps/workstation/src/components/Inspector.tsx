@@ -1,6 +1,7 @@
 import { useUi } from '../store';
 import { geometryDisplay, type Part, type Requirement } from '@archeon/design-protocol';
 import { geometryMode } from '@archeon/scene-engine';
+import { provenanceTone, type ValueTone } from '../services/tone';
 
 interface Assembly {
   id: string;
@@ -30,12 +31,13 @@ interface Props {
   revision: string;
 }
 
-function Field({ k, v, note }: { k: string; v: string; note?: string }) {
-  const missing = !v || v === 'NOT COMPUTED' || v === 'NOT AVAILABLE' || v === 'UNVERIFIED' || v === 'GRAPH ONLY';
+function Field({ k, v, note, tone }: { k: string; v: string; note?: string; tone?: ValueTone }) {
+  const missing = !v || v === 'NOT COMPUTED' || v === 'NOT AVAILABLE' || v === 'UNVERIFIED';
+  const cls = missing ? 'muted' : tone ?? 'tone-fact';
   return (
     <div className="insp-row">
       <span>{k}</span>
-      <b className={missing ? 'muted' : ''}>{v}</b>
+      <b className={cls.startsWith('tone-') || cls === 'muted' ? cls : `tone-${cls}`}>{v}</b>
       {note && <i>{note}</i>}
     </div>
   );
@@ -168,6 +170,7 @@ export function Inspector({
   });
   const linkedReqs = requirements.filter((r) => part.provenance.requirement_ids.includes(r.id));
   const parentName = assemblies.find((a) => a.id === part.parent)?.name ?? part.parent ?? '—';
+  const display = geometryDisplay(part.spatial.cad, geometryMode(!!(part.spatial.cad?.preview || part.spatial.cad?.path), debug));
 
   return (
     <section className="rail-panel inspector">
@@ -179,9 +182,9 @@ export function Inspector({
       <div className="insp-summary">
         {mat?.name ?? part.material ?? 'UNVERIFIED'} · {relatedIfaces.length} interfaces · {featN} features · GRAPH ONLY
       </div>
-      <Field k="PARENT" v={parentName} />
-      <Field k="ROLE" v={part.semantic_role || '—'} />
-      <Field k="MATERIAL" v={mat?.name ?? part.material ?? 'UNVERIFIED'} />
+      <Field k="PARENT" v={parentName} tone="fact" />
+      <Field k="ROLE" v={part.semantic_role || '—'} tone="id" />
+      <Field k="MATERIAL" v={mat?.name ?? part.material ?? 'UNVERIFIED'} tone="fact" />
       {([
         ['GEOMETRY', 'Geometry'],
         ['CONNECTIONS', 'Connections'],
@@ -191,16 +194,21 @@ export function Inspector({
         ['HISTORY', 'History']
       ] as const).map(([key, label]) => (
         <div key={key}>
-          <button type="button" className="insp-acc" onClick={() => toggleInspect(key)}>
+          <button
+            type="button"
+            className={`insp-acc ${key === 'PROVENANCE' || key === 'ANALYSIS' || key === 'CONNECTIONS' ? 'insp-acc--intel' : ''}`}
+            onClick={() => toggleInspect(key)}
+          >
             {inspectOpen[key] ? '▾' : '▸'} {label}
           </button>
           {inspectOpen[key] && key === 'GEOMETRY' && (
             <>
-              <Field k="PN / ID" v={part.id} />
+              <Field k="PN / ID" v={part.id} tone="id" />
               <Field
                 k="DISPLAY"
-                v={geometryDisplay(part.spatial.cad, geometryMode(!!(part.spatial.cad?.preview || part.spatial.cad?.path), debug))}
+                v={display}
                 note="CAD and primitive are exclusive — never both"
+                tone={display === 'GENERATED MESH' ? 'prov' : 'fact'}
               />
               <Field k="CAD FRAME" v={part.spatial.cad?.coordinate_frame ?? 'CAD_LOCAL'} note="viewer does not recenter or Y-up rotate meshes" />
               <Field k="UP AXIS" v={part.spatial.cad?.up_axis ?? 'Z'} note="ARCHEON world is Z-UP" />
@@ -211,8 +219,8 @@ export function Inspector({
               <Field k="MASS" v={mass != null ? `${mass.toFixed(3)} kg` : 'NOT COMPUTED'} note={mass != null ? 'HEURISTIC · density × primitive volume' : 'no density'} />
               <Field k="CENTER OF MASS" v="NOT COMPUTED" />
               <Field k="CAD FORMAT" v={part.spatial.cad?.format?.toUpperCase() ?? 'PRIMITIVE'} />
-              <Field k="CAD TRUTH" v={part.spatial.cad?.truth ?? 'GENERATED'} />
-              <Field k="CAD SOURCE" v={part.spatial.cad?.source ?? '—'} />
+              <Field k="CAD TRUTH" v={part.spatial.cad?.truth ?? 'GENERATED'} tone={provenanceTone(part.spatial.cad?.truth ?? 'GENERATED')} />
+              <Field k="CAD SOURCE" v={part.spatial.cad?.source ?? '—'} tone={provenanceTone(part.spatial.cad?.source ?? '')} />
             </>
           )}
           {inspectOpen[key] && key === 'CONNECTIONS' && (
@@ -222,17 +230,17 @@ export function Inspector({
             </>
           )}
           {inspectOpen[key] && key === 'REQUIREMENTS' && (
-            <Field k="LINKED" v={linkedReqs.map((r) => r.id).join(', ') || 'NONE'} />
+            <Field k="LINKED" v={linkedReqs.map((r) => r.id).join(', ') || 'NONE'} tone="id" />
           )}
           {inspectOpen[key] && key === 'ANALYSIS' && (
-            <Field k="VALIDATION" v="GRAPH ONLY" note="not FEA · collision NOT CHECKED" />
+            <Field k="VALIDATION" v="GRAPH ONLY" note="not FEA · collision NOT CHECKED" tone="graph" />
           )}
           {inspectOpen[key] && key === 'PROVENANCE' && (
             <>
-              <Field k="CLASS" v={part.provenance.class} />
-              <Field k="CREATED BY" v={part.provenance.created_by} />
-              <Field k="REASON" v={part.provenance.reason || '—'} />
-              <Field k="AGENT" v={part.provenance.agent_id ?? '—'} />
+              <Field k="CLASS" v={part.provenance.class} tone={provenanceTone(part.provenance.class)} />
+              <Field k="CREATED BY" v={part.provenance.created_by} tone="agent" />
+              <Field k="REASON" v={part.provenance.reason || '—'} tone="fact" />
+              <Field k="AGENT" v={part.provenance.agent_id ?? '—'} tone="agent" />
             </>
           )}
           {inspectOpen[key] && key === 'HISTORY' && (

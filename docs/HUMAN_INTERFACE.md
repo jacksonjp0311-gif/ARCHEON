@@ -32,6 +32,12 @@ SUMMARY by default. ENGINEERING / PROVENANCE / GRAPH on demand.
 
 Human-readable name is primary. Semantic id is secondary.
 
+## Color grammar
+
+Gold is human control (DESIGN, ASSEMBLE, EXPLODE, FOCUS, HOME, FIT). Lavender is ARCHEON intelligence (agent names, PROPOSAL / PLAN / ACTIVITY, GENERATED / DERIVED, semantic IDs, ASK ARCHEON). White is engineering fact. Gray is secondary. Green is validated. Amber is assumed / not run. Red is invalid.
+
+Lavender should stay rare: when it appears, the operator knows ARCHEON itself is involved.
+
 ## Truth language
 
 Known / Derived / Assumed / Preview / Exact / Simulation — never interchangeable.

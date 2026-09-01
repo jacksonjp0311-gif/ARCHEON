@@ -13,7 +13,7 @@ export function ObjectHud({ kind, name, onAction }: Props) {
     <div className="object-hud" aria-label="object actions">
       {name && <span className="object-hud__name">{name}</span>}
       {actions.map((a) => (
-        <button key={a.id} type="button" onClick={() => onAction(a.id)}>{a.label}</button>
+        <button key={a.id} type="button" className={a.id === 'ask' ? 'ask' : ''} onClick={() => onAction(a.id)}>{a.label}</button>
       ))}
     </div>
   );

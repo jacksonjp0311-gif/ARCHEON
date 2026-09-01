@@ -31,7 +31,7 @@ export function RadialMenu({ onAction }: Props) {
           <button
             key={it.id}
             type="button"
-            className="radial__item"
+            className={`radial__item ${it.id === 'ask' ? 'ask' : ''}`}
             style={{ transform: `translate(${x}px, ${y}px)` }}
             onClick={() => {
               onAction(it.id);

@@ -15,7 +15,7 @@ export function ContextRibbon({ kind, name, onAction }: Props) {
       </div>
       <div className="context-ribbon__acts">
         {actions.map((a) => (
-          <button key={a.id} type="button" title={a.title} onClick={() => onAction(a.id)}>{a.label}</button>
+          <button key={a.id} type="button" className={a.id === 'ask' ? 'ask' : ''} title={a.title} onClick={() => onAction(a.id)}>{a.label}</button>
         ))}
       </div>
     </div>

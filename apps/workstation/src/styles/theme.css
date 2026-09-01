@@ -65,6 +65,11 @@ button.active, button.on { border-color: var(--orange); color: var(--orange); }
 button.primary { border-color: var(--orange); color: var(--orange); }
 button.danger { border-color: var(--fault); color: var(--fault); }
 
+.tone-agent, .tone-prov, .tone-id, .tone-graph { color: var(--lavender); }
+.tone-delta { color: var(--gold); }
+.tone-fact { color: var(--text-primary); }
+.agent-hud__cmd input::placeholder { color: var(--lavender); opacity: 0.75; }
+
 .app {
   height: 100%;
   display: grid;
@@ -163,8 +168,9 @@ button.danger { border-color: var(--fault); color: var(--fault); }
 .debug-toggles button.on { border-color: var(--action-primary); color: var(--action-primary); }
 .meta--slim { flex: 0 0 auto; }
 .crumbs { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; pointer-events: auto; }
-.crumbs button { border: 0; background: transparent; padding: 0 2px; color: var(--ice-2); }
+.crumbs button { border: 0; background: transparent; padding: 0 2px; color: var(--text-primary); }
 .crumbs i { color: var(--muted); font-style: normal; margin: 0 4px; }
+.crumbs--agent button:last-of-type { color: var(--lavender); }
 .float-hud {
   position: absolute;
   z-index: 26;
@@ -236,8 +242,8 @@ button.danger { border-color: var(--fault); color: var(--fault); }
   top: -18px;
   width: 36px;
   height: 36px;
-  border-color: var(--orange);
-  color: var(--orange);
+  border-color: var(--lavender);
+  color: var(--lavender);
 }
 .radial__item {
   position: absolute;
@@ -296,10 +302,16 @@ button.danger { border-color: var(--fault); color: var(--fault); }
 .insp-row span { color: var(--muted); }
 .insp-row i { grid-column: 2; color: var(--muted); font-size: 9px; font-style: normal; }
 .insp-row .muted { color: var(--amber); font-weight: 400; }
+.insp-row .tone-id, .insp-row .tone-agent, .insp-row .tone-prov, .insp-row .tone-graph { color: var(--lavender); font-weight: 500; }
+.insp-row .tone-fact { color: var(--text-primary); font-weight: 500; }
+.insp-row .tone-valid { color: var(--valid); font-weight: 500; }
+.insp-row .tone-warn { color: var(--warning); font-weight: 400; }
+.insp-row .tone-delta { color: var(--gold); font-weight: 500; }
+.insp-acc--intel { color: var(--lavender); }
 .insp-counts { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 10px; color: var(--text-muted); font-size: 10px; }
 .insp-actions { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 10px; }
 .insp-rels { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 10px 8px; }
-.insp-rels button { font-size: 10px; color: var(--text-muted); }
+.insp-rels button { font-size: 10px; color: var(--lavender); border-color: var(--border); }
 .tracker-item {
   display: grid;
   grid-template-columns: 10px 1fr 16px;
@@ -357,7 +369,8 @@ button.danger { border-color: var(--fault); color: var(--fault); }
 }
 .agent-hud__title small { color: var(--agent-hi); letter-spacing: 0.08em; }
 .agent-hud__tabs { display: flex; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
-.agent-hud__tabs button { flex: 1; font-size: 9px; padding: 5px 2px; border: 0; border-right: 1px solid var(--line); }
+.agent-hud__tabs button { flex: 1; font-size: 9px; padding: 5px 2px; border: 0; border-right: 1px solid var(--line); color: var(--text-muted); }
+.agent-hud__tabs button.active { color: var(--lavender); background: var(--surface-2); }
 .agent-hud__body { flex: 1; overflow: auto; padding: 8px; min-height: 0; }
 .agent-hud__cmd { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--line); }
 .agent-hud__cmd input { flex: 1; }
@@ -367,6 +380,8 @@ button.danger { border-color: var(--fault); color: var(--fault); }
   background: linear-gradient(135deg, transparent 40%, var(--line-hi) 41%, var(--line-hi) 50%, transparent 51%);
 }
 .agent-row { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid var(--border); }
+.agent-row b { color: var(--lavender); font-weight: 500; }
+.agent-row .idle { color: var(--text-muted); }
 .hud {
   position: absolute;
   left: 10px;
@@ -384,6 +399,8 @@ button.danger { border-color: var(--fault); color: var(--fault); }
   letter-spacing: 0.12em;
   color: var(--text-primary);
 }
+.hud .state { color: var(--gold-deep); letter-spacing: 0.14em; font-size: 10px; margin-top: 2px; }
+.hud .layer { color: var(--lavender); font-size: 10px; letter-spacing: 0.1em; margin-top: 2px; }
 .hud .hint { color: var(--text-muted); font-size: 10px; letter-spacing: 0.08em; margin-top: 2px; }
 .legend {
   position: absolute;
@@ -427,6 +444,9 @@ button.danger { border-color: var(--fault); color: var(--fault); }
 }
 .proposal h3 { margin: 0 0 6px; color: var(--agent); font-size: 11px; letter-spacing: 0.12em; }
 .proposal .row { display: flex; gap: 6px; margin-top: 8px; }
+.proposal .delta { color: var(--gold); }
+.proposal .req { color: var(--lavender); }
+.proposal .intent { color: var(--text-primary); }
 
 .dock {
   grid-area: dock;
@@ -500,8 +520,8 @@ th { color: var(--muted); font-size: 10px; letter-spacing: 0.12em; }
 .palette-body h3 { margin: 8px 10px 4px; color: var(--muted); font-size: 10px; letter-spacing: 0.14em; }
 .palette-body button { display: flex; justify-content: space-between; width: calc(100% - 16px); margin: 2px 8px; text-align: left; }
 .insp-name { padding: 0 10px 4px; }
-.insp-name strong { display: block; letter-spacing: 0.08em; }
-.insp-name small { color: var(--muted); }
+.insp-name strong { display: block; letter-spacing: 0.08em; color: var(--text-primary); }
+.insp-name small { color: var(--lavender); }
 .insp-summary { padding: 0 10px 8px; color: var(--text-muted); }
 .insp-sects { display: flex; flex-wrap: wrap; }
 .insp-sects button { flex: 1; font-size: 9px; }
@@ -509,8 +529,13 @@ th { color: var(--muted); font-size: 10px; letter-spacing: 0.12em; }
 .reply-card h3 { margin: 0 0 6px; color: var(--agent); font-size: 11px; letter-spacing: 0.12em; }
 .live-steps { margin: 0 0 8px; padding-left: 18px; color: var(--text-muted); }
 .live-steps small { color: var(--text-muted); }
-.agent-fab.is-working { border-color: var(--warning); color: var(--warning); }
+.agent-fab.is-working { border-color: var(--lavender); color: var(--lavender); }
 .agent-fab.is-decide { border-color: var(--action-primary); color: var(--action-primary); }
+button.ask { color: var(--lavender); border-color: var(--lavender); }
+.variant-list button { color: var(--lavender); }
+.live-steps .run { color: var(--lavender); }
+.palette-body button.kind-AGENT b, .palette-body button.kind-AGENT small { color: var(--lavender); }
+.palette-body h3.kind-AGENT { color: var(--lavender); }
 .spatial-label {
   background: rgba(8, 8, 8, 0.88);
   border: 1px solid var(--action-primary);

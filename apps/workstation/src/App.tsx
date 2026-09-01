@@ -522,7 +522,8 @@ export default function App() {
       <section className="viewport">
         <div className="hud">
           {doc && <Breadcrumbs projectName={doc.project.name} parts={doc.parts} assemblies={doc.assemblies} />}
-          <div>{spatialLabel(spatial)} · ENGINEERING</div>
+          <div className="state">{spatialLabel(spatial)} · ENGINEERING</div>
+          <div className="layer">DesignIR projection</div>
           {!selectedId && <div className="hint">Click geometry to inspect</div>}
         </div>
         {doc && (

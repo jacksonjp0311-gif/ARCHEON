@@ -37,11 +37,12 @@ export function CommandPalette({ catalog, onCommand }: Props) {
         <div className="palette-body">
           {Object.entries(grouped).map(([kind, items]) => (
             <section key={kind}>
-              <h3>{kind}</h3>
+              <h3 className={`kind-${kind}`}>{kind}</h3>
               {items.map((item) => (
                 <button
                   key={item.id}
                   type="button"
+                  className={`kind-${item.kind}`}
                   onClick={() => {
                     onCommand(item);
                     setOpen(false);

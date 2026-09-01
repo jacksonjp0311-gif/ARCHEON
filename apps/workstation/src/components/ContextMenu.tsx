@@ -21,6 +21,7 @@ export function ContextMenu({ kind, onAction }: Props) {
         <button
           key={a.id}
           type="button"
+          className={a.id === 'ask' ? 'ask' : ''}
           title={a.title}
           onClick={() => {
             onAction(a.id);
