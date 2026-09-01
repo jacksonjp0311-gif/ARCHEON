@@ -304,9 +304,9 @@ export function ArmScene({
 
   const worldRef = useRef(world);
   worldRef.current = world;
-  const fitNonce = useUi((s) => s.fitNonce);
+  const fitEpoch = useUi((s) => s.fitEpoch);
   const variantMode = useUi((s) => s.variantMode);
-  const fitSig = `${spatial}|${explodeContext}|${isolate}|${focusId}|${variantMode}|${fitNonce}`;
+  const fitSig = `${spatial}|${explodeContext}|${isolate}|${focusId}|${variantMode}|${fitEpoch}`;
 
   useEffect(() => {
     const w = worldRef.current;

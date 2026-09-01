@@ -34,6 +34,7 @@ interface Ui {
   hudCollapsed: boolean;
   agentTab: AgentTab;
   fitNonce: number;
+  fitEpoch: number;
   fitCenter: [number, number, number];
   fitRadius: number;
   variantMode: SceneSnapshot['variantMode'];
@@ -136,6 +137,7 @@ export const useUi = create<Ui>((set) => ({
   hudCollapsed: false,
   agentTab: 'CHAT',
   fitNonce: 0,
+  fitEpoch: 0,
   fitCenter: [0.4, 0.15, 0],
   fitRadius: 1.4,
   variantMode: 'NONE',
@@ -251,7 +253,7 @@ export const useUi = create<Ui>((set) => ({
       fitRadius,
       fitNonce: s.fitNonce + 1
     })),
-  bumpFit: () => set((s) => ({ fitNonce: s.fitNonce + 1 })),
+  bumpFit: () => set((s) => ({ fitEpoch: s.fitEpoch + 1 })),
   resetView: () =>
     set((s) => ({
       view: 'ASSEMBLED',
@@ -322,7 +324,7 @@ export const useUi = create<Ui>((set) => ({
     set((s) => {
       const prev = s.spatialHistory[s.spatialHistory.length - 1];
       if (!prev) return s;
-      return { ...fromSnap(prev), spatialHistory: s.spatialHistory.slice(0, -1), fitNonce: s.fitNonce + 1 };
+      return { ...fromSnap(prev), spatialHistory: s.spatialHistory.slice(0, -1), fitEpoch: s.fitEpoch + 1 };
     }),
   dispatch: (cmd) =>
     set((s) => {
@@ -349,7 +351,7 @@ export const useUi = create<Ui>((set) => ({
       return {
         ...fromSnap(next),
         spatialHistory: record ? [...s.spatialHistory, snap].slice(-16) : s.spatialHistory,
-        fitNonce: next.fitRequest !== 'none' ? s.fitNonce + 1 : s.fitNonce
+        fitEpoch: next.fitRequest !== 'none' ? s.fitEpoch + 1 : s.fitEpoch
       };
     })
 }));
