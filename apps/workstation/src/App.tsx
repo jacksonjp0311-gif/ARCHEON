@@ -1,7 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
-import { VIEW_MODES, TREE_TABS, DOCK_TABS, type ViewMode } from '@archeon/spatial-grammar';
-import { LOCAL_COMMANDS, type Part, type Requirement } from '@archeon/design-protocol';
+import { useEffect, useState } from 'react';
+import { VIEW_MODES, DOCK_TABS, WORKSTATION_MODES, type ViewMode, type WorkstationMode } from '@archeon/spatial-grammar';
+import { neighborhoodOf, type Part, type Requirement } from '@archeon/design-protocol';
+import type { SpreadPreset } from '@archeon/scene-engine';
 import { ArmScene } from './scene/ArmScene';
+import { AgentHud } from './components/AgentHud';
+import { Inspector } from './components/Inspector';
+import { ItemTracker } from './components/ItemTracker';
+import { Navigator } from './components/Navigator';
 import { getJson, postJson } from './api';
 import { useUi } from './store';
 import { ARCHEON_PRODUCT, ARCHEON_VERSION } from './version';
@@ -43,7 +48,7 @@ interface ProjectMeta {
 
 interface ChatOut {
   reply: string;
-  views?: { kind: string; factor?: number; id?: string; layer?: string; mode?: string }[];
+  views?: { kind: string; factor?: number; id?: string; layer?: string; mode?: string; enabled?: boolean; strategy?: string }[];
   notes?: string[];
   transaction?: { transaction_id: string };
 }
@@ -69,7 +74,9 @@ export default function App() {
   const selectedId = useUi((s) => s.selectedId);
   const view = useUi((s) => s.view);
   const explosion = useUi((s) => s.explosion);
-  const treeTab = useUi((s) => s.treeTab);
+  const spread = useUi((s) => s.spread);
+  const mode = useUi((s) => s.mode);
+  const overlay = useUi((s) => s.overlay);
   const dockTab = useUi((s) => s.dockTab);
   const connected = useUi((s) => s.connected);
 
@@ -110,18 +117,61 @@ export default function App() {
     return () => clearInterval(id);
   }, []);
 
-  function applyViews(views: ChatOut['views']) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') useUi.getState().clearSelection();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  function applyViews(views: ChatOut['views'], design: DesignDoc | null) {
     const ui = useUi.getState();
     for (const v of views || []) {
       if (v.kind === 'explode') {
         ui.setExplosion(v.factor ?? 0.7);
         ui.setView('EXPLODED');
+        if (v.strategy) ui.setStrategy(v.strategy as 'SEQUENCE' | 'RADIAL' | 'AXIAL' | 'SYSTEM' | 'BOM_FOCUS' | 'SERVICE' | 'GRAPH' | 'CUSTOM');
       }
       if (v.kind === 'isolate' && v.id) ui.setIsolate(v.id);
       if (v.kind === 'select' && v.id) ui.setSelected(v.id);
       if (v.kind === 'reset_view') ui.resetView();
       if (v.kind === 'set_mode' && v.mode) ui.setView(v.mode as ViewMode);
-      if (v.kind === 'show' && v.layer === 'interfaces') ui.setView('INTERFACES');
+      if (v.kind === 'show' && v.layer === 'interfaces') ui.setOverlay('INTERFACES');
+      if (v.kind === 'focus' && v.id) {
+        ui.setSelected(v.id);
+        ui.setFocusId(v.id);
+        ui.setGhostOthers(true);
+        ui.setHudOpen(true);
+      }
+      if (v.kind === 'ghost') ui.setGhostOthers(v.enabled !== false);
+      if (v.kind === 'clear_selection') ui.clearSelection();
+      if (v.kind === 'track' && v.id) ui.track(v.id);
+      if (v.kind === 'open_hud') ui.setHudOpen(true);
+      if (v.kind === 'explode_context') {
+        ui.setExplodeContext(v.id || ui.selectedId);
+        ui.setSpatial('PART_EXPLODED');
+        ui.setExplosion(v.factor ?? 0.85);
+      }
+      if (v.kind === 'neighborhood') {
+        const seed = v.id || ui.selectedId;
+        if (seed && design) {
+          const seeds = [seed, ...design.parts.filter((p) => p.parent === seed).map((p) => p.id)];
+          const ids = [...new Set(seeds.flatMap((s) => neighborhoodOf(s, design.ports, design.interfaces)))];
+          ui.setSelected(seed);
+          ui.setNeighborhood(ids);
+          ui.setOverlay('INTERFACES');
+          ui.setGhostOthers(true);
+        } else if (seed) {
+          ui.setSelected(seed);
+          ui.setOverlay('INTERFACES');
+        }
+      }
+      if (v.kind === 'weakest_assumption' && v.id) {
+        ui.setSelected(v.id);
+        ui.setOverlay('PROVENANCE');
+        ui.setHudOpen(true);
+      }
     }
   }
 
@@ -132,7 +182,7 @@ export default function App() {
     setMsg('');
     try {
       const out = await postJson<ChatOut>('/api/commands', { message: text });
-      applyViews(out.views);
+      applyViews(out.views, doc);
       setChat((c) => [...c, { who: 'ARCHEON', text: out.reply }]);
       if (out.notes?.length) setChat((c) => [...c, { who: 'NOTES', text: out.notes!.join('\n') }]);
       await refresh();
@@ -170,6 +220,7 @@ export default function App() {
     setBusy(true);
     try {
       await postJson('/api/projects/load', { id });
+      useUi.getState().clearProjectSelection();
       await refresh();
       setChat((c) => [...c, { who: 'SYSTEM', text: `Loaded project ${id}. CAD meshes attach from cad/ and generated/.` }]);
     } catch (e) {
@@ -206,31 +257,14 @@ export default function App() {
   }
 
   const selected = doc?.parts.find((p) => p.id === selectedId);
-  const treeItems = useMemo(() => {
-    if (!doc) return [];
-    switch (treeTab) {
-      case 'SYSTEM':
-        return doc.assemblies.filter((a) => !a.parent).map((a) => ({ id: a.id, name: a.name, role: a.semantic_role, prov: '' }));
-      case 'ASSEMBLY':
-        return doc.assemblies.map((a) => ({ id: a.id, name: a.name, role: a.semantic_role, prov: '' }));
-      case 'FEATURES':
-        return doc.features.map((f) => ({ id: f.id, name: f.id, role: `${f.kind} · ${f.part}`, prov: '' }));
-      case 'INTERFACES':
-        return doc.interfaces.map((i) => ({ id: i.id, name: i.name, role: i.semantic_role, prov: i.kind }));
-      case 'REQUIREMENTS':
-        return doc.requirements.map((r) => ({
-          id: r.id,
-          name: r.id,
-          role: r.satisfied === true ? 'DERIVED/OK' : r.satisfied === false ? 'FAIL' : 'UNVERIFIED',
-          prov: r.provenance.class
-        }));
-      default:
-        return doc.parts.map((p) => ({ id: p.id, name: p.name, role: p.semantic_role, prov: p.provenance.class }));
-    }
-  }, [doc, treeTab]);
-
   const reachMm = meta?.reach_m != null ? Math.round(meta.reach_m * 1000) : '—';
   const propReach = meta?.proposal?.reach_m != null ? Math.round(meta.proposal.reach_m * 1000) : null;
+  const proposalIds = [
+    ...(meta?.proposal?.transaction.requirements ?? []),
+    selectedId ?? ''
+  ].filter(Boolean);
+  const plan = chat.filter((c) => c.who === 'NOTES' || c.who === 'ARCHEON').slice(-6).map((c) => c.text);
+  const activity = (meta?.logs ?? []).slice(-12);
 
   return (
     <div className="app">
@@ -253,6 +287,11 @@ export default function App() {
           <div className="chip"><span>REVISION</span><b>{doc?.project.revision_id ?? '—'}</b></div>
           <div className="chip"><span>BRANCH</span><b>{doc?.project.branch ?? 'main'}</b></div>
           <div className="chip"><span>KERNEL</span><b className={cad?.build123d ? 'ok' : 'warn'}>{cad?.kernel ?? doc?.project.kernel ?? '—'}</b></div>
+          <div className="chip"><span>MODE</span>
+            <select className="project-select" value={mode} onChange={(e) => useUi.getState().setMode(e.target.value as WorkstationMode)}>
+              {WORKSTATION_MODES.map((m) => <option key={m}>{m}</option>)}
+            </select>
+          </div>
           <div className="chip"><span>AGENTS</span><b>11</b></div>
           <div className="chip"><span>VALIDATION</span><b className={(val?.error_count ?? 0) === 0 ? 'ok' : 'err'}>{(val?.error_count ?? '—') === 0 ? 'GRAPH OK' : `${val?.error_count} ERR`}</b></div>
           <div className="chip"><span>MEMORY</span><b>LOCAL</b></div>
@@ -263,12 +302,16 @@ export default function App() {
           <select value={view} onChange={(e) => useUi.getState().setView(e.target.value as ViewMode)}>
             {VIEW_MODES.map((m) => <option key={m}>{m}</option>)}
           </select>
+          <select value={spread} onChange={(e) => useUi.getState().setSpread(e.target.value as SpreadPreset)} title="Explosion spread">
+            {(['COMPACT', 'NORMAL', 'ENGINEERING', 'WIDE', 'EXTREME'] as SpreadPreset[]).map((s) => <option key={s}>{s}</option>)}
+          </select>
           <span>EXPLODE</span>
           <input type="range" min={0} max={1} step={0.01} value={explosion} onChange={(e) => {
             const n = Number(e.target.value);
             useUi.getState().setExplosion(n);
             if (n > 0 && view === 'ASSEMBLED') useUi.getState().setView('EXPLODED');
           }} />
+          <button type="button" className={overlay === 'EXPLODE_LINES' ? 'active' : ''} onClick={() => useUi.getState().setOverlay(overlay === 'EXPLODE_LINES' ? 'NONE' : 'EXPLODE_LINES')}>LINES</button>
           <label className="top-btn">
             IMPORT CAD
             <input type="file" hidden accept=".stl,.step,.stp,.glb,.gltf,.obj" onChange={(e) => {
@@ -284,33 +327,21 @@ export default function App() {
         </div>
       </header>
 
-      <aside className="tree">
-        <h2>DESIGN TREE</h2>
-        <div className="tabs">
-          {TREE_TABS.map((t) => (
-            <button key={t} className={treeTab === t ? 'active' : ''} onClick={() => useUi.getState().setTreeTab(t)}>{t}</button>
-          ))}
-        </div>
-        <div className="tree-body">
-          {treeItems.map((item) => (
-            <div
-              key={item.id}
-              className={`tree-item ${selectedId === item.id ? 'sel' : ''}`}
-              onClick={() => useUi.getState().setSelected(item.id)}
-            >
-              {item.name}
-              <span className="prov">{item.prov}</span>
-              <span className="role">{item.role}</span>
-            </div>
-          ))}
-        </div>
-      </aside>
+      {doc && (
+        <Navigator
+          parts={doc.parts}
+          assemblies={doc.assemblies}
+          features={doc.features}
+          interfaces={doc.interfaces}
+          requirements={doc.requirements}
+        />
+      )}
 
       <section className="viewport">
         <div className="hud">
           <div className="tag">SPATIAL PROJECTION · NOT MANUFACTURING CAD</div>
-          <h1>{selected?.name ?? 'ARCHEON ARM'}</h1>
-          <div>{selectedId} · {view}</div>
+          <h1>{selected?.name ?? 'NO SELECTION'}</h1>
+          <div>{selectedId ?? 'click empty space or Esc to deselect'} · {view} · {spread}</div>
           {selected?.spatial.cad && (
             <div className="cad-flag">{selected.spatial.cad.format.toUpperCase()} · {selected.spatial.cad.truth} · {selected.spatial.cad.note}</div>
           )}
@@ -319,42 +350,48 @@ export default function App() {
           <ArmScene
             parts={doc.parts}
             ports={doc.ports}
+            interfaces={doc.interfaces}
+            assemblies={doc.assemblies}
             proposalParts={preview?.parts ?? null}
           />
         )}
         <div className="legend">v{displayVersion} · hash {meta?.hash?.slice(0, 10) ?? '—'}</div>
+        <AgentHud
+          chat={chat}
+          msg={msg}
+          setMsg={setMsg}
+          busy={busy}
+          onSend={send}
+          proposal={meta?.proposal ?? null}
+          reachMm={reachMm}
+          propReach={propReach}
+          findings={val?.findings ?? []}
+          plan={plan}
+          activity={activity}
+          onApprove={() => void decide('commit')}
+          onReject={() => void decide('reject')}
+          onValidate={() => void send('validate proposal')}
+        />
       </section>
 
-      <aside className="agent">
-        <h2>AGENT CONSOLE</h2>
-        <div className="agent-body">
-          {meta?.proposal && (
-            <div className="proposal">
-              <h3>PROPOSAL · {meta.proposal.transaction.status}</h3>
-              <div>{meta.proposal.transaction.intent}</div>
-              <div className="notes">{meta.proposal.transaction.reason}</div>
-              <div>Affected req: {meta.proposal.transaction.requirements.join(', ') || '—'}</div>
-              {propReach != null && <div>Derived reach: {reachMm} → {propReach} mm (DERIVED, not measured)</div>}
-              <div className="row">
-                <button className="primary" onClick={() => decide('commit')}>APPROVE</button>
-                <button className="danger" onClick={() => decide('reject')}>REJECT</button>
-                <button onClick={() => send('validate proposal')}>VALIDATE</button>
-              </div>
-            </div>
-          )}
-          {chat.map((c, i) => (
-            <div className="log" key={i}><span className="who">{c.who}</span> {c.text}</div>
-          ))}
-        </div>
-        <div className="quick">
-          {LOCAL_COMMANDS.map((c) => (
-            <button key={c} onClick={() => send(c)}>{c}</button>
-          ))}
-        </div>
-        <form onSubmit={(e) => { e.preventDefault(); send(msg); }}>
-          <input value={msg} onChange={(e) => setMsg(e.target.value)} placeholder="engineering command…" />
-          <button className="primary" disabled={busy}>SEND</button>
-        </form>
+      <aside className="inspector-rail">
+        <ItemTracker
+          parts={doc?.parts ?? []}
+          assemblies={doc?.assemblies ?? []}
+          requirements={doc?.requirements ?? []}
+          proposalIds={proposalIds}
+        />
+        <Inspector
+          selectedId={selectedId}
+          part={selected}
+          assemblies={doc?.assemblies ?? []}
+          features={doc?.features ?? []}
+          interfaces={doc?.interfaces ?? []}
+          ports={doc?.ports ?? []}
+          requirements={doc?.requirements ?? []}
+          materials={doc?.materials ?? []}
+          revision={doc?.project.revision_id ?? 'rev.0001'}
+        />
       </aside>
 
       <footer className="dock">
@@ -376,6 +413,29 @@ export default function App() {
                 ))}
               </tbody>
             </table>
+          )}
+          {dockTab === 'MATES' && (
+            <table>
+              <thead><tr><th>INTERFACE</th><th>KIND</th><th>ROLE</th><th>A</th><th>B</th></tr></thead>
+              <tbody>
+                {doc?.interfaces.map((i) => (
+                  <tr key={i.id} onClick={() => useUi.getState().setSelected(i.id)}>
+                    <td>{i.name}</td><td>{i.kind}</td><td>{i.semantic_role}</td><td>{i.a}</td><td>{i.b}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {dockTab === 'ANALYSIS' && (
+            <div className="notes">
+              Reach DERIVED from link lengths: {reachMm} mm. Payload 3 kg is a requirement (UNVERIFIED). No FEA, no motion envelope, no interference Boolean in this build.
+              <div>
+                <button type="button" onClick={() => useUi.getState().setSectionOn(!useUi.getState().sectionOn)}>
+                  SECTION PLANE {useUi.getState().sectionOn ? 'ON' : 'OFF'}
+                </button>
+                <span> visualization only — does not modify CAD</span>
+              </div>
+            </div>
           )}
           {dockTab === 'FEATURE TREE' && (
             <table>

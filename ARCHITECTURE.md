@@ -1,6 +1,6 @@
 # ARCHEON architecture
 
-Version 0.1.0 — Phase 1 foundation.
+Version 0.2.0 — Spatial engineering workstation.
 
 > Geometry is only one projection of an engineered system.
 
@@ -59,7 +59,8 @@ Every committed transaction produces a revision. Provenance records who/why/whic
 ```text
 ┌─────────────────────────────────────────────┐
 │ Workstation (React / R3F)                   │
-│  spatial projection · HUD · agent console   │
+│  navigator · spatial view · inspector       │
+│  floating Agent HUD (not a permanent rail)  │
 └────────────────────┬────────────────────────┘
                      │ HTTP  /api
 ┌────────────────────▼────────────────────────┐
@@ -76,6 +77,20 @@ document   (bounded)  (graph)      (Python)
 ```
 
 Physics/CAD libraries never import UI types. The UI never writes DesignIR files.
+
+### v0.2 workstation surfaces
+
+```text
+LEFT   Engineering Navigator (system / assembly / parts / features / joints / interfaces / analysis / requirements)
+CENTER Spatial viewport (projection only)
+RIGHT  Item Tracker + CAD Inspector
+BOTTOM Feature / BOM / Mates / Analysis / Transactions / Validation / Timeline
+FLOAT  ARCHEON Agent HUD (morphing instrument — session UI state only)
+```
+
+Selection is nullable (`selectedId: string | null`) plus `hoveredId`, `trackedIds`, `recentIds`. Tracker is a watch list, not selection history. HUD geometry lives in `sessionStorage` key `archeon.agentHud.v1` and is never written to DesignIR.
+
+Explosion is a graph projection: `progress ∈ [0,1]` × spread preset (`COMPACT` … `EXTREME`) × hierarchy. Render transform = canonical origin + explosion + focus pull + proposal ghost. Identity is unchanged.
 
 ---
 

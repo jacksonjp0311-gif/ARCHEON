@@ -1,6 +1,7 @@
 //! Bounded agents. They propose transactions; they never write DesignIR themselves.
 use archeon_assembly::ExplosionStrategy;
 use archeon_design_ir::DesignDocument;
+use archeon_provenance::ProvenanceClass;
 use archeon_transactions::{Authority, DesignTransaction, Operation, TxError};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -101,6 +102,14 @@ pub enum ViewCommand {
     Show { layer: String },
     ResetView,
     SetMode { mode: String },
+    Focus { id: String },
+    Ghost { enabled: bool },
+    ClearSelection,
+    Track { id: String },
+    Neighborhood { id: String },
+    WeakestAssumption { id: String },
+    ExplodeContext { id: Option<String>, factor: f64 },
+    OpenHud,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -161,11 +170,78 @@ pub fn parse_command(text: &str, doc: &DesignDocument) -> Parsed {
     let mut tx: Option<DesignTransaction> = None;
     let mut action: Option<String> = None;
 
+    if lower.contains("clear selection") || lower == "deselect" {
+        views.push(ViewCommand::ClearSelection);
+        notes.push("Spatial Director: selection cleared. Tracker unchanged.".into());
+    }
+    if lower.contains("give me") || lower.contains("show me the") || lower.starts_with("get the") {
+        if let Some(id) = resolve_entity(&lower, doc) {
+            views.push(ViewCommand::Select { id: id.clone() });
+            views.push(ViewCommand::Focus { id: id.clone() });
+            views.push(ViewCommand::Ghost { enabled: true });
+            views.push(ViewCommand::OpenHud);
+            notes.push("Spatial Director: focus + ghost others. Inspector follows selection.".into());
+        }
+    }
+    if lower.contains("break it apart") || lower.contains("break apart") || lower.contains("explode this") {
+        let factor = extract_percent(&lower).unwrap_or(0.85);
+        views.push(ViewCommand::ExplodeContext { id: None, factor });
+        notes.push("Spatial Director: explode selected assembly context only.".into());
+    }
+    if lower.contains("what this connects") || lower.contains("what connects") || lower.contains("connected to") {
+        if let Some(id) = resolve_entity(&lower, doc) {
+            views.push(ViewCommand::Neighborhood { id });
+        } else {
+            views.push(ViewCommand::Neighborhood { id: String::new() });
+        }
+        views.push(ViewCommand::Show { layer: "interfaces".into() });
+        notes.push("Assembly Designer: highlight graph neighborhood.".into());
+    }
+    if lower.contains("weakest assumption") || lower.contains("unverified") {
+        let id = weakest_assumption(doc);
+        views.push(ViewCommand::WeakestAssumption { id: id.clone() });
+        views.push(ViewCommand::Select { id });
+        notes.push("Critic: highlighting an ASSUMED / UNVERIFIED entity. Not a ranking of physical risk.".into());
+    }
+    if lower.contains("track ") || lower.starts_with("track") {
+        let hits = resolve_all(&lower, doc);
+        if hits.is_empty() {
+            notes.push("Item Tracker: no resolvable entity in command.".into());
+        } else {
+            for id in hits {
+                views.push(ViewCommand::Track { id });
+            }
+            notes.push("Item Tracker: watch list updated. Deselect does not untrack.".into());
+        }
+    }
+    if lower.contains("larger bearing") || lower.contains("bigger bearing") {
+        if let Some(shaft) = doc.part("part.shoulder.shaft") {
+            if let archeon_design_ir::Primitive::Cylinder { radius, .. } = shaft.spatial.primitive {
+                let next = radius * 1.15;
+                let mut proposed = DesignTransaction::propose(
+                    "cad-designer",
+                    &format!("Larger bearing journal: radius {radius:.4} m → {next:.4} m"),
+                    "Catalog adapter is not connected. This is a geometric journal change, not a purchased PN.",
+                    vec![Operation::ChangeDimension {
+                        part: "part.shoulder.shaft".into(),
+                        field: "radius".into(),
+                        value: next,
+                    }],
+                );
+                proposed.requirements = vec!["req.bearings".into()];
+                proposed.confidence = 0.4;
+                tx = Some(proposed);
+                views.push(ViewCommand::SetMode { mode: "AGENT_PROPOSAL".into() });
+                views.push(ViewCommand::OpenHud);
+                notes.push("Components: proposed journal scale. Not a vendor bearing. DTP only.".into());
+            }
+        }
+    }
     if lower.contains("reset view") || lower == "reset" {
         views.push(ViewCommand::ResetView);
         notes.push("Spatial Director: reset camera / assembled.".into());
     }
-    if lower.contains("explode") {
+    if (lower.contains("explode") && !lower.contains("explode this")) && !lower.contains("break") {
         let factor = extract_percent(&lower).unwrap_or(0.7);
         views.push(ViewCommand::Explode {
             factor,
@@ -174,14 +250,14 @@ pub fn parse_command(text: &str, doc: &DesignDocument) -> Parsed {
         notes.push("Spatial Director: SEQUENCE explosion (reverse assembly order).".into());
     }
     if lower.contains("isolate") {
-        if let Some(id) = resolve_part(&lower, doc) {
+        if let Some(id) = resolve_entity(&lower, doc) {
             views.push(ViewCommand::Isolate { id: id.clone() });
             views.push(ViewCommand::Select { id });
             notes.push("Spatial Director: isolate semantic part.".into());
         }
     }
     if lower.contains("select") {
-        if let Some(id) = resolve_part(&lower, doc) {
+        if let Some(id) = resolve_entity(&lower, doc) {
             views.push(ViewCommand::Select { id });
         }
     }
@@ -284,24 +360,56 @@ fn extract_mm(s: &str) -> Option<f64> {
     None
 }
 
-fn resolve_part(s: &str, doc: &DesignDocument) -> Option<String> {
-    let aliases = [
-        ("upper arm", "part.upper_arm.tube"),
-        ("forearm", "part.forearm.tube"),
-        ("shoulder", "part.shoulder.housing"),
-        ("elbow", "part.elbow.housing"),
-        ("wrist", "part.wrist.housing"),
-        ("end effector", "part.ee.adapter"),
-        ("effector", "part.ee.adapter"),
-        ("base", "part.base.plate"),
-        ("column", "part.base.column"),
-    ];
-    for (k, id) in aliases {
-        if s.contains(k) {
-            return Some(id.into());
+fn weakest_assumption(doc: &DesignDocument) -> String {
+    if let Some(r) = doc.requirements.iter().find(|r| {
+        matches!(r.provenance.class, ProvenanceClass::Assumed | ProvenanceClass::Unverified)
+    }) {
+        return r.id.0.clone();
+    }
+    doc.parts
+        .iter()
+        .find(|p| matches!(p.provenance.class, ProvenanceClass::Assumed | ProvenanceClass::Unverified))
+        .map(|p| p.id.0.clone())
+        .unwrap_or_else(|| "part.shoulder.shaft".into())
+}
+
+const ENTITY_ALIASES: &[(&str, &str)] = &[
+    ("upper arm", "asm.upper_arm"),
+    ("end effector", "part.ee.adapter"),
+    ("forearm", "asm.forearm"),
+    ("bearing", "part.shoulder.shaft"),
+    ("shoulder", "asm.shoulder"),
+    ("elbow", "asm.elbow"),
+    ("wrist", "asm.wrist"),
+    ("effector", "part.ee.adapter"),
+    ("column", "part.base.column"),
+    ("base", "asm.base"),
+];
+
+fn resolve_entity(s: &str, doc: &DesignDocument) -> Option<String> {
+    resolve_all(s, doc).into_iter().next()
+}
+
+fn resolve_all(s: &str, doc: &DesignDocument) -> Vec<String> {
+    let mut hits = Vec::new();
+    for (k, id) in ENTITY_ALIASES {
+        if s.contains(k) && !hits.iter().any(|h| h == id) {
+            hits.push((*id).to_string());
         }
     }
-    doc.parts.iter().find(|p| s.contains(&p.name.to_lowercase())).map(|p| p.id.0.clone())
+    for p in &doc.parts {
+        let name = p.name.to_lowercase();
+        if !name.is_empty() && s.contains(&name) && !hits.iter().any(|h| h == &p.id.0) {
+            hits.push(p.id.0.clone());
+        }
+    }
+    for a in &doc.assemblies {
+        let name = a.name.to_lowercase();
+        if !name.is_empty() && s.contains(&name) && !hits.iter().any(|h| h == &a.id.0) {
+            hits.push(a.id.0.clone());
+        }
+    }
+    hits
 }
 
 pub fn critic_notes(doc: &DesignDocument) -> Vec<String> {
@@ -389,5 +497,40 @@ mod tests {
     fn local_parser_explode() {
         let p = parse_command("explode assembly", &doc());
         assert!(matches!(p.views.first(), Some(ViewCommand::Explode { .. })));
+    }
+
+    #[test]
+    fn local_parser_clears_selection() {
+        let p = parse_command("clear selection", &doc());
+        assert!(p.views.iter().any(|v| matches!(v, ViewCommand::ClearSelection)));
+    }
+
+    #[test]
+    fn local_parser_focuses_shoulder_assembly() {
+        let p = parse_command("give me the shoulder", &doc());
+        assert!(p.views.iter().any(|v| matches!(v, ViewCommand::Select { id } if id == "asm.shoulder")));
+        assert!(p.views.iter().any(|v| matches!(v, ViewCommand::Focus { .. })));
+        assert!(p.views.iter().any(|v| matches!(v, ViewCommand::OpenHud)));
+    }
+
+    #[test]
+    fn local_parser_tracks_multiple() {
+        let p = parse_command("track the bearing and the upper arm", &doc());
+        let tracks: Vec<_> = p
+            .views
+            .iter()
+            .filter_map(|v| match v {
+                ViewCommand::Track { id } => Some(id.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert!(tracks.contains(&"part.shoulder.shaft"));
+        assert!(tracks.contains(&"asm.upper_arm"));
+    }
+
+    #[test]
+    fn local_parser_break_apart_is_context_explode() {
+        let p = parse_command("break it apart", &doc());
+        assert!(p.views.iter().any(|v| matches!(v, ViewCommand::ExplodeContext { .. })));
     }
 }

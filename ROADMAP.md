@@ -11,7 +11,16 @@ Status language: **shipped**, **partial**, **not started**. Nothing here is a cl
 - Agent cards and authority
 - Adapter boundaries (CAD, AI, memory)
 
-## Phase 1 — Semantic assembly + spatial workstation — this release
+## Phase 1 — Semantic assembly + spatial workstation — shipped
+
+## Phase 1.1 / v0.2 — Spatial engineering workstation — this tree
+
+- Floating morphing Agent HUD (not a permanent right rail)
+- Selection nullability + Item Tracker + CAD Inspector
+- Explosion v2 with spread presets and hierarchical SYSTEM explode
+- Auto camera framing, explode lines, PBR/shadows
+- Composed SpatialView / RenderStyle / Overlay
+- Contextual agent commands (`give me the shoulder`, `break it apart`, …)
 
 - ARCHEON Arm example project
 - Workstation shell (tree, viewport, agent console, bottom workspace)

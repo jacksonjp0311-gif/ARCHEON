@@ -7,6 +7,7 @@ description = "Bounded agent SDK, tool registry, and orchestration"
 
 [dependencies]
 archeon-design-ir = { workspace = true }
+archeon-provenance = { workspace = true }
 archeon-transactions = { workspace = true }
 archeon-validation = { workspace = true }
 archeon-assembly = { workspace = true }

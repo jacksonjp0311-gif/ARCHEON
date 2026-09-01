@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.1.0-38d7ff?style=for-the-badge&labelColor=050b12" alt="0.1.0" />
+  <img src="https://img.shields.io/badge/version-0.2.0-38d7ff?style=for-the-badge&labelColor=050b12" alt="0.2.0" />
   <img src="https://img.shields.io/badge/license-MIT-ff981b?style=for-the-badge&labelColor=050b12" alt="MIT" />
   <img src="https://img.shields.io/badge/kernel-DesignIR-6ce391?style=for-the-badge&labelColor=050b12" alt="DesignIR" />
   <img src="https://img.shields.io/badge/CAD-STEP%20%2B%20STL-8ec8de?style=for-the-badge&labelColor=050b12" alt="CAD" />
@@ -33,7 +33,7 @@ off-the-shelf bearings, and a parts budget below $2,000.
 
 …and get a semantic assembly, interfaces, parametric features, exact solids, critique, visual diffs, and a human commit gate.
 
-This repository is **Phase 1**: a working Windows workstation, Design Transaction Protocol, local agents, CAD import, and the ARCHEON Arm example. It does **not** claim a production robot, FEA, or autonomous CAD.
+This repository is **v0.2 / Phase 1.1**: a spatial engineering workstation (navigator, viewport, inspector, item tracker, floating Agent HUD), Design Transaction Protocol, local agents, CAD import, and the ARCHEON Arm example. It does **not** claim a production robot, FEA, or autonomous CAD.
 
 ---
 
@@ -100,7 +100,8 @@ Agents refer to **semantic topology** (`Part: ShoulderHousing / Feature: Bearing
 | Capability | Status |
 |---|---|
 | Semantic six-axis arm (DesignIR JSON) | Live |
-| 3D workstation (explode, isolate, interfaces, provenance) | Live |
+| Spatial workstation (navigator, inspector, tracker, explode v2) | Live |
+| Floating morphing Agent HUD | Live |
 | Design Transaction Protocol + human COMMIT | Live |
 | Local agent commands (no API key required) | Live |
 | Project load (`projects/<name>/`) | Live |
@@ -128,29 +129,33 @@ The HUD labels CAD files with `SOURCE` / `GENERATED` and a note. ARCHEON will no
 
 Windows-first. Ice-blue structure, cybernetic orange for selection / proposals, square HUD.
 
-**Top bar:** project · revision · kernel · validation · explode · **IMPORT CAD** · **REGEN CAD** · HARD RESET  
+**Top bar:** project · revision · kernel · mode · validation · explode spread · **IMPORT CAD** · **REGEN CAD** · HARD RESET  
 
-**Left:** design tree (system / assembly / parts / features / interfaces / requirements)  
+**Left:** Engineering Navigator (system / assembly / parts / features / joints / interfaces / analysis / requirements)  
 
-**Center:** spatial viewport — parametric solids, imported meshes, explosion, isolate, x-ray, interface markers  
+**Center:** spatial viewport — PBR solids, imported meshes, hierarchical explosion, isolate, x-ray, explode lines, interface markers  
 
-**Right:** agent console (deterministic commands, proposals, APPROVE / REJECT)  
+**Right:** Item Tracker + CAD Inspector (not the agent). Selection is nullable; deselect with empty click, Escape, or inspector ×.  
 
-**Bottom:** BOM · feature tree · transactions · validation · timeline · console  
+**Bottom:** Feature tree · BOM · Mates · Analysis · Transactions · Validation · Timeline  
+
+**Floating:** ARCHEON Agent HUD — `[◈ AGENT]` morphs into a draggable / resizable instrument (session UI state only; never DesignIR).
 
 Local commands (no key):
 
 ```text
+give me the shoulder
+break it apart
+show interfaces
+show me what this connects to
+where is the weakest assumption
+try a larger bearing
+clear selection
 explode assembly
 isolate shoulder
-show interfaces
-show requirements
-select base
-reset view
 increase upper arm length by 25 mm
 validate proposal
 commit proposal
-reject proposal
 ```
 
 ---
@@ -167,7 +172,7 @@ cd ARCHEON
 
 That is the **icon compiler** (HELIX-style):
 
-1. Bump `DEV_BUILD` so the UI shows `0.1.0+dev.N`  
+1. Bump `DEV_BUILD` so the UI shows `0.2.0+dev.N`  
 2. Compile the workstation if source is newer  
 3. Rebuild `archeon.exe` only if Rust / canon changed  
 4. Publish `%LOCALAPPDATA%\ARCHEON\ui`  

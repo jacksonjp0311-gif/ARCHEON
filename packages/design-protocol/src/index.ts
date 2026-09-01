@@ -73,14 +73,36 @@ export interface Requirement {
 }
 
 export const LOCAL_COMMANDS = [
+  'give me the shoulder',
+  'break it apart',
+  'show interfaces',
+  'show me what this connects to',
+  'where is the weakest assumption',
+  'try a larger bearing',
+  'clear selection',
   'explode assembly',
   'isolate shoulder',
-  'show interfaces',
-  'show requirements',
-  'select base',
-  'reset view',
   'increase upper arm length by 25 mm',
   'validate proposal',
-  'commit proposal',
-  'reject proposal'
+  'commit proposal'
 ];
+
+export function neighborhoodOf(
+  id: string,
+  ports: { id: string; host: string }[],
+  interfaces: { id: string; a: string; b: string }[]
+): string[] {
+  const portIds = new Set(ports.filter((p) => p.host === id || p.id === id).map((p) => p.id));
+  const out = new Set<string>();
+  for (const iface of interfaces) {
+    const aHost = ports.find((p) => p.id === iface.a)?.host;
+    const bHost = ports.find((p) => p.id === iface.b)?.host;
+    if (portIds.has(iface.a) || portIds.has(iface.b) || aHost === id || bHost === id || iface.id === id) {
+      out.add(iface.id);
+      if (aHost) out.add(aHost);
+      if (bHost) out.add(bHost);
+    }
+  }
+  out.delete(id);
+  return [...out];
+}
