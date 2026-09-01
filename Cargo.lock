@@ -22,7 +22,7 @@ dependencies = [
 
 [[package]]
 name = "archeon-agents"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "archeon-assembly",
  "archeon-design-ir",
@@ -39,7 +39,7 @@ dependencies = [
 
 [[package]]
 name = "archeon-api"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "archeon-agents",
  "archeon-assembly",
@@ -64,7 +64,7 @@ dependencies = [
 
 [[package]]
 name = "archeon-assembly"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "archeon-design-ir",
  "archeon-provenance",
@@ -74,7 +74,7 @@ dependencies = [
 
 [[package]]
 name = "archeon-design-ir"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "archeon-provenance",
  "hex",
@@ -86,7 +86,7 @@ dependencies = [
 
 [[package]]
 name = "archeon-live"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "archeon-design-ir",
  "archeon-provenance",
@@ -101,7 +101,7 @@ dependencies = [
 
 [[package]]
 name = "archeon-provenance"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "serde",
  "serde_json",
@@ -109,7 +109,7 @@ dependencies = [
 
 [[package]]
 name = "archeon-transactions"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "archeon-design-ir",
  "archeon-provenance",
@@ -122,7 +122,7 @@ dependencies = [
 
 [[package]]
 name = "archeon-validation"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "archeon-design-ir",
  "archeon-provenance",

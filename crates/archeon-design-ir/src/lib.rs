@@ -23,6 +23,29 @@ mod tests {
     use archeon_provenance::Provenance;
 
     #[test]
+    fn cad_ref_defaults_are_cad_local_meters() {
+        let json = r#"{"format":"stl","path":"generated/a.stl","truth":"GENERATED","note":""}"#;
+        let c: CadRef = serde_json::from_str(json).unwrap();
+        assert_eq!(c.coordinate_frame, "CAD_LOCAL");
+        assert_eq!(c.units, "m");
+        assert_eq!(c.local_origin, [0.0, 0.0, 0.0]);
+        assert!(c.geometry_revision.is_empty());
+        assert!(c.source.is_empty());
+        let attached = CadRef::attached(
+            "stl",
+            "generated/a.stl",
+            Some("generated/a.stl".into()),
+            "GENERATED",
+            "note",
+            "GENERATED",
+        );
+        assert_eq!(attached.coordinate_frame, "CAD_LOCAL");
+        assert_eq!(attached.local_origin, [0.0, 0.0, 0.0]);
+        assert_eq!(attached.units, "m");
+        assert_eq!(attached.source, "GENERATED");
+    }
+
+    #[test]
     fn roundtrip_minimal_document() {
         let doc = DesignDocument {
             schema_version: SCHEMA_VERSION.into(),

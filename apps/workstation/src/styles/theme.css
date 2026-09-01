@@ -140,6 +140,27 @@ button.danger { border-color: var(--fault); color: var(--fault); }
 .health-chip { letter-spacing: 0.12em; }
 .health-chip.ok { border-color: var(--green); color: var(--green); }
 .health-chip.warn { border-color: var(--amber); color: var(--amber); }
+.health-body { padding: 8px 10px; }
+.health-body p { margin: 4px 0; color: var(--text-muted); }
+.health-diag { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 8px; }
+.health-diag h3 {
+  margin: 0 0 6px;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--action-primary);
+  font-weight: 500;
+}
+.health-diag p { margin: 2px 0; font-size: 10px; }
+.debug-toggles { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.debug-toggles button {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+}
+.debug-toggles button.on { border-color: var(--action-primary); color: var(--action-primary); }
 .meta--slim { flex: 0 0 auto; }
 .crumbs { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; pointer-events: auto; }
 .crumbs button { border: 0; background: transparent; padding: 0 2px; color: var(--ice-2); }

@@ -942,13 +942,14 @@ async fn cad_import(
     let mut doc = st.0.doc.lock().unwrap();
     let part_id = if let Some(existing) = attach_to {
         if let Some(part) = doc.part_mut(&existing) {
-            part.spatial.cad = Some(archeon_design_ir::CadRef {
-                format: format.into(),
-                path: rel.clone(),
-                preview: preview.clone(),
-                truth: "SOURCE".into(),
-                note: "Imported CAD attached to existing semantic part.".into(),
-            });
+            part.spatial.cad = Some(archeon_design_ir::CadRef::attached(
+                format,
+                rel.clone(),
+                preview.clone(),
+                "SOURCE",
+                "Imported CAD attached to existing semantic part. Frame CAD_LOCAL, units m.",
+                "SOURCE",
+            ));
             if let Some([sx, sy, sz]) = bbox {
                 if let archeon_design_ir::Primitive::Box {
                     sx: psx,

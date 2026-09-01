@@ -13,6 +13,14 @@ Status language: **shipped**, **partial**, **not started**. Nothing here is a cl
 
 ## Phase 1 — Semantic assembly + spatial workstation — shipped
 
+## Phase 1.4.3 / v0.5.3 — Render integrity — this tree
+
+- Stray 1 m gray lines were drei `<Edges>` placeholders on `<group>` parents
+- Technical edges sanitized; STL loader does not `geom.center()`
+- CAD mesh metadata: CAD_LOCAL frame, local origin, units, revision, source
+- `getRenderedEntityBounds()` is the fit/selection/explode bounds source
+- SYSTEM HEALTH render diagnostics (not viewport chrome)
+
 ## Phase 1.4.2 / v0.5.2 — Spatial overlay discipline — this tree
 
 - Independent overlay flags (trails ≠ exploded mode)

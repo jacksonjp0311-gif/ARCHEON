@@ -6,6 +6,47 @@ import { applyClose, applyOpen, applyPin, emptyHuds, inspectorAfterSelection, sa
 
 export type DisplayState = 'VISIBLE' | 'HIDDEN' | 'GHOSTED' | 'ISOLATED';
 
+export interface RenderDebug {
+  edges: boolean;
+  grid: boolean;
+  trails: boolean;
+  interfaces: boolean;
+  datums: boolean;
+  cadMeshes: boolean;
+  primitives: boolean;
+  shadows: boolean;
+}
+
+export const DEFAULT_RENDER_DEBUG: RenderDebug = {
+  edges: true,
+  grid: true,
+  trails: true,
+  interfaces: true,
+  datums: true,
+  cadMeshes: true,
+  primitives: true,
+  shadows: true
+};
+
+export interface MeshLocalBounds {
+  min: [number, number, number];
+  max: [number, number, number];
+  triangles: number;
+}
+
+export interface RenderStats {
+  visibleParts: number;
+  cadMeshes: number;
+  primitiveFallbacks: number;
+  triangles: number;
+  drawCalls: number;
+  edgesEnabled: boolean;
+  sceneSize: [number, number, number];
+  largestId: string | null;
+  largestSize: [number, number, number];
+  geomRev: number;
+}
+
 interface Ui {
   selectedId: string | null;
   hoveredId: string | null;
@@ -56,6 +97,9 @@ interface Ui {
   trackerExpanded: boolean;
   contextMenu: { x: number; y: number; id: string } | null;
   radialOpen: boolean;
+  renderDebug: RenderDebug;
+  meshBounds: Record<string, MeshLocalBounds>;
+  renderStats: RenderStats;
   setSelected: (id: string | null) => void;
   toggleSelected: (id: string) => void;
   setHovered: (id: string | null) => void;
@@ -108,6 +152,9 @@ interface Ui {
   setTrackerExpanded: (v: boolean) => void;
   setContextMenu: (m: { x: number; y: number; id: string } | null) => void;
   setRadialOpen: (v: boolean) => void;
+  toggleRenderDebug: (k: keyof RenderDebug) => void;
+  setMeshBounds: (id: string, b: MeshLocalBounds) => void;
+  setRenderStats: (s: RenderStats) => void;
 }
 
 function pushRecent(recent: string[], id: string): string[] {
@@ -164,6 +211,20 @@ export const useUi = create<Ui>((set) => ({
   trackerExpanded: false,
   contextMenu: null,
   radialOpen: false,
+  renderDebug: DEFAULT_RENDER_DEBUG,
+  meshBounds: {},
+  renderStats: {
+    visibleParts: 0,
+    cadMeshes: 0,
+    primitiveFallbacks: 0,
+    triangles: 0,
+    drawCalls: 0,
+    edgesEnabled: true,
+    sceneSize: [0, 0, 0],
+    largestId: null,
+    largestSize: [0, 0, 0],
+    geomRev: 0
+  },
   setSelected: (selectedId) =>
     set((s) => {
       const huds = inspectorAfterSelection(s.huds, selectedId);
@@ -318,7 +379,7 @@ export const useUi = create<Ui>((set) => ({
     }),
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
   setInspectSection: (inspectSection) => set({ inspectSection }),
-  setGeomRev: (geomRev) => set({ geomRev }),
+  setGeomRev: (geomRev) => set({ geomRev, meshBounds: {} }),
   setAgentWorking: (agentWorking) => set({ agentWorking }),
   setCadStatus: (cadStatus) => set({ cadStatus }),
   setActiveVariant: (activeVariant) => set({ activeVariant }),
@@ -352,6 +413,9 @@ export const useUi = create<Ui>((set) => ({
   setTrackerExpanded: (trackerExpanded) => set({ trackerExpanded }),
   setContextMenu: (contextMenu) => set({ contextMenu, radialOpen: false }),
   setRadialOpen: (radialOpen) => set({ radialOpen, contextMenu: null }),
+  toggleRenderDebug: (k) => set((s) => ({ renderDebug: { ...s.renderDebug, [k]: !s.renderDebug[k] } })),
+  setMeshBounds: (id, b) => set((s) => ({ meshBounds: { ...s.meshBounds, [id]: b } })),
+  setRenderStats: (renderStats) => set({ renderStats }),
   spatialUndo: () =>
     set((s) => {
       const prev = s.spatialHistory[s.spatialHistory.length - 1];

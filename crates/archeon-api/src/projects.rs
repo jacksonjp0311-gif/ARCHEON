@@ -82,45 +82,50 @@ pub fn attach_cad_files(doc: &mut DesignDocument, dir: &Path) {
         let cad_glb = dir.join("cad").join(format!("{stem}.glb"));
 
         if gen_step.is_file() {
-            part.spatial.cad = Some(CadRef {
-                format: "step".into(),
-                path: format!("generated/{stem}.step"),
-                preview: gen_stl.is_file().then(|| format!("generated/{stem}.stl")),
-                truth: "GENERATED".into(),
-                note: "Kernel STEP. Spatial view uses STL tessellation if present.".into(),
-            });
+            part.spatial.cad = Some(CadRef::attached(
+                "step",
+                format!("generated/{stem}.step"),
+                gen_stl.is_file().then(|| format!("generated/{stem}.stl")),
+                "GENERATED",
+                "Kernel STEP. Spatial view uses STL tessellation if present. Frame CAD_LOCAL, units m.",
+                "GENERATED",
+            ));
         } else if cad_step.is_file() {
-            part.spatial.cad = Some(CadRef {
-                format: "step".into(),
-                path: format!("cad/{stem}.step"),
-                preview: cad_stl.is_file().then(|| format!("cad/{stem}.stl")),
-                truth: "SOURCE".into(),
-                note: "Imported STEP. Exact file is stored; preview may be tessellated.".into(),
-            });
+            part.spatial.cad = Some(CadRef::attached(
+                "step",
+                format!("cad/{stem}.step"),
+                cad_stl.is_file().then(|| format!("cad/{stem}.stl")),
+                "SOURCE",
+                "Imported STEP. Exact file is stored; preview may be tessellated. Frame CAD_LOCAL unless noted.",
+                "SOURCE",
+            ));
         } else if cad_glb.is_file() {
-            part.spatial.cad = Some(CadRef {
-                format: "glb".into(),
-                path: format!("cad/{stem}.glb"),
-                preview: None,
-                truth: "SOURCE".into(),
-                note: "Imported glTF. Visualization only — not BREP.".into(),
-            });
+            part.spatial.cad = Some(CadRef::attached(
+                "glb",
+                format!("cad/{stem}.glb"),
+                None,
+                "SOURCE",
+                "Imported glTF. Visualization only — not BREP.",
+                "SOURCE",
+            ));
         } else if cad_stl.is_file() {
-            part.spatial.cad = Some(CadRef {
-                format: "stl".into(),
-                path: format!("cad/{stem}.stl"),
-                preview: Some(format!("cad/{stem}.stl")),
-                truth: "SOURCE".into(),
-                note: "Imported STL tessellation. Not exact CAD.".into(),
-            });
+            part.spatial.cad = Some(CadRef::attached(
+                "stl",
+                format!("cad/{stem}.stl"),
+                Some(format!("cad/{stem}.stl")),
+                "SOURCE",
+                "Imported STL tessellation. Not exact CAD. Frame CAD_LOCAL, units m.",
+                "SOURCE",
+            ));
         } else if gen_stl.is_file() {
-            part.spatial.cad = Some(CadRef {
-                format: "stl".into(),
-                path: format!("generated/{stem}.stl"),
-                preview: Some(format!("generated/{stem}.stl")),
-                truth: "GENERATED".into(),
-                note: "Kernel STL tessellation of the DesignIR primitive.".into(),
-            });
+            part.spatial.cad = Some(CadRef::attached(
+                "stl",
+                format!("generated/{stem}.stl"),
+                Some(format!("generated/{stem}.stl")),
+                "GENERATED",
+                "Kernel STL tessellation. Frame CAD_LOCAL, units m. Viewer must not recenter.",
+                "GENERATED",
+            ));
         }
     }
 }
@@ -211,18 +216,18 @@ pub fn create_imported_part(
             radial_group: Some("import".into()),
             parent_axis: None,
             service_path: vec![],
-            cad: Some(CadRef {
-                format: format.into(),
-                path: rel_path.into(),
+            cad: Some(CadRef::attached(
+                format,
+                rel_path,
                 preview,
-                truth: "SOURCE".into(),
-                note: if format == "step" || format == "stp" {
+                "SOURCE",
+                if format == "step" || format == "stp" {
                     "Imported STEP stored as exact CAD. Spatial mesh is tessellation if present."
-                        .into()
                 } else {
-                    "Imported mesh. Visualization only — not a BREP kernel solid.".into()
+                    "Imported mesh. Visualization only — not a BREP kernel solid."
                 },
-            }),
+                "SOURCE",
+            )),
         },
         provenance: {
             let mut p = Provenance::generated("operator", "CAD import");

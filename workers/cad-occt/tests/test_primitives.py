@@ -33,6 +33,26 @@ def test_stl_has_facets(tmp_path: Path):
     assert text.count("facet normal") == 12
 
 
+def test_box_stl_is_cad_local_not_recentered(tmp_path: Path):
+    p = tmp_path / "box.stl"
+    write_box_stl(str(p), 0.2, 0.1, 0.05)
+    xs, ys, zs = [], [], []
+    for line in p.read_text(encoding="ascii").splitlines():
+        parts = line.split()
+        if len(parts) == 4 and parts[0] == "vertex":
+            x, y, z = float(parts[1]), float(parts[2]), float(parts[3])
+            xs.append(x)
+            ys.append(y)
+            zs.append(z)
+    assert xs and ys and zs
+    assert min(xs) == -0.1 and max(xs) == 0.1
+    assert min(ys) == -0.05 and max(ys) == 0.05
+    assert min(zs) == -0.025 and max(zs) == 0.025
+    assert abs((min(xs) + max(xs)) / 2) < 1e-12
+    assert abs((min(ys) + max(ys)) / 2) < 1e-12
+    assert abs((min(zs) + max(zs)) / 2) < 1e-12
+
+
 def test_tube_step_is_brep(tmp_path: Path):
     from archeon_cad.step_writer import write_tube_step
 

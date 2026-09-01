@@ -1,5 +1,6 @@
 import { useUi } from '../store';
-import type { Part, Requirement } from '@archeon/design-protocol';
+import { geometryDisplay, type Part, type Requirement } from '@archeon/design-protocol';
+import { geometryMode } from '@archeon/scene-engine';
 
 interface Assembly {
   id: string;
@@ -60,6 +61,7 @@ export function Inspector({
   const track = useUi((s) => s.track);
   const inspectOpen = useUi((s) => s.inspectOpen);
   const toggleInspect = useUi((s) => s.toggleInspect);
+  const debug = useUi((s) => s.renderDebug);
 
   const assembly = assemblies.find((a) => a.id === selectedId);
   const requirement = requirements.find((r) => r.id === selectedId);
@@ -195,12 +197,20 @@ export function Inspector({
           {inspectOpen[key] && key === 'GEOMETRY' && (
             <>
               <Field k="PN / ID" v={part.id} />
+              <Field
+                k="DISPLAY"
+                v={geometryDisplay(part.spatial.cad, geometryMode(!!(part.spatial.cad?.preview || part.spatial.cad?.path), debug))}
+                note="CAD and primitive are exclusive — never both"
+              />
+              <Field k="CAD FRAME" v={part.spatial.cad?.coordinate_frame ?? 'CAD_LOCAL'} note="viewer does not recenter meshes" />
+              <Field k="CAD UNITS" v={part.spatial.cad?.units ?? 'm'} />
               <Field k="BBOX" v={bbox} note="DERIVED from DesignIR primitive — not BREP" />
               <Field k="VOLUME" v={`${volume.toExponential(3)} m³`} note="DERIVED from primitive envelope" />
               <Field k="MASS" v={mass != null ? `${mass.toFixed(3)} kg` : 'NOT COMPUTED'} note={mass != null ? 'HEURISTIC · density × primitive volume' : 'no density'} />
               <Field k="CENTER OF MASS" v="NOT COMPUTED" />
               <Field k="CAD FORMAT" v={part.spatial.cad?.format?.toUpperCase() ?? 'PRIMITIVE'} />
               <Field k="CAD TRUTH" v={part.spatial.cad?.truth ?? 'GENERATED'} />
+              <Field k="CAD SOURCE" v={part.spatial.cad?.source ?? '—'} />
             </>
           )}
           {inspectOpen[key] && key === 'CONNECTIONS' && (

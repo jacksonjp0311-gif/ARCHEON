@@ -107,6 +107,49 @@ pub struct CadRef {
     pub truth: String,
     #[serde(default)]
     pub note: String,
+    /// Mesh is authored in this frame. CAD_LOCAL = origin at the solid's local origin (not recentered in the viewer).
+    #[serde(default = "cad_local_frame")]
+    pub coordinate_frame: String,
+    #[serde(default)]
+    pub local_origin: [f64; 3],
+    #[serde(default = "meters_unit")]
+    pub units: String,
+    #[serde(default)]
+    pub geometry_revision: String,
+    /// GENERATED kernel | SOURCE import. Distinct from `truth` which is the file class.
+    #[serde(default)]
+    pub source: String,
+}
+
+fn cad_local_frame() -> String {
+    "CAD_LOCAL".into()
+}
+fn meters_unit() -> String {
+    "m".into()
+}
+
+impl CadRef {
+    pub fn attached(
+        format: impl Into<String>,
+        path: impl Into<String>,
+        preview: Option<String>,
+        truth: impl Into<String>,
+        note: impl Into<String>,
+        source: impl Into<String>,
+    ) -> Self {
+        Self {
+            format: format.into(),
+            path: path.into(),
+            preview,
+            truth: truth.into(),
+            note: note.into(),
+            coordinate_frame: cad_local_frame(),
+            local_origin: [0.0, 0.0, 0.0],
+            units: meters_unit(),
+            geometry_revision: String::new(),
+            source: source.into(),
+        }
+    }
 }
 
 fn one() -> u32 {

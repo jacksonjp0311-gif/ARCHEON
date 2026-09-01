@@ -31,6 +31,28 @@ export interface CadRef {
   preview?: string | null;
   truth: string;
   note: string;
+  /** Mesh vertices live in this frame. CAD_LOCAL = solid local origin, not viewer-recentered. */
+  coordinate_frame?: string;
+  local_origin?: [number, number, number];
+  units?: string;
+  geometry_revision?: string;
+  source?: string;
+}
+
+export type GeometryDisplay =
+  | 'EXACT CAD TESSELLATION'
+  | 'GENERATED MESH'
+  | 'DESIGNIR PRIMITIVE FALLBACK';
+
+/** What the viewport should claim for a part. Drawn mode wins over metadata. */
+export function geometryDisplay(
+  cad: CadRef | null | undefined,
+  drawn: 'cad' | 'primitive' | 'hidden' = 'cad'
+): GeometryDisplay {
+  if (drawn !== 'cad' || !cad) return 'DESIGNIR PRIMITIVE FALLBACK';
+  const src = (cad.source || cad.truth || '').toUpperCase();
+  if (src === 'GENERATED') return 'GENERATED MESH';
+  return 'EXACT CAD TESSELLATION';
 }
 
 export interface Spatial {

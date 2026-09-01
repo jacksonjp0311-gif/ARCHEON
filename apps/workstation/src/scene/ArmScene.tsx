@@ -1,22 +1,26 @@
-import { Suspense, useEffect, useMemo, useRef } from 'react';
+import { Suspense, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber';
-import { ContactShadows, Edges, Environment, Grid, Html, Line, OrbitControls } from '@react-three/drei';
+import { ContactShadows, Environment, Grid, Html, Line, OrbitControls } from '@react-three/drei';
 import { STLLoader } from 'three-stdlib';
 import * as THREE from 'three';
 import {
   fitDistanceForAabb,
-  focusOffset,
-  getEntityWorldBounds,
-  getFinalRenderTransform,
+  geometryMode,
+  getRenderedEntityBounds,
   getScopeBounds,
   hierarchicalOffsets,
+  overlayVisible,
   partsInScope,
-  primitiveSize,
+  focusOffset,
+  getFinalRenderTransform,
   resolveFitIntent,
+  sanitizeEdgeSegments,
+  validateAabb,
   worldPortFromLocal
 } from '@archeon/scene-engine';
 import { useUi } from '../store';
 import { localInterfaceGraph, type Part } from '@archeon/design-protocol';
+import type { RenderDebug } from '../store';
 
 const GOLD = '#D6A33A';
 const GOLD_HI = '#F0C45C';
@@ -131,14 +135,82 @@ function meshUrl(part: Part): string | null {
   return `/api/media/${rel.split('\\').join('/')}?g=${rev}`;
 }
 
-function StlMesh({ url, material, opacity, wire, clip }: { url: string; material: ReturnType<typeof pbr>; opacity: number; wire?: boolean; clip: THREE.Plane[] }) {
-  const geom = useLoader(STLLoader, url);
-  useMemo(() => {
-    geom.computeVertexNormals();
-    geom.center();
-  }, [geom]);
+/**
+ * Technical edges as a child of <mesh>, never of <group>.
+ * drei <Edges> on a Group keeps a 1 m placeholder Line2 ([0,0,0]→[1,0,0])
+ * because Group has no geometry — that was the stray gray line around every part.
+ */
+function TechnicalEdges({ color, threshold = 28 }: { color: string; threshold?: number }) {
+  const lineRef = useRef<THREE.LineSegments>(null);
+  useLayoutEffect(() => {
+    const line = lineRef.current;
+    if (!line) return;
+    const parent = line.parent as THREE.Mesh | null;
+    const src = parent?.geometry;
+    if (!src) return;
+    if (line.userData.edgeSrc === src.uuid && line.userData.edgeTh === threshold) return;
+    src.computeBoundingBox();
+    const bb = src.boundingBox;
+    const diag = bb ? bb.min.distanceTo(bb.max) : 0.1;
+    const maxLen = Math.min(2, Math.max(0.015, diag * 1.25));
+    const edges = new THREE.EdgesGeometry(src, threshold);
+    const pos = edges.getAttribute('position');
+    const filtered = pos ? sanitizeEdgeSegments(pos.array as ArrayLike<number>, maxLen) : [];
+    edges.dispose();
+    const g = new THREE.BufferGeometry();
+    if (filtered.length >= 6) {
+      g.setAttribute('position', new THREE.Float32BufferAttribute(filtered, 3));
+    }
+    const prev = line.geometry;
+    line.geometry = g;
+    if (prev && prev !== g) prev.dispose();
+    line.userData.edgeSrc = src.uuid;
+    line.userData.edgeTh = threshold;
+  });
   return (
-    <mesh geometry={geom} castShadow receiveShadow>
+    <lineSegments ref={lineRef} raycast={() => null}>
+      <lineBasicMaterial color={color} />
+    </lineSegments>
+  );
+}
+
+function StlMesh({
+  url,
+  partId,
+  material,
+  opacity,
+  wire,
+  clip,
+  edgeColor,
+  showEdges,
+  castShadow
+}: {
+  url: string;
+  partId: string;
+  material: ReturnType<typeof pbr>;
+  opacity: number;
+  wire?: boolean;
+  clip: THREE.Plane[];
+  edgeColor: string;
+  showEdges: boolean;
+  castShadow: boolean;
+}) {
+  const geom = useLoader(STLLoader, url);
+  useEffect(() => {
+    geom.computeVertexNormals();
+    geom.computeBoundingBox();
+    const bb = geom.boundingBox;
+    if (!bb) return;
+    const idx = geom.getIndex();
+    const tris = idx ? idx.count / 3 : geom.getAttribute('position').count / 3;
+    useUi.getState().setMeshBounds(partId, {
+      min: [bb.min.x, bb.min.y, bb.min.z],
+      max: [bb.max.x, bb.max.y, bb.max.z],
+      triangles: Math.max(0, Math.round(tris))
+    });
+  }, [geom, partId]);
+  return (
+    <mesh geometry={geom} castShadow={castShadow} receiveShadow={castShadow}>
       <meshStandardMaterial
         color={material.color}
         metalness={material.metalness}
@@ -149,6 +221,7 @@ function StlMesh({ url, material, opacity, wire, clip }: { url: string; material
         clippingPlanes={clip}
         envMapIntensity={material.env ?? 1}
       />
+      {showEdges && <TechnicalEdges color={edgeColor} threshold={36} />}
     </mesh>
   );
 }
@@ -165,7 +238,8 @@ function Solid({
   wire,
   provenanceOverlay,
   proposal,
-  offset
+  offset,
+  debug
 }: {
   part: Part;
   selected: boolean;
@@ -179,6 +253,7 @@ function Solid({
   provenanceOverlay: boolean;
   proposal: boolean;
   offset: [number, number, number];
+  debug: RenderDebug;
 }) {
   const pos = getFinalRenderTransform(part.spatial.origin_m, { explosion: offset });
   const prim = part.spatial.primitive;
@@ -192,6 +267,7 @@ function Solid({
   const clip = cutaway ? [new THREE.Plane(n, sectionPos || 0.002)] : [];
   const rot = part.spatial.rpy_rad as [number, number, number];
   const cadUrl = meshUrl(part);
+  const mode = geometryMode(!!cadUrl, debug);
   const warn = part.provenance.class === 'UNVERIFIED' || part.provenance.class === 'ASSUMED';
   const edge = proposal
     ? LAVENDER
@@ -226,12 +302,23 @@ function Solid({
         if (useUi.getState().hoveredId === part.id) useUi.getState().setHovered(null);
       }}
     >
-      {cadUrl ? (
+      {mode === 'cad' && cadUrl && (
         <Suspense fallback={null}>
-          <StlMesh url={cadUrl} material={material} opacity={opacity} wire={wire || proposal} clip={clip} />
+          <StlMesh
+            url={cadUrl}
+            partId={part.id}
+            material={material}
+            opacity={opacity}
+            wire={wire || proposal}
+            clip={clip}
+            edgeColor={edge}
+            showEdges={debug.edges && !ghosted}
+            castShadow={debug.shadows}
+          />
         </Suspense>
-      ) : prim.kind === 'box' ? (
-        <mesh castShadow receiveShadow>
+      )}
+      {mode === 'primitive' && prim.kind === 'box' && (
+        <mesh castShadow={debug.shadows} receiveShadow={debug.shadows}>
           <boxGeometry args={[prim.sx, prim.sy, prim.sz]} />
           <meshStandardMaterial
             color={material.color}
@@ -243,9 +330,11 @@ function Solid({
             clippingPlanes={clip}
             envMapIntensity={material.env ?? 1}
           />
+          {debug.edges && !ghosted && <TechnicalEdges color={edge} threshold={22} />}
         </mesh>
-      ) : (
-        <mesh castShadow receiveShadow>
+      )}
+      {mode === 'primitive' && prim.kind === 'cylinder' && (
+        <mesh castShadow={debug.shadows} receiveShadow={debug.shadows}>
           <cylinderGeometry args={[prim.radius, prim.radius, prim.height, 48]} />
           <meshStandardMaterial
             color={material.color}
@@ -257,9 +346,9 @@ function Solid({
             clippingPlanes={clip}
             envMapIntensity={material.env ?? 1}
           />
+          {debug.edges && !ghosted && <TechnicalEdges color={edge} threshold={28} />}
         </mesh>
       )}
-      {!ghosted && <Edges threshold={12} color={edge} />}
       {(selected || hovered) && !proposal && (
         <Html center sprite occlude={false} style={{ pointerEvents: 'none' }}>
           <div className="spatial-label">
@@ -276,6 +365,18 @@ function Solid({
       )}
     </group>
   );
+}
+
+function DrawCallProbe() {
+  const frames = useRef(0);
+  useFrame(({ gl }) => {
+    frames.current += 1;
+    if (frames.current % 45 !== 0) return;
+    const calls = gl.info.render.calls;
+    const s = useUi.getState().renderStats;
+    if (s.drawCalls !== calls) useUi.getState().setRenderStats({ ...s, drawCalls: calls });
+  });
+  return null;
 }
 
 function CameraRig() {
@@ -347,11 +448,15 @@ export function ArmScene({
   const ghostRoles = useUi((s) => s.ghostRoles);
   const activeVariant = useUi((s) => s.activeVariant);
   const requestFit = useUi((s) => s.requestFit);
+  const debug = useUi((s) => s.renderDebug);
+  const meshBounds = useUi((s) => s.meshBounds);
+  const geomRev = useUi((s) => s.geomRev);
   const xray = style === 'XRAY';
   const wire = style === 'WIREFRAME' || style === 'HIDDEN_LINE';
   const cutaway = sectionOn;
-  const showIfaces = overlays.interfaces || overlays.mates || overlays.constraints;
-  const explodeLines = overlays.explodeTrails;
+  const showIfaces = overlayVisible(overlays.interfaces || overlays.mates || overlays.constraints, debug.interfaces);
+  const explodeLines = overlayVisible(overlays.explodeTrails, debug.trails);
+  const showDatums = overlayVisible(overlays.datums, debug.datums);
   const localGraph = useMemo(
     () => localInterfaceGraph(selected, parts, ports, interfaces),
     [selected, parts, ports, interfaces]
@@ -386,17 +491,25 @@ export function ArmScene({
       const explosionOff = map[p.id] ?? [0, 0, 0];
       const focus = focusOffset(p.id, p.parent, exploding ? null : focusId, exploding);
       const pos = getFinalRenderTransform(p.spatial.origin_m, { explosion: explosionOff, focus });
-      const size = primitiveSize(p.spatial.primitive);
-      const box = getEntityWorldBounds(pos, size, p.spatial.rpy_rad);
-      return { part: p, off: explosionOff, pos, box };
+      const cadUrl = meshUrl(p);
+      const mode = geometryMode(!!cadUrl, debug);
+      const meshLocal = mode === 'cad' && meshBounds[p.id] ? { min: meshBounds[p.id].min, max: meshBounds[p.id].max } : null;
+      const rb = getRenderedEntityBounds({
+        origin: pos,
+        rpy: p.spatial.rpy_rad,
+        primitive: p.spatial.primitive,
+        meshLocal
+      });
+      return { part: p, off: explosionOff, pos, box: { min: rb.min, max: rb.max }, rb, mode };
     });
-  }, [visible, explosion, strategy, spread, explodeContext, assemblies, focusId, exploding]);
+  }, [visible, explosion, strategy, spread, explodeContext, assemblies, focusId, exploding, meshBounds, debug, geomRev]);
 
   const worldRef = useRef(world);
   worldRef.current = world;
   const fitEpoch = useUi((s) => s.fitEpoch);
   const variantMode = useUi((s) => s.variantMode);
-  const fitSig = `${spatial}|${explodeContext}|${isolate}|${focusId}|${variantMode}|${fitEpoch}`;
+  const meshBoundCount = Object.keys(meshBounds).length;
+  const fitSig = `${spatial}|${explodeContext}|${isolate}|${focusId}|${variantMode}|${fitEpoch}|${meshBoundCount}|${geomRev}`;
 
   useEffect(() => {
     const w = worldRef.current;
@@ -419,7 +532,8 @@ export function ArmScene({
     } else if (intent === 'selection' && selected) {
       subset = w.filter((x) => x.part.id === selected || x.part.parent === selected);
     }
-    const boxes = (subset.length ? subset : w).map((x) => x.box);
+    const pool = subset.length ? subset : w;
+    const boxes = pool.filter((x) => validateAabb(x.box).ok).map((x) => x.box);
     const fit = getScopeBounds(boxes);
     const sz: [number, number, number] = [
       Math.max(0.08, fit.max[0] - fit.min[0]),
@@ -428,6 +542,45 @@ export function ArmScene({
     ];
     requestFit(fit.center, fit.radius, sz);
   }, [fitSig]);
+
+  useEffect(() => {
+    let cad = 0;
+    let prim = 0;
+    let tris = 0;
+    let largestId: string | null = null;
+    let largestVol = -1;
+    let largestSize: [number, number, number] = [0, 0, 0];
+    for (const w of world) {
+      if (w.mode === 'cad') cad += 1;
+      else if (w.mode === 'primitive') prim += 1;
+      const mb = meshBounds[w.part.id];
+      if (mb) tris += mb.triangles;
+      const vol = w.rb.size[0] * w.rb.size[1] * w.rb.size[2];
+      if (vol > largestVol) {
+        largestVol = vol;
+        largestId = w.part.id;
+        largestSize = w.rb.size;
+      }
+    }
+    const fit = getScopeBounds(world.filter((x) => validateAabb(x.box).ok).map((x) => x.box));
+    const prev = useUi.getState().renderStats;
+    useUi.getState().setRenderStats({
+      visibleParts: world.length,
+      cadMeshes: cad,
+      primitiveFallbacks: prim,
+      triangles: tris,
+      drawCalls: prev.drawCalls,
+      edgesEnabled: debug.edges,
+      sceneSize: [
+        Math.max(0, fit.max[0] - fit.min[0]),
+        Math.max(0, fit.max[1] - fit.min[1]),
+        Math.max(0, fit.max[2] - fit.min[2])
+      ],
+      largestId,
+      largestSize,
+      geomRev
+    });
+  }, [world, debug.edges, meshBounds, geomRev]);
 
   return (
     <Canvas
@@ -453,22 +606,25 @@ export function ArmScene({
         <planeGeometry args={[16, 16]} />
         <meshStandardMaterial color="#080808" roughness={0.88} metalness={0.12} envMapIntensity={0.35} />
       </mesh>
-      <Grid
-        position={[0.4, 0.001, 0]}
-        args={[12, 12]}
-        cellSize={0.05}
-        cellThickness={0.35}
-        cellColor="#2a2c30"
-        sectionSize={0.25}
-        sectionThickness={0.9}
-        sectionColor="#7E5B1E"
-        fadeDistance={3.6}
-        fadeStrength={1.85}
-        infiniteGrid
-      />
-      <ContactShadows position={[0.4, 0, 0]} opacity={0.52} scale={10} blur={2.8} far={6} />
+      {debug.grid && (
+        <Grid
+          position={[0.4, 0.001, 0]}
+          args={[12, 12]}
+          cellSize={0.05}
+          cellThickness={0.35}
+          cellColor="#2a2c30"
+          sectionSize={0.25}
+          sectionThickness={0.9}
+          sectionColor="#7E5B1E"
+          fadeDistance={3.6}
+          fadeStrength={1.85}
+          infiniteGrid
+        />
+      )}
+      {debug.shadows && <ContactShadows position={[0.4, 0, 0]} opacity={0.52} scale={10} blur={2.8} far={6} />}
       <axesHelper args={[0.16]} />
       <CameraRig />
+      <DrawCallProbe />
       <Suspense fallback={null}>
         {world.map(({ part: p, pos }) => {
           const roleGhost = ghostRoles.includes(p.semantic_role) || (ghostRoles.length > 0 && ghostRoles.some((r) => p.semantic_role.includes(r) || p.id.includes(r)));
@@ -495,6 +651,7 @@ export function ArmScene({
               provenanceOverlay={overlays.provenance}
               proposal={false}
               offset={delta}
+              debug={debug}
             />
           );
         })}
@@ -515,6 +672,7 @@ export function ArmScene({
                   provenanceOverlay={false}
                   proposal
                   offset={[0, 0, 0]}
+                  debug={debug}
                 />
               </group>
             ))
@@ -542,6 +700,7 @@ export function ArmScene({
                 provenanceOverlay={false}
                 proposal
                 offset={[0, 0, 0.02]}
+                debug={debug}
               />
             );
           })}
@@ -606,7 +765,7 @@ export function ArmScene({
               />
             );
           })}
-      {overlays.datums && selected &&
+      {showDatums && selected &&
         ports
           .filter((port) => localGraph.portIds.has(port.id))
           .map((port) => {

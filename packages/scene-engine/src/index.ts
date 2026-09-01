@@ -185,6 +185,21 @@ export function fitSphere(
 }
 
 export {
+  getRenderedEntityBounds,
+  validateAabb,
+  primitiveLocalAabb,
+  transformLocalAabb,
+  sanitizeEdgeSegments,
+  geometryMode,
+  overlayVisible,
+  fitSizeFromRendered,
+  aabbSize,
+  aabbCenter
+} from './bounds';
+export type { LocalAabb, RenderedBounds } from './bounds';
+export { BOUNDS_MAX_M, BOUNDS_MIN_M, CENTER_MAX_M } from './bounds';
+
+export {
   recursiveExplosionOffsets,
   resolveExplodeContext,
   partsInScope,
