@@ -1,0 +1,86 @@
+{
+  "revisions": [
+    {
+      "id": "rev.0001",
+      "parent_revision": null,
+      "transaction_id": null,
+      "timestamp": "2026-08-31T00:00:00Z",
+      "author": "archeon.seed",
+      "agent": "architect",
+      "message": "Initial ARCHEON Arm seed. Simplified solids. Semantic structure is the product.",
+      "geometry_hash": null,
+      "design_hash": null
+    }
+  ],
+  "decisions": [
+    {
+      "id": "dec.serial-6",
+      "text": "Use a 6-DOF serial chain with a spherical wrist approximated as one housing in Phase 1.",
+      "requirement_ids": ["req.dof"],
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "architect",
+        "reason": "Architecture seed. Wrist internals are not designed.",
+        "requirement_ids": ["req.dof"],
+        "agent_id": "architect",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    }
+  ],
+  "evidence": [
+    {
+      "id": "ev.reach-derived",
+      "kind": "derivation",
+      "text": "reach = upper_arm.length + forearm.length + wrist.length = 400 + 330 + 70 = 800 mm. DERIVED from parameters, not measured.",
+      "provenance": {
+        "class": "DERIVED",
+        "created_by": "analysis-engineer",
+        "reason": "Link-sum kinematic proxy.",
+        "requirement_ids": ["req.reach"],
+        "agent_id": "analysis-engineer",
+        "tools": ["calculate_distance"],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "ev.joint-count",
+      "kind": "graph",
+      "text": "Named revolute interfaces: J1, J2, J3, J4, J6 plus wrist stack intent for J5. Phase 1 housing is simplified.",
+      "provenance": {
+        "class": "DERIVED",
+        "created_by": "architect",
+        "reason": "Interface graph count.",
+        "requirement_ids": ["req.dof"],
+        "agent_id": "architect",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    }
+  ],
+  "analyses": [
+    {
+      "id": "an.reach",
+      "kind": "kinematics_link_sum",
+      "status": "DERIVED",
+      "notes": "Not a full DH workspace. No joint-limit collision. No FEA.",
+      "provenance": {
+        "class": "DERIVED",
+        "created_by": "analysis-engineer",
+        "reason": "Phase 1 reach proxy.",
+        "requirement_ids": ["req.reach"],
+        "agent_id": "analysis-engineer",
+        "tools": ["calculate_distance"],
+        "evidence_ids": ["ev.reach-derived"],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+[package]
+name = "archeon-assembly"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Assembly graph queries and explosion projection"
+
+[dependencies]
+archeon-design-ir = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+archeon-provenance = { workspace = true }

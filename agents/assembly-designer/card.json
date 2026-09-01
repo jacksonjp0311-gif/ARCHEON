@@ -1,0 +1,1 @@
+{"id":"assembly-designer","role":"Assembly Designer","brief":"Mates, packaging, spatial relationships.","allowed_ops":["create_mate","create_port","create_interface","move_component"],"authority":["READ","PROPOSE"],"tools":["list_interfaces","create_transaction"]}

@@ -1,0 +1,29 @@
+{
+  "datums": [
+    {"id": "datum.j1", "host": "part.base.column", "kind": "axis", "origin_m": [0, 0, 0], "axis": [0, 0, 1], "semantic_role": "joint_axis_yaw",
+      "provenance": {"class": "GENERATED", "created_by": "cad-designer", "reason": "J1 axis.", "requirement_ids": ["req.dof"], "agent_id": "cad-designer", "tools": ["datum_axis"], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
+    {"id": "datum.j2", "host": "part.shoulder.housing", "kind": "axis", "origin_m": [0, 0, 0.20], "axis": [0, 1, 0], "semantic_role": "joint_axis",
+      "provenance": {"class": "GENERATED", "created_by": "cad-designer", "reason": "Shoulder pitch JointAxis.", "requirement_ids": ["req.dof"], "agent_id": "cad-designer", "tools": ["datum_axis"], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
+    {"id": "datum.j3", "host": "part.elbow.housing", "kind": "axis", "origin_m": [0.42, 0, 0.20], "axis": [0, 1, 0], "semantic_role": "joint_axis",
+      "provenance": {"class": "GENERATED", "created_by": "cad-designer", "reason": "Elbow axis.", "requirement_ids": ["req.dof"], "agent_id": "cad-designer", "tools": ["datum_axis"], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
+    {"id": "datum.j4", "host": "part.wrist.housing", "kind": "axis", "origin_m": [0.77, 0, 0.20], "axis": [1, 0, 0], "semantic_role": "joint_axis",
+      "provenance": {"class": "GENERATED", "created_by": "cad-designer", "reason": "Wrist roll.", "requirement_ids": ["req.dof"], "agent_id": "cad-designer", "tools": ["datum_axis"], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
+    {"id": "datum.j6", "host": "part.ee.adapter", "kind": "axis", "origin_m": [0.84, 0, 0.20], "axis": [1, 0, 0], "semantic_role": "tool_axis",
+      "provenance": {"class": "GENERATED", "created_by": "cad-designer", "reason": "Flange axis.", "requirement_ids": ["req.payload"], "agent_id": "cad-designer", "tools": ["datum_axis"], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}}
+  ],
+  "features": [
+    {"id": "feat.base.plate.box", "part": "part.base.plate", "kind": "box", "semantic_role": "body",
+      "params": {"sx": 0.22, "sy": 0.22, "sz": 0.02},
+      "provenance": {"class": "GENERATED", "created_by": "cad-designer", "reason": "Plate extrusion analog.", "requirement_ids": [], "agent_id": "cad-designer", "tools": ["box"], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
+    {"id": "feat.shoulder.pocket", "part": "part.shoulder.housing", "kind": "hole", "semantic_role": "bearing_pocket",
+      "params": {"diameter_m": 0.036, "depth_m": 0.018, "note": "BearingPocket — semantic. Primitive kernel cuts a cylinder."},
+      "provenance": {"class": "ASSUMED", "created_by": "cad-designer", "reason": "Bearing pocket intent. Not a qualified bore.", "requirement_ids": ["req.bearings"], "agent_id": "cad-designer", "tools": ["hole"], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
+    {"id": "feat.upper.extrude", "part": "part.upper_arm.tube", "kind": "extrude", "semantic_role": "link_body",
+      "params": {"depth_m": 0.05, "driven_by": "upper_arm.length"},
+      "provenance": {"class": "GENERATED", "created_by": "cad-designer", "reason": "Link solid driven by parameter.", "requirement_ids": ["req.reach"], "agent_id": "cad-designer", "tools": ["extrude"], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}}
+  ],
+  "constraints": [
+    {"id": "con.reach", "kind": "dimensional", "entities": ["part.upper_arm.tube", "part.forearm.tube", "part.wrist.housing"], "value": 0.8, "unit": "m",
+      "provenance": {"class": "DERIVED", "created_by": "constraint-engineer", "reason": "Σ lengths >= 800 mm.", "requirement_ids": ["req.reach"], "agent_id": "constraint-engineer", "tools": [], "evidence_ids": ["ev.reach-derived"], "revision_id": "rev.0001", "user_approved": true}}
+  ]
+}

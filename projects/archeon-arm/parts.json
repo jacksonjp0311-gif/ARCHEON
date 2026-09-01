@@ -1,0 +1,238 @@
+{
+  "parts": [
+    {
+      "id": "part.base.plate",
+      "name": "Base plate",
+      "parent": "asm.base",
+      "system": "sys.arm",
+      "material": "mat.al6061",
+      "semantic_role": "ground_plate",
+      "qty": 1,
+      "catalog_ref": null,
+      "spatial": {
+        "origin_m": [0, 0, 0.01],
+        "rpy_rad": [0, 0, 0],
+        "primitive": { "kind": "box", "sx": 0.22, "sy": 0.22, "sz": 0.02 },
+        "assembly_stage": 1,
+        "explosion_vector": [0, 0, -1],
+        "explosion_distance_m": 0.12,
+        "radial_group": "base",
+        "parent_axis": "datum.j1",
+        "service_path": [[0, 0, 0], [0, 0, -0.12]]
+      },
+      "provenance": {
+        "class": "GENERATED", "created_by": "cad-designer", "reason": "Simplified plate solid.",
+        "requirement_ids": [], "agent_id": "cad-designer", "tools": ["box"], "evidence_ids": [],
+        "revision_id": "rev.0001", "user_approved": true
+      }
+    },
+    {
+      "id": "part.base.column",
+      "name": "Base column",
+      "parent": "asm.base",
+      "system": "sys.arm",
+      "material": "mat.al6061",
+      "semantic_role": "riser",
+      "qty": 1,
+      "catalog_ref": null,
+      "spatial": {
+        "origin_m": [0, 0, 0.06],
+        "rpy_rad": [0, 0, 0],
+        "primitive": { "kind": "cylinder", "radius": 0.04, "height": 0.08 },
+        "assembly_stage": 2,
+        "explosion_vector": [0, 0, -1],
+        "explosion_distance_m": 0.08,
+        "radial_group": "base",
+        "parent_axis": "datum.j1",
+        "service_path": []
+      },
+      "provenance": {
+        "class": "GENERATED", "created_by": "cad-designer", "reason": "Yaw pedestal.",
+        "requirement_ids": [], "agent_id": "cad-designer", "tools": ["cylinder"], "evidence_ids": [],
+        "revision_id": "rev.0001", "user_approved": true
+      }
+    },
+    {
+      "id": "part.shoulder.housing",
+      "name": "Shoulder housing",
+      "parent": "asm.shoulder",
+      "system": "sys.arm",
+      "material": "mat.al6061",
+      "semantic_role": "shoulder_housing",
+      "qty": 1,
+      "catalog_ref": null,
+      "spatial": {
+        "origin_m": [0, 0, 0.145],
+        "rpy_rad": [0, 0, 0],
+        "primitive": { "kind": "box", "sx": 0.14, "sy": 0.10, "sz": 0.09 },
+        "assembly_stage": 3,
+        "explosion_vector": [0, 0.4, 1],
+        "explosion_distance_m": 0.16,
+        "radial_group": "shoulder",
+        "parent_axis": "datum.j2",
+        "service_path": [[0, 0, 0.145], [0, 0.2, 0.145]]
+      },
+      "provenance": {
+        "class": "GENERATED", "created_by": "cad-designer", "reason": "ShoulderHousing semantic body.",
+        "requirement_ids": ["req.service"], "agent_id": "cad-designer", "tools": ["box"], "evidence_ids": [],
+        "revision_id": "rev.0001", "user_approved": true
+      }
+    },
+    {
+      "id": "part.shoulder.shaft",
+      "name": "Shoulder pitch shaft",
+      "parent": "asm.shoulder",
+      "system": "sys.arm",
+      "material": "mat.steel",
+      "semantic_role": "joint_axis",
+      "qty": 1,
+      "catalog_ref": "BEARING-PLACEHOLDER",
+      "spatial": {
+        "origin_m": [0.0, 0.0, 0.20],
+        "rpy_rad": [1.5708, 0, 0],
+        "primitive": { "kind": "cylinder", "radius": 0.018, "height": 0.12 },
+        "assembly_stage": 4,
+        "explosion_vector": [0, 1, 0],
+        "explosion_distance_m": 0.18,
+        "radial_group": "shoulder",
+        "parent_axis": "datum.j2",
+        "service_path": [[0, 0, 0.20], [0, 0.25, 0.20]]
+      },
+      "provenance": {
+        "class": "ASSUMED", "created_by": "components", "reason": "Catalog bearing/shaft placeholder — not a purchased PN.",
+        "requirement_ids": ["req.bearings"], "agent_id": "components", "tools": [], "evidence_ids": [],
+        "revision_id": "rev.0001", "user_approved": true
+      }
+    },
+    {
+      "id": "part.upper_arm.tube",
+      "name": "Upper arm",
+      "parent": "asm.upper_arm",
+      "system": "sys.arm",
+      "material": "mat.al6061",
+      "semantic_role": "upper_arm_link",
+      "qty": 1,
+      "catalog_ref": null,
+      "spatial": {
+        "origin_m": [0.20, 0, 0.20],
+        "rpy_rad": [0, 0, 0],
+        "primitive": { "kind": "box", "sx": 0.40, "sy": 0.05, "sz": 0.05 },
+        "assembly_stage": 5,
+        "explosion_vector": [1, 0, 0.15],
+        "explosion_distance_m": 0.22,
+        "radial_group": "arm",
+        "parent_axis": "datum.j2",
+        "service_path": []
+      },
+      "provenance": {
+        "class": "GENERATED", "created_by": "cad-designer", "reason": "Parametric link driven by upper_arm.length.",
+        "requirement_ids": ["req.reach"], "agent_id": "cad-designer", "tools": ["box"], "evidence_ids": ["ev.reach-derived"],
+        "revision_id": "rev.0001", "user_approved": true
+      }
+    },
+    {
+      "id": "part.elbow.housing",
+      "name": "Elbow housing",
+      "parent": "asm.elbow",
+      "system": "sys.arm",
+      "material": "mat.al6061",
+      "semantic_role": "elbow_housing",
+      "qty": 1,
+      "catalog_ref": null,
+      "spatial": {
+        "origin_m": [0.42, 0, 0.20],
+        "rpy_rad": [0, 0, 0],
+        "primitive": { "kind": "box", "sx": 0.09, "sy": 0.08, "sz": 0.08 },
+        "assembly_stage": 6,
+        "explosion_vector": [1, 0.2, 0.2],
+        "explosion_distance_m": 0.20,
+        "radial_group": "arm",
+        "parent_axis": "datum.j3",
+        "service_path": [[0.42, 0, 0.20], [0.42, 0.2, 0.20]]
+      },
+      "provenance": {
+        "class": "GENERATED", "created_by": "cad-designer", "reason": "Elbow joint body.",
+        "requirement_ids": ["req.service"], "agent_id": "cad-designer", "tools": ["box"], "evidence_ids": [],
+        "revision_id": "rev.0001", "user_approved": true
+      }
+    },
+    {
+      "id": "part.forearm.tube",
+      "name": "Forearm",
+      "parent": "asm.forearm",
+      "system": "sys.arm",
+      "material": "mat.al6061",
+      "semantic_role": "forearm_link",
+      "qty": 1,
+      "catalog_ref": null,
+      "spatial": {
+        "origin_m": [0.605, 0, 0.20],
+        "rpy_rad": [0, 0, 0],
+        "primitive": { "kind": "box", "sx": 0.33, "sy": 0.042, "sz": 0.042 },
+        "assembly_stage": 7,
+        "explosion_vector": [1, 0, 0.1],
+        "explosion_distance_m": 0.24,
+        "radial_group": "arm",
+        "parent_axis": "datum.j3",
+        "service_path": []
+      },
+      "provenance": {
+        "class": "GENERATED", "created_by": "cad-designer", "reason": "Parametric link driven by forearm.length.",
+        "requirement_ids": ["req.reach"], "agent_id": "cad-designer", "tools": ["box"], "evidence_ids": ["ev.reach-derived"],
+        "revision_id": "rev.0001", "user_approved": true
+      }
+    },
+    {
+      "id": "part.wrist.housing",
+      "name": "Wrist housing",
+      "parent": "asm.wrist",
+      "system": "sys.arm",
+      "material": "mat.al6061",
+      "semantic_role": "wrist_stack",
+      "qty": 1,
+      "catalog_ref": null,
+      "spatial": {
+        "origin_m": [0.805, 0, 0.20],
+        "rpy_rad": [0, 1.5708, 0],
+        "primitive": { "kind": "cylinder", "radius": 0.028, "height": 0.07 },
+        "assembly_stage": 8,
+        "explosion_vector": [1, 0, 0],
+        "explosion_distance_m": 0.18,
+        "radial_group": "wrist",
+        "parent_axis": "datum.j4",
+        "service_path": [[0.805, 0, 0.20], [1.0, 0, 0.20]]
+      },
+      "provenance": {
+        "class": "GENERATED", "created_by": "cad-designer", "reason": "Simplified 3-DOF wrist as one cylinder.",
+        "requirement_ids": ["req.dof"], "agent_id": "cad-designer", "tools": ["cylinder"], "evidence_ids": [],
+        "revision_id": "rev.0001", "user_approved": true
+      }
+    },
+    {
+      "id": "part.ee.adapter",
+      "name": "End-effector adapter",
+      "parent": "asm.end_effector",
+      "system": "sys.arm",
+      "material": "mat.al6061",
+      "semantic_role": "tool_flange",
+      "qty": 1,
+      "catalog_ref": null,
+      "spatial": {
+        "origin_m": [0.86, 0, 0.20],
+        "rpy_rad": [0, 0, 0],
+        "primitive": { "kind": "box", "sx": 0.06, "sy": 0.06, "sz": 0.028 },
+        "assembly_stage": 9,
+        "explosion_vector": [1, 0, 0],
+        "explosion_distance_m": 0.16,
+        "radial_group": "wrist",
+        "parent_axis": "datum.j6",
+        "service_path": []
+      },
+      "provenance": {
+        "class": "GENERATED", "created_by": "cad-designer", "reason": "Tool flange placeholder. No gripper.",
+        "requirement_ids": ["req.payload"], "agent_id": "cad-designer", "tools": ["box"], "evidence_ids": [],
+        "revision_id": "rev.0001", "user_approved": true
+      }
+    }
+  ]
+}

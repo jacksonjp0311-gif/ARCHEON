@@ -1,0 +1,13 @@
+[project]
+name = "archeon-cad"
+version = "0.1.0"
+description = "ARCHEON CAD kernel worker (build123d optional, primitive STEP/STL always)"
+requires-python = ">=3.11"
+readme = "README.md"
+
+[project.optional-dependencies]
+occt = ["build123d"]
+test = ["pytest"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

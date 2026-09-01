@@ -1,0 +1,55 @@
+{
+  "parameters": {
+    "upper_arm.length": {
+      "name": "upper_arm.length",
+      "value": 400,
+      "unit": "mm",
+      "si": 0.4,
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "cad-designer",
+        "reason": "Seed link length so derived reach equals 800 mm with forearm+wrist.",
+        "requirement_ids": ["req.reach"],
+        "agent_id": "cad-designer",
+        "tools": [],
+        "evidence_ids": ["ev.reach-derived"],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    "forearm.length": {
+      "name": "forearm.length",
+      "value": 330,
+      "unit": "mm",
+      "si": 0.33,
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "cad-designer",
+        "reason": "Seed link length.",
+        "requirement_ids": ["req.reach"],
+        "agent_id": "cad-designer",
+        "tools": [],
+        "evidence_ids": ["ev.reach-derived"],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    "wrist.length": {
+      "name": "wrist.length",
+      "value": 70,
+      "unit": "mm",
+      "si": 0.07,
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "cad-designer",
+        "reason": "Seed wrist stack height.",
+        "requirement_ids": ["req.reach"],
+        "agent_id": "cad-designer",
+        "tools": [],
+        "evidence_ids": ["ev.reach-derived"],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    }
+  }
+}

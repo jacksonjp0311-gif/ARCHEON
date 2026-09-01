@@ -1,0 +1,8 @@
+{
+  "id": "spatial-director",
+  "role": "Spatial Director",
+  "brief": "Explosion, isolate, x-ray, interfaces. Does not mutate DesignIR.",
+  "allowed_ops": [],
+  "authority": ["READ"],
+  "tools": ["create_exploded_view", "focus_part"]
+}

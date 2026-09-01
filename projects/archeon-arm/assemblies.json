@@ -1,0 +1,174 @@
+{
+  "systems": [
+    {
+      "id": "sys.arm",
+      "name": "Serial manipulator",
+      "parent": null,
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "architect",
+        "reason": "Top-level system.",
+        "requirement_ids": ["req.dof"],
+        "agent_id": "architect",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    }
+  ],
+  "assemblies": [
+    {
+      "id": "asm.arm",
+      "name": "ARCHEON Arm",
+      "parent": null,
+      "system": "sys.arm",
+      "children": ["asm.base", "asm.shoulder", "asm.upper_arm", "asm.elbow", "asm.forearm", "asm.wrist", "asm.end_effector"],
+      "semantic_role": "root_machine",
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "architect",
+        "reason": "Root assembly.",
+        "requirement_ids": ["req.dof"],
+        "agent_id": "architect",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "asm.base",
+      "name": "BaseAssembly",
+      "parent": "asm.arm",
+      "system": "sys.arm",
+      "children": ["part.base.plate", "part.base.column"],
+      "semantic_role": "fixed_base",
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "Grounded base.",
+        "requirement_ids": [],
+        "agent_id": "assembly-designer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "asm.shoulder",
+      "name": "ShoulderAssembly",
+      "parent": "asm.arm",
+      "system": "sys.arm",
+      "children": ["part.shoulder.housing", "part.shoulder.shaft"],
+      "semantic_role": "joint_1_2",
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "Yaw + pitch shoulder.",
+        "requirement_ids": ["req.dof", "req.service"],
+        "agent_id": "assembly-designer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "asm.upper_arm",
+      "name": "UpperArmAssembly",
+      "parent": "asm.arm",
+      "system": "sys.arm",
+      "children": ["part.upper_arm.tube"],
+      "semantic_role": "link_2",
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "Primary reach link.",
+        "requirement_ids": ["req.reach"],
+        "agent_id": "assembly-designer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "asm.elbow",
+      "name": "ElbowAssembly",
+      "parent": "asm.arm",
+      "system": "sys.arm",
+      "children": ["part.elbow.housing"],
+      "semantic_role": "joint_3",
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "Elbow pitch.",
+        "requirement_ids": ["req.dof", "req.service"],
+        "agent_id": "assembly-designer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "asm.forearm",
+      "name": "ForearmAssembly",
+      "parent": "asm.arm",
+      "system": "sys.arm",
+      "children": ["part.forearm.tube"],
+      "semantic_role": "link_3",
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "Second reach link.",
+        "requirement_ids": ["req.reach"],
+        "agent_id": "assembly-designer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "asm.wrist",
+      "name": "WristAssembly",
+      "parent": "asm.arm",
+      "system": "sys.arm",
+      "children": ["part.wrist.housing"],
+      "semantic_role": "joints_4_5_6",
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "Spherical wrist stack (simplified as one housing).",
+        "requirement_ids": ["req.dof"],
+        "agent_id": "assembly-designer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "asm.end_effector",
+      "name": "EndEffectorInterface",
+      "parent": "asm.arm",
+      "system": "sys.arm",
+      "children": ["part.ee.adapter"],
+      "semantic_role": "tool_flange",
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "Tool flange. No gripper designed in Phase 1.",
+        "requirement_ids": ["req.payload"],
+        "agent_id": "assembly-designer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    }
+  ]
+}

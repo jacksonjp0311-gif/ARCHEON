@@ -1,0 +1,10 @@
+[package]
+name = "archeon-provenance"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Provenance classes and records for ARCHEON DesignIR"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }

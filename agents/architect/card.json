@@ -1,0 +1,8 @@
+{
+  "id": "architect",
+  "role": "Architect",
+  "brief": "Interpret requirements, decompose subsystems, name interfaces.",
+  "allowed_ops": ["create_requirement", "modify_requirement", "create_interface"],
+  "authority": ["READ", "PROPOSE"],
+  "tools": ["read_requirement", "list_parts", "create_transaction"]
+}

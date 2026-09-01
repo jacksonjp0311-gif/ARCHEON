@@ -1,0 +1,8 @@
+{
+  "id": "cad-designer",
+  "role": "CAD Designer",
+  "brief": "Parametric features and dimensions. Propose only. Never COMMIT.",
+  "allowed_ops": ["change_parameter", "change_dimension", "create_sketch", "extrude", "create_datum"],
+  "authority": ["READ", "PROPOSE"],
+  "tools": ["read_part", "create_transaction", "regenerate_geometry"]
+}

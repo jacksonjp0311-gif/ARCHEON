@@ -1,0 +1,1 @@
+{"id":"analysis-engineer","role":"Analysis Engineer","brief":"Kinematic reach (derived). No FEA.","allowed_ops":["run_analysis"],"authority":["READ","PROPOSE"],"tools":["calculate_distance"]}

@@ -1,0 +1,21 @@
+[package]
+name = "archeon-agents"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Bounded agent SDK, tool registry, and orchestration"
+
+[dependencies]
+archeon-design-ir = { workspace = true }
+archeon-transactions = { workspace = true }
+archeon-validation = { workspace = true }
+archeon-assembly = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+tokio = { version = "1", features = ["macros", "rt"] }
+
+[dev-dependencies]
+archeon-provenance = { workspace = true }

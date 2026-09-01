@@ -1,0 +1,1 @@
+{"id":"bom","role":"BOM","brief":"Quantities and aggregation. Cost remains UNVERIFIED.","allowed_ops":[],"authority":["READ"],"tools":["list_parts"]}

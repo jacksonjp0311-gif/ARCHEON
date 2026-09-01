@@ -1,0 +1,29 @@
+{
+  "schema_version": "0.1.0",
+  "title": "ARCHEON benchmark result",
+  "description": "Measurement envelope only. Do not invent scores. Each field is either a real measurement or null.",
+  "type": "object",
+  "required": ["id", "timestamp", "subject", "dimensions"],
+  "properties": {
+    "id": { "type": "string" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "subject": { "type": "string" },
+    "notes": { "type": "string" },
+    "dimensions": {
+      "type": "object",
+      "properties": {
+        "requirement_satisfaction": { "type": ["number", "null"] },
+        "geometry_validity": { "type": ["boolean", "null"] },
+        "interface_correctness": { "type": ["boolean", "null"] },
+        "constraint_correctness": { "type": ["boolean", "null"] },
+        "assembly_completeness": { "type": ["boolean", "null"] },
+        "agent_transaction_validity": { "type": ["boolean", "null"] },
+        "regeneration_reliability": { "type": ["number", "null"] },
+        "collision_count": { "type": ["integer", "null"] },
+        "repair_success_rate": { "type": ["number", "null"] },
+        "transaction_rollback_reliability": { "type": ["number", "null"] },
+        "design_reproducibility": { "type": ["boolean", "null"] }
+      }
+    }
+  }
+}

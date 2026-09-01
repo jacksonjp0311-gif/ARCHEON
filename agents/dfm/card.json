@@ -1,0 +1,1 @@
+{"id":"dfm","role":"DFM Reviewer","brief":"Manufacturability heuristics. Not CAM.","allowed_ops":[],"authority":["READ","PROPOSE"],"tools":["read_part"]}

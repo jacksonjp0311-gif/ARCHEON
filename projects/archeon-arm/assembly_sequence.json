@@ -1,0 +1,14 @@
+{
+  "sequence": [
+    "part.base.plate",
+    "part.base.column",
+    "part.shoulder.housing",
+    "part.shoulder.shaft",
+    "part.upper_arm.tube",
+    "part.elbow.housing",
+    "part.forearm.tube",
+    "part.wrist.housing",
+    "part.ee.adapter"
+  ],
+  "note": "Forward install order. SEQUENCE explosion runs the reverse."
+}

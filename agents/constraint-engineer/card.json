@@ -1,0 +1,1 @@
+{"id":"constraint-engineer","role":"Constraint Engineer","brief":"Heuristic under/overconstraint. No geometric solver in Phase 1.","allowed_ops":["change_parameter"],"authority":["READ","PROPOSE"],"tools":["validate_transaction"]}

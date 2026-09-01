@@ -1,0 +1,136 @@
+{
+  "requirements": [
+    {
+      "id": "req.payload",
+      "text": "Payload capacity at the end-effector flange shall be at least 3 kg.",
+      "quantity": "payload",
+      "operator": ">=",
+      "value": 3.0,
+      "unit": "kg",
+      "acceptance": "Structural analysis and test. Not performed in Phase 1.",
+      "satisfied": null,
+      "evidence": [],
+      "provenance": {
+        "class": "UNVERIFIED",
+        "created_by": "architect",
+        "reason": "User intent. Capability is a requirement, not a measured result.",
+        "requirement_ids": ["req.payload"],
+        "agent_id": "architect",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "req.reach",
+      "text": "Fully extended kinematic reach shall be at least 800 mm from the shoulder pitch axis to the EE flange.",
+      "quantity": "reach",
+      "operator": ">=",
+      "value": 800.0,
+      "unit": "mm",
+      "acceptance": "Derived from link-length parameters. Not a measured workspace.",
+      "satisfied": true,
+      "evidence": ["ev.reach-derived"],
+      "provenance": {
+        "class": "DERIVED",
+        "created_by": "analysis-engineer",
+        "reason": "reach = upper_arm.length + forearm.length + wrist.length",
+        "requirement_ids": ["req.reach"],
+        "agent_id": "analysis-engineer",
+        "tools": ["calculate_distance"],
+        "evidence_ids": ["ev.reach-derived"],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "req.budget",
+      "text": "Total parts budget at or below 2000 USD.",
+      "quantity": "bom_cost",
+      "operator": "<=",
+      "value": 2000.0,
+      "unit": "USD",
+      "acceptance": "Catalog adapter not connected. No prices invented.",
+      "satisfied": null,
+      "evidence": [],
+      "provenance": {
+        "class": "UNVERIFIED",
+        "created_by": "bom",
+        "reason": "Budget is a requirement. Phase 1 does not estimate cost.",
+        "requirement_ids": ["req.budget"],
+        "agent_id": "bom",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "req.dof",
+      "text": "Serial manipulator with six revolute joints.",
+      "quantity": "dof",
+      "operator": "=",
+      "value": 6.0,
+      "unit": "count",
+      "acceptance": "Joint count in assembly graph.",
+      "satisfied": true,
+      "evidence": ["ev.joint-count"],
+      "provenance": {
+        "class": "DERIVED",
+        "created_by": "architect",
+        "reason": "Six named revolute joints in the interface graph.",
+        "requirement_ids": ["req.dof"],
+        "agent_id": "architect",
+        "tools": [],
+        "evidence_ids": ["ev.joint-count"],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "req.service",
+      "text": "Joints shall be serviceable with a published extraction path.",
+      "quantity": null,
+      "operator": null,
+      "value": null,
+      "unit": null,
+      "acceptance": "Each joint has a service_path on at least one part.",
+      "satisfied": true,
+      "evidence": [],
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "assembly-designer",
+        "reason": "Service vectors are design intent, not a maintenance procedure.",
+        "requirement_ids": ["req.service"],
+        "agent_id": "assembly-designer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "req.bearings",
+      "text": "Revolute joints shall use off-the-shelf bearings where possible.",
+      "quantity": null,
+      "operator": null,
+      "value": null,
+      "unit": null,
+      "acceptance": "Catalog adapter exists but is not connected.",
+      "satisfied": null,
+      "evidence": [],
+      "provenance": {
+        "class": "UNVERIFIED",
+        "created_by": "components",
+        "reason": "Bearing PNs are placeholders, not purchased parts.",
+        "requirement_ids": ["req.bearings"],
+        "agent_id": "components",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    }
+  ]
+}

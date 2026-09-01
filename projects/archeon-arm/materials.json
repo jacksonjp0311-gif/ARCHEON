@@ -1,0 +1,77 @@
+{
+  "materials": [
+    {
+      "id": "mat.al6061",
+      "name": "Aluminium 6061-T6 (handbook density)",
+      "density_kg_m3": 2700,
+      "notes": "Density is a published handbook value (SOURCE). Application of this alloy to the prototype is ASSUMED. No allowables, no fatigue data, no FEA.",
+      "provenance": {
+        "class": "SOURCE",
+        "created_by": "cad-designer",
+        "reason": "Handbook density only.",
+        "requirement_ids": [],
+        "agent_id": "cad-designer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "mat.steel",
+      "name": "Generic carbon steel (handbook density)",
+      "density_kg_m3": 7850,
+      "notes": "Density SOURCE. Grade UNVERIFIED. Shaft is a placeholder.",
+      "provenance": {
+        "class": "SOURCE",
+        "created_by": "components",
+        "reason": "Handbook density only.",
+        "requirement_ids": ["req.bearings"],
+        "agent_id": "components",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    }
+  ],
+  "loads": [
+    {
+      "id": "load.payload",
+      "kind": "force",
+      "target": "part.ee.adapter",
+      "magnitude": 29.43,
+      "unit": "N",
+      "provenance": {
+        "class": "DERIVED",
+        "created_by": "analysis-engineer",
+        "reason": "3 kg * 9.81 m/s² at flange. Requirement, not a verified structural load case.",
+        "requirement_ids": ["req.payload"],
+        "agent_id": "analysis-engineer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    }
+  ],
+  "functions": [
+    {
+      "id": "fn.reach",
+      "name": "Position tool flange in workspace",
+      "parts": ["part.upper_arm.tube", "part.forearm.tube", "part.wrist.housing"],
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "architect",
+        "reason": "Primary function.",
+        "requirement_ids": ["req.reach"],
+        "agent_id": "architect",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    }
+  ],
+  "flows": []
+}

@@ -1,0 +1,8 @@
+{
+  "id": "critic",
+  "role": "Critic",
+  "brief": "Find missing requirements, impossible interfaces, unverified claims. Cannot self-commit.",
+  "allowed_ops": [],
+  "authority": ["READ", "PROPOSE"],
+  "tools": ["validate_transaction", "list_interfaces"]
+}

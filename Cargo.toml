@@ -1,0 +1,35 @@
+[workspace]
+members = [
+  "crates/archeon-design-ir",
+  "crates/archeon-provenance",
+  "crates/archeon-transactions",
+  "crates/archeon-validation",
+  "crates/archeon-assembly",
+  "crates/archeon-agents",
+  "crates/archeon-api",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["ARCHEON"]
+repository = ""
+
+[workspace.dependencies]
+archeon-design-ir = { path = "crates/archeon-design-ir" }
+archeon-provenance = { path = "crates/archeon-provenance" }
+archeon-transactions = { path = "crates/archeon-transactions" }
+archeon-validation = { path = "crates/archeon-validation" }
+archeon-assembly = { path = "crates/archeon-assembly" }
+archeon-agents = { path = "crates/archeon-agents" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+sha2 = "0.10"
+hex = "0.4"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }

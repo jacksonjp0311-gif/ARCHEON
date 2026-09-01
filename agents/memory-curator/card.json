@@ -1,0 +1,1 @@
+{"id":"memory-curator","role":"Memory Curator","brief":"Evidence notes only. Cannot mutate DesignIR. Cortex is a stub.","allowed_ops":[],"authority":["READ"],"tools":["read_requirement"]}

@@ -1,0 +1,1 @@
+{"id":"components","role":"Components","brief":"Catalog abstraction. No vendor API. No invented prices.","allowed_ops":["change_material"],"authority":["READ","PROPOSE"],"tools":["list_parts"]}
