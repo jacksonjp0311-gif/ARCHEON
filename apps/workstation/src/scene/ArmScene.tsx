@@ -3,7 +3,17 @@ import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber';
 import { ContactShadows, Edges, Html, Line, OrbitControls } from '@react-three/drei';
 import { STLLoader } from 'three-stdlib';
 import * as THREE from 'three';
-import { fitSphere, hierarchicalOffsets, renderTransform, worldBox } from '@archeon/scene-engine';
+import {
+  focusOffset,
+  getEntityWorldBounds,
+  getFinalRenderTransform,
+  getScopeBounds,
+  hierarchicalOffsets,
+  partsInScope,
+  primitiveSize,
+  resolveFitIntent,
+  transformHostPoint
+} from '@archeon/scene-engine';
 import { useUi } from '../store';
 import type { Part } from '@archeon/design-protocol';
 
@@ -51,18 +61,6 @@ function meshUrl(part: Part): string | null {
   if (!rel) return null;
   const rev = useUi.getState().geomRev;
   return `/api/media/${rel.split('\\').join('/')}?g=${rev}`;
-}
-
-function depthOf(part: Part, assemblies: { id: string; parent: string | null }[]): number {
-  let d = 0;
-  let pid: string | null = part.parent;
-  const seen = new Set<string>();
-  while (pid && !seen.has(pid) && d < 8) {
-    seen.add(pid);
-    d += 1;
-    pid = assemblies.find((a) => a.id === pid)?.parent ?? null;
-  }
-  return d;
 }
 
 function StlMesh({ url, material, opacity, wire, clip }: { url: string; material: ReturnType<typeof pbr>; opacity: number; wire?: boolean; clip: THREE.Plane[] }) {
@@ -114,7 +112,7 @@ function Solid({
   proposal: boolean;
   offset: [number, number, number];
 }) {
-  const pos = renderTransform(part.spatial.origin_m, offset);
+  const pos = getFinalRenderTransform(part.spatial.origin_m, { explosion: offset });
   const prim = part.spatial.primitive;
   const material = proposal
     ? { color: ORANGE, metalness: 0.25, roughness: 0.42 }
@@ -261,7 +259,6 @@ export function ArmScene({
   const focusId = useUi((s) => s.focusId);
   const explodeContext = useUi((s) => s.explodeContext);
   const sectionOn = useUi((s) => s.sectionOn);
-  const variantMode = useUi((s) => s.variantMode);
   const activeVariant = useUi((s) => s.activeVariant);
   const requestFit = useUi((s) => s.requestFit);
   const xray = style === 'XRAY';
@@ -272,15 +269,17 @@ export function ArmScene({
 
   const visible = useMemo(() => {
     if (spatial === 'ISOLATE' && isolate) {
-      if (isolate.startsWith('asm.')) {
-        return parts.filter((p) => p.parent === isolate || p.id === isolate);
-      }
-      const hit = parts.find((p) => p.id === isolate);
-      if (!hit) return parts;
-      return parts.filter((p) => p.id === isolate || p.parent === hit.parent || p.id === hit.parent);
+      const scoped = partsInScope(isolate, parts, assemblies);
+      if (scoped && scoped.size) return parts.filter((p) => scoped.has(p.id));
     }
     return parts;
-  }, [parts, spatial, isolate]);
+  }, [parts, spatial, isolate, assemblies]);
+
+  const exploding = explosion > 0.02 && (spatial.includes('EXPLOD') || !!explodeContext);
+  const scopeSet = useMemo(
+    () => partsInScope(explodeContext, parts, assemblies),
+    [explodeContext, parts, assemblies]
+  );
 
   const world = useMemo(() => {
     const spatialParts = visible.map((p) => ({
@@ -289,32 +288,51 @@ export function ArmScene({
       explosion_vector: p.spatial.explosion_vector,
       explosion_distance_m: p.spatial.explosion_distance_m,
       assembly_stage: p.spatial.assembly_stage,
-      depth: depthOf(p, assemblies),
       parentId: p.parent,
       servicePath: p.spatial.service_path
     }));
-    const map = hierarchicalOffsets(spatialParts, strategy, explosion, spread);
+    const map = hierarchicalOffsets(spatialParts, strategy, explosion, spread, assemblies, explodeContext);
     return visible.map((p) => {
-      const inContext = !explodeContext || p.id === explodeContext || p.parent === explodeContext;
-      const raw = map[p.id] ?? [0, 0, 0];
-      const off: [number, number, number] = inContext ? raw : [raw[0] * 0.12, raw[1] * 0.12, raw[2] * 0.12];
-      const prim = p.spatial.primitive;
-      const size: [number, number, number] = prim.kind === 'box' ? [prim.sx, prim.sy, prim.sz] : [prim.radius * 2, prim.radius * 2, prim.height];
-      const pos = renderTransform(p.spatial.origin_m, off);
-      return { part: p, off, pos, box: worldBox(pos, size) };
+      const explosionOff = map[p.id] ?? [0, 0, 0];
+      const focus = focusOffset(p.id, p.parent, exploding ? null : focusId, exploding);
+      const pos = getFinalRenderTransform(p.spatial.origin_m, { explosion: explosionOff, focus });
+      const size = primitiveSize(p.spatial.primitive);
+      const box = getEntityWorldBounds(pos, size, p.spatial.rpy_rad);
+      return { part: p, off: explosionOff, pos, box };
     });
-  }, [visible, explosion, strategy, spread, explodeContext, assemblies]);
+  }, [visible, explosion, strategy, spread, explodeContext, assemblies, focusId, exploding]);
 
-  const layoutKey = `${selected}|${neighborhood.join(',')}|${explosion.toFixed(3)}|${strategy}|${spread}|${spatial}|${isolate}|${explodeContext}|${world.map((w) => w.pos.map((n) => n.toFixed(3)).join(',')).join(';')}`;
+  const worldRef = useRef(world);
+  worldRef.current = world;
+  const fitNonce = useUi((s) => s.fitNonce);
+  const variantMode = useUi((s) => s.variantMode);
+  const fitSig = `${spatial}|${explodeContext}|${isolate}|${focusId}|${variantMode}|${fitNonce}`;
 
   useEffect(() => {
-    const subset = selected
-      ? world.filter((w) => w.part.id === selected || w.part.parent === selected || neighborhood.includes(w.part.id))
-      : world;
-    const boxes = (subset.length ? subset : world).map((w) => w.box);
-    const fit = fitSphere(boxes);
-    requestFit(fit.center, fit.radius);
-  }, [layoutKey]); // layoutKey encodes selection, neighborhood, and exploded positions
+    const w = worldRef.current;
+    const intent = resolveFitIntent({
+      spatial,
+      isolate,
+      explodeContext,
+      focusId,
+      variantMode,
+      explosion,
+      explicit: useUi.getState().fitNonce ? undefined : undefined
+    });
+    let subset = w;
+    if (intent === 'focus' && focusId) {
+      subset = w.filter((x) => x.part.id === focusId || x.part.parent === focusId);
+    } else if (intent === 'isolate' && isolate) {
+      subset = w.filter((x) => x.part.id === isolate || x.part.parent === isolate);
+    } else if (intent === 'part_exploded' && scopeSet) {
+      subset = w.filter((x) => scopeSet.has(x.part.id));
+    } else if (intent === 'selection' && selected) {
+      subset = w.filter((x) => x.part.id === selected || x.part.parent === selected);
+    }
+    const boxes = (subset.length ? subset : w).map((x) => x.box);
+    const fit = getScopeBounds(boxes);
+    requestFit(fit.center, fit.radius * 1.15);
+  }, [fitSig]);
 
   return (
     <Canvas
@@ -358,9 +376,14 @@ export function ArmScene({
       <axesHelper args={[0.22]} />
       <CameraRig />
       <Suspense fallback={null}>
-        {world.map(({ part: p, off }) => {
+        {world.map(({ part: p, pos }) => {
           const ghosted =
             ghostOthers && selected != null && p.id !== selected && p.parent !== selected && !neighborhood.includes(p.id);
+          const delta: [number, number, number] = [
+            pos[0] - p.spatial.origin_m[0],
+            pos[1] - p.spatial.origin_m[1],
+            pos[2] - p.spatial.origin_m[2]
+          ];
           return (
             <Solid
               key={p.id}
@@ -375,7 +398,7 @@ export function ArmScene({
               wire={wire}
               provenanceOverlay={overlay === 'PROVENANCE'}
               proposal={false}
-              offset={focusPull(p.id, p.parent, focusId, off)}
+              offset={delta}
             />
           );
         })}
@@ -428,33 +451,49 @@ export function ArmScene({
           })}
       </Suspense>
       {explodeLines && explosion > 0.04 &&
-        world.map(({ part: p, pos }) => (
-          <Line
-            key={`line-${p.id}`}
-            points={[p.spatial.origin_m, pos]}
-            color={selected === p.id ? ORANGE : ICE}
-            lineWidth={selected === p.id ? 1.4 : 0.7}
-            transparent
-            opacity={selected === p.id ? 0.85 : 0.28}
-          />
-        ))}
+        world
+          .filter(({ part: p, off }) => {
+            if (Math.hypot(...off) < 1e-4) return false;
+            if (scopeSet) return scopeSet.has(p.id);
+            return true;
+          })
+          .map(({ part: p, pos }) => (
+            <Line
+              key={`line-${p.id}`}
+              points={[p.spatial.origin_m, pos]}
+              color={selected === p.id ? ORANGE : ICE}
+              lineWidth={selected === p.id ? 1.4 : 0.7}
+              transparent
+              opacity={selected === p.id ? 0.85 : 0.28}
+            />
+          ))}
       {showIfaces &&
-        ports.map((port) => (
-          <mesh key={port.id} position={port.origin_m}>
-            <octahedronGeometry args={[0.012, 0]} />
-            <meshBasicMaterial color="#38d7ff" />
-          </mesh>
-        ))}
+        ports.map((port) => {
+          const host = world.find((w) => w.part.id === port.host);
+          const pos = host
+            ? transformHostPoint(port.origin_m, host.part.spatial.origin_m, host.pos, host.part.spatial.rpy_rad)
+            : port.origin_m;
+          return (
+            <mesh key={port.id} position={pos}>
+              <octahedronGeometry args={[0.012, 0]} />
+              <meshBasicMaterial color="#38d7ff" />
+            </mesh>
+          );
+        })}
       {showIfaces &&
         interfaces.map((iface) => {
           const a = ports.find((p) => p.id === iface.a);
           const b = ports.find((p) => p.id === iface.b);
           if (!a || !b) return null;
+          const ha = world.find((w) => w.part.id === a.host);
+          const hb = world.find((w) => w.part.id === b.host);
+          const pa = ha ? transformHostPoint(a.origin_m, ha.part.spatial.origin_m, ha.pos, ha.part.spatial.rpy_rad) : a.origin_m;
+          const pb = hb ? transformHostPoint(b.origin_m, hb.part.spatial.origin_m, hb.pos, hb.part.spatial.rpy_rad) : b.origin_m;
           const hot = neighborhood.includes(iface.id) || neighborhood.includes(a.host) || neighborhood.includes(b.host);
           return (
             <Line
               key={`iface-${iface.id}`}
-              points={[a.origin_m, b.origin_m]}
+              points={[pa, pb]}
               color={hot ? ORANGE : '#38d7ff'}
               lineWidth={hot ? 1.6 : 1}
               transparent
@@ -467,13 +506,4 @@ export function ArmScene({
   );
 }
 
-function focusPull(
-  id: string,
-  parent: string | null,
-  focusId: string | null,
-  off: [number, number, number]
-): [number, number, number] {
-  if (!focusId) return off;
-  if (id !== focusId && parent !== focusId) return off;
-  return [off[0] * 0.35 + 0.18, off[1] * 0.35 + 0.12, off[2] * 0.35];
-}
+

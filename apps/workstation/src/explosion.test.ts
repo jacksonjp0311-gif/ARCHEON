@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { applySceneCommand, emptyScene, explosionOffset, hierarchicalOffsets, nudgeSpread, profileFor, type SpatialPart } from '@archeon/scene-engine';
+import {
+  applySceneCommand,
+  emptyScene,
+  explosionOffset,
+  getFinalRenderTransform,
+  getEntityWorldBounds,
+  hierarchicalOffsets,
+  nudgeSpread,
+  profileFor,
+  resolveExplodeContext,
+  resolveFitIntent,
+  transformHostPoint,
+  type SpatialPart
+} from '@archeon/scene-engine';
 
 const part: SpatialPart = {
   id: 'part.a',
@@ -103,4 +116,125 @@ describe('scene command bus', () => {
     expect(nudgeSpread('ENGINEERING', 1)).toBe('WIDE');
     expect(nudgeSpread('COMPACT', -1)).toBe('COMPACT');
   });
+
+  it('clear_selection does not destroy system explosion', () => {
+    let s = applySceneCommand(emptyScene(), { op: 'explode_system', factor: 0.7 });
+    s = applySceneCommand(s, { op: 'select_entity', entity_id: 'part.a' });
+    s = applySceneCommand(s, { op: 'clear_selection' });
+    expect(s.explosion).toBe(0.7);
+    expect(s.spatial).toBe('SYSTEM_EXPLODED');
+    expect(s.selectedId).toBeNull();
+  });
+
+  it('explode_entity clears focus pull', () => {
+    let s = applySceneCommand(emptyScene(), { op: 'focus_entity', entity_id: 'part.a' });
+    s = applySceneCommand(s, { op: 'explode_entity', entity_id: 'asm.shoulder', factor: 0.8 });
+    expect(s.focusId).toBeNull();
+    expect(s.spatial).toBe('PART_EXPLODED');
+    expect(s.fitRequest).toBe('scope');
+  });
+
+  it('restore_display resets explosion scope', () => {
+    let s = applySceneCommand(emptyScene(), { op: 'explode_entity', entity_id: 'asm.shoulder' });
+    s = applySceneCommand(s, { op: 'restore_display' });
+    expect(s.explodeContext).toBeNull();
+    expect(s.explosion).toBe(0);
+    expect(s.spatial).toBe('ASSEMBLED');
+  });
 });
+
+describe('explode scope', () => {
+  const assemblies = [
+    { id: 'asm.arm', parent: null as string | null },
+    { id: 'asm.shoulder', parent: 'asm.arm' },
+    { id: 'asm.base', parent: 'asm.arm' }
+  ];
+  const parts = [
+    { id: 'part.shoulder.housing', parent: 'asm.shoulder' },
+    { id: 'part.shoulder.shaft', parent: 'asm.shoulder' },
+    { id: 'part.base.plate', parent: 'asm.base' }
+  ];
+
+  it('leaf part resolves to containing assembly', () => {
+    expect(resolveExplodeContext('part.shoulder.housing', parts, assemblies)).toBe('asm.shoulder');
+  });
+
+  it('assembly stays itself', () => {
+    expect(resolveExplodeContext('asm.shoulder', parts, assemblies)).toBe('asm.shoulder');
+  });
+
+  it('local explosion does not move out-of-scope parts', () => {
+    const spatial: SpatialPart[] = parts.map((p, i) => ({
+      id: p.id,
+      origin_m: [i * 0.2, 0, 0] as [number, number, number],
+      explosion_vector: [1, 0, 0] as [number, number, number],
+      explosion_distance_m: 0.2,
+      assembly_stage: i + 1,
+      parentId: p.parent
+    }));
+    const off = hierarchicalOffsets(spatial, 'SYSTEM', 1, 'ENGINEERING', assemblies, 'asm.shoulder');
+    expect(off['part.base.plate']).toEqual([0, 0, 0]);
+    expect(Math.hypot(...off['part.shoulder.housing'])).toBeGreaterThan(0.01);
+  });
+
+  it('child offset includes parent assembly offset', () => {
+    const spatial: SpatialPart[] = parts.map((p, i) => ({
+      id: p.id,
+      origin_m: [i * 0.3, 0, 0.1] as [number, number, number],
+      explosion_vector: [0, 0, 1] as [number, number, number],
+      explosion_distance_m: 0.05,
+      assembly_stage: i + 1,
+      parentId: p.parent
+    }));
+    const mid = hierarchicalOffsets(spatial, 'SYSTEM', 0.3, 'ENGINEERING', assemblies, null);
+    const full = hierarchicalOffsets(spatial, 'SYSTEM', 1, 'ENGINEERING', assemblies, null);
+    const midMove = Math.hypot(...mid['part.shoulder.housing']);
+    const fullMove = Math.hypot(...full['part.shoulder.housing']);
+    expect(fullMove).toBeGreaterThan(midMove);
+  });
+});
+
+describe('final transform and bounds', () => {
+  it('composes canonical + explosion + focus', () => {
+    const p = getFinalRenderTransform([1, 0, 0], { explosion: [0, 0.2, 0], focus: [0.1, 0, 0] });
+    expect(p).toEqual([1.1, 0.2, 0]);
+  });
+
+  it('rotated bounds are not axis-aligned primitive only', () => {
+    const b = getEntityWorldBounds([0, 0, 0], [2, 0.2, 0.2], [0, 0, Math.PI / 2]);
+    expect(b.max[1] - b.min[1]).toBeGreaterThan(1);
+  });
+
+  it('ports follow host final transform', () => {
+    const p = transformHostPoint([0.1, 0, 0.2], [0, 0, 0.2], [0.5, 0, 0.2]);
+    expect(p[0]).toBeCloseTo(0.6);
+    expect(p[2]).toBeCloseTo(0.2);
+  });
+
+  it('system explode fit intent is not selection', () => {
+    expect(
+      resolveFitIntent({
+        spatial: 'SYSTEM_EXPLODED',
+        isolate: null,
+        explodeContext: null,
+        focusId: null,
+        variantMode: 'NONE',
+        explosion: 0.7
+      })
+    ).toBe('system_exploded');
+  });
+
+  it('part explode fit uses local scope', () => {
+    expect(
+      resolveFitIntent({
+        spatial: 'PART_EXPLODED',
+        isolate: null,
+        explodeContext: 'asm.shoulder',
+        focusId: null,
+        variantMode: 'NONE',
+        explosion: 0.85
+      })
+    ).toBe('part_exploded');
+  });
+});
+

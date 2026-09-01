@@ -13,7 +13,14 @@ Status language: **shipped**, **partial**, **not started**. Nothing here is a cl
 
 ## Phase 1 — Semantic assembly + spatial workstation — shipped
 
-## Phase 1.3 / v0.4 — Adaptive Human Interface — this tree
+## Phase 1.3.1 / v0.4.1 — Spatial stability — this tree
+
+- Recursive assembly-accumulated explosion (no 12% residual drift)
+- EXPLODE resolves leaf → containing assembly
+- Camera fit follows spatial intent; slider no longer steals orbit
+- Ports, explode lines, and bounds use final render transforms
+
+## Phase 1.3 / v0.4 — Adaptive Human Interface — shipped
 
 - Compact Engineering Rail (PROJECT / FIND / SYSTEM / ANALYZE / HISTORY)
 - Searchable Project Browser (filters, not destinations)

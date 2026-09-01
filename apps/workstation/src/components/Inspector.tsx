@@ -58,9 +58,6 @@ export function Inspector({
   const setGhost = useUi((s) => s.setGhostOthers);
   const setFocus = useUi((s) => s.setFocusId);
   const track = useUi((s) => s.track);
-  const setExplosion = useUi((s) => s.setExplosion);
-  const setSpatial = useUi((s) => s.setSpatial);
-  const setExplodeContext = useUi((s) => s.setExplodeContext);
   const inspectOpen = useUi((s) => s.inspectOpen);
   const toggleInspect = useUi((s) => s.toggleInspect);
 
@@ -132,7 +129,7 @@ export function Inspector({
         <div className="insp-actions">
           <button type="button" onClick={() => { setFocus(assembly.id); setGhost(true); }}>FOCUS</button>
           <button type="button" onClick={() => setIsolate(assembly.id)}>ISOLATE</button>
-          <button type="button" onClick={() => { setExplodeContext(assembly.id); setSpatial('PART_EXPLODED'); setExplosion(0.85); }}>EXPLODE</button>
+          <button type="button" onClick={() => { useUi.getState().setStrategy('SYSTEM'); useUi.getState().dispatch({ op: 'explode_entity', entity_id: assembly.id, factor: 0.85 }); }}>EXPLODE</button>
           <button type="button" onClick={() => setView('X_RAY')}>X-RAY</button>
           <button type="button" onClick={() => setGhost(true)}>GHOST</button>
           <button type="button" onClick={() => track(assembly.id)}>TRACK</button>
@@ -266,7 +263,11 @@ export function Inspector({
       <div className="insp-actions">
         <button type="button" onClick={() => { setFocus(part.id); setGhost(true); }}>FOCUS</button>
         <button type="button" onClick={() => setIsolate(part.id)}>ISOLATE</button>
-        <button type="button" onClick={() => { setExplodeContext(part.parent ?? part.id); setSpatial('PART_EXPLODED'); setExplosion(0.85); }}>EXPLODE</button>
+        <button type="button" onClick={() => {
+          const scope = part.parent ?? part.id;
+          useUi.getState().setStrategy('SYSTEM');
+          useUi.getState().dispatch({ op: 'explode_entity', entity_id: scope, factor: 0.85 });
+        }}>EXPLODE</button>
         <button type="button" onClick={() => setView('X_RAY')}>X-RAY</button>
         <button type="button" onClick={() => setGhost(true)}>GHOST</button>
         <button type="button" onClick={() => track(part.id)}>TRACK</button>

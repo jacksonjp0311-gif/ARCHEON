@@ -179,70 +179,37 @@ export function fitSphere(
   return { center, radius };
 }
 
+export {
+  recursiveExplosionOffsets,
+  resolveExplodeContext,
+  partsInScope,
+  assemblyDescendants,
+  getFinalRenderTransform,
+  getEntityWorldBounds,
+  getScopeBounds,
+  transformHostPoint,
+  resolveFitIntent,
+  focusOffset,
+  primitiveSize,
+  stageWeight
+} from './explode';
+export type { AssemblyRef, FitIntent, RenderLayers, Vec3 } from './explode';
+
+import { recursiveExplosionOffsets, type AssemblyRef } from './explode';
+
 /**
- * SYSTEM explosion: subassemblies separate first, then children.
- * Other strategies remain per-part deterministic offsets.
+ * Recursive assembly-aware explosion. Optional assemblies + scope.
+ * Out-of-scope parts stay at zero offset (no residual drift).
  */
 export function hierarchicalOffsets(
   parts: SpatialPart[],
   strategy: ExplosionStrategy,
   t: number,
-  preset: SpreadPreset = 'ENGINEERING'
+  preset: SpreadPreset = 'ENGINEERING',
+  assemblies: AssemblyRef[] = [],
+  scopeId: string | null = null
 ): Record<string, [number, number, number]> {
-  const n = Math.max(1, parts.length);
-  const out: Record<string, [number, number, number]> = {};
-  if (strategy !== 'SYSTEM') {
-    for (const p of parts) out[p.id] = explosionOffset(p, strategy, t, n, preset);
-    return out;
-  }
-  const profile = profileFor(preset, strategy, t);
-  const assemblyK = smoothstep(Math.min(1, profile.progress / 0.45));
-  const childK = profile.progress > 0.35 ? smoothstep((profile.progress - 0.35) / 0.65) : 0;
-  if (assemblyK <= 0 && childK <= 0) {
-    for (const p of parts) out[p.id] = [0, 0, 0];
-    return out;
-  }
-  const groups = new Map<string, SpatialPart[]>();
-  for (const part of parts) {
-    const key = part.parentId ?? '_root';
-    const list = groups.get(key) ?? [];
-    list.push(part);
-    groups.set(key, list);
-  }
-  let cx = 0, cy = 0, cz = 0;
-  for (const part of parts) {
-    cx += part.origin_m[0];
-    cy += part.origin_m[1];
-    cz += part.origin_m[2];
-  }
-  const inv = 1 / Math.max(1, parts.length);
-  const worldC: [number, number, number] = [cx * inv, cy * inv, cz * inv];
-  const asmOff = new Map<string, [number, number, number]>();
-  for (const [key, group] of groups) {
-    let gx = 0, gy = 0, gz = 0;
-    let vx = 0, vy = 0, vz = 0;
-    for (const part of group) {
-      gx += part.origin_m[0];
-      gy += part.origin_m[1];
-      gz += part.origin_m[2];
-      vx += part.explosion_vector[0];
-      vy += part.explosion_vector[1];
-      vz += part.explosion_vector[2];
-    }
-    const ginv = 1 / group.length;
-    const centroid: [number, number, number] = [gx * ginv, gy * ginv, gz * ginv];
-    let dir: [number, number, number] = [centroid[0] - worldC[0], centroid[1] - worldC[1], centroid[2] - worldC[2]];
-    if (len3(dir) < 1e-6) dir = norm3([vx, vy, vz]);
-    else dir = norm3(dir);
-    const mag = 0.22 * profile.spreadScale * profile.hierarchySpacing * assemblyK;
-    asmOff.set(key, scale3(dir, mag));
-  }
-  for (const part of parts) {
-    const parentOff = asmOff.get(part.parentId ?? '_root') ?? [0, 0, 0];
-    const child = explosionOffset(part, 'RADIAL', childK, n, preset);
-    out[part.id] = add3(parentOff, child);
-  }
-  return out;
+  return recursiveExplosionOffsets(parts, strategy, t, preset, assemblies, scopeId);
 }
 
 /** Semantic scene commands. Agents never animate frames; the scene engine interpolates. */
@@ -288,7 +255,7 @@ export interface SceneSnapshot {
   variantMode: 'NONE' | 'SPREAD' | 'STACK' | 'OVERLAY' | 'FOCUS' | 'COMPARE';
   activeVariant: string | null;
   cameraAxis: 'x' | 'y' | 'z' | null;
-  fitRequest: 'none' | 'scene' | 'selection' | 'home' | 'previous';
+  fitRequest: 'none' | 'scene' | 'selection' | 'home' | 'previous' | 'scope';
 }
 
 export function emptyScene(): SceneSnapshot {
@@ -314,9 +281,13 @@ export function emptyScene(): SceneSnapshot {
 export function applySceneCommand(state: SceneSnapshot, cmd: SceneCommand): SceneSnapshot {
   switch (cmd.op) {
     case 'select_entity':
-      return { ...state, selectedId: cmd.entity_id, fitRequest: 'selection' };
+      return {
+        ...state,
+        selectedId: cmd.entity_id,
+        fitRequest: state.explosion > 0.02 || String(state.spatial).includes('EXPLOD') ? 'none' : 'selection'
+      };
     case 'clear_selection':
-      return { ...state, selectedId: null, isolate: null, neighborhoodIds: [], ghostOthers: false, focusId: null, fitRequest: 'none' };
+      return { ...state, selectedId: null, neighborhoodIds: [], ghostOthers: false, focusId: null, fitRequest: 'none' };
     case 'focus_entity':
     case 'focus_assembly':
       return {
@@ -325,6 +296,7 @@ export function applySceneCommand(state: SceneSnapshot, cmd: SceneCommand): Scen
         focusId: cmd.entity_id,
         ghostOthers: cmd.ghost_others !== false,
         isolate: null,
+        spatial: state.explosion > 0.02 || String(state.spatial).includes('EXPLOD') ? state.spatial : 'FOCUS',
         fitRequest: 'selection'
       };
     case 'explode_entity':
@@ -333,12 +305,30 @@ export function applySceneCommand(state: SceneSnapshot, cmd: SceneCommand): Scen
         explodeContext: cmd.entity_id ?? state.selectedId,
         explosion: cmd.factor ?? 0.85,
         spatial: 'PART_EXPLODED',
-        fitRequest: 'selection'
+        focusId: null,
+        isolate: null,
+        fitRequest: 'scope'
       };
     case 'explode_system':
-      return { ...state, explosion: cmd.factor ?? 0.7, spatial: 'SYSTEM_EXPLODED', explodeContext: null, fitRequest: 'scene' };
-    case 'set_explosion':
-      return { ...state, explosion: Math.min(1, Math.max(0, cmd.progress)), spatial: cmd.progress > 0 ? 'EXPLODED' : 'ASSEMBLED' };
+      return {
+        ...state,
+        explosion: cmd.factor ?? 0.7,
+        spatial: 'SYSTEM_EXPLODED',
+        explodeContext: null,
+        focusId: null,
+        isolate: null,
+        fitRequest: 'scope'
+      };
+    case 'set_explosion': {
+      const progress = Math.min(1, Math.max(0, cmd.progress));
+      return {
+        ...state,
+        explosion: progress,
+        spatial: progress <= 0 ? 'ASSEMBLED' : state.explodeContext ? 'PART_EXPLODED' : state.spatial === 'ASSEMBLED' ? 'EXPLODED' : state.spatial,
+        explodeContext: progress <= 0 ? null : state.explodeContext,
+        fitRequest: 'none'
+      };
+    }
     case 'set_explosion_spread':
       return { ...state, spread: cmd.spread };
     case 'ghost_others':
@@ -361,7 +351,7 @@ export function applySceneCommand(state: SceneSnapshot, cmd: SceneCommand): Scen
     case 'hide_overlay':
       return { ...state, overlay: 'NONE' };
     case 'fit_scene':
-      return { ...state, fitRequest: 'scene' };
+      return { ...state, fitRequest: state.explodeContext ? 'scope' : 'scene' };
     case 'fit_selection':
       return { ...state, fitRequest: 'selection' };
     case 'align_camera':
@@ -379,7 +369,16 @@ export function applySceneCommand(state: SceneSnapshot, cmd: SceneCommand): Scen
     case 'previous_view':
       return { ...state, fitRequest: 'previous' };
     case 'home_view':
-      return { ...state, fitRequest: 'home', explosion: 0, isolate: null, ghostOthers: false, spatial: 'ASSEMBLED' };
+      return {
+        ...state,
+        fitRequest: 'home',
+        explosion: 0,
+        isolate: null,
+        ghostOthers: false,
+        spatial: 'ASSEMBLED',
+        explodeContext: null,
+        focusId: null
+      };
     case 'show_affected':
       return { ...state, ghostOthers: true, overlay: 'AGENT_DIFF', fitRequest: 'selection' };
     default:

@@ -1,7 +1,7 @@
 ﻿import { useEffect, useState } from 'react';
 import { type ViewMode } from '@archeon/spatial-grammar';
 import { neighborhoodOf, type Part, type Requirement } from '@archeon/design-protocol';
-import type { SpreadPreset } from '@archeon/scene-engine';
+import { resolveExplodeContext, type SpreadPreset } from '@archeon/scene-engine';
 import { ArmScene } from './scene/ArmScene';
 import { AgentHud } from './components/AgentHud';
 import { Breadcrumbs } from './components/Breadcrumbs';
@@ -188,7 +188,11 @@ export default function App() {
       if (v.kind === 'clear_selection') ui.dispatch({ op: 'clear_selection' });
       if (v.kind === 'track' && v.id) ui.dispatch({ op: 'track_entity', entity_id: v.id });
       if (v.kind === 'open_hud') ui.setHudOpen(true);
-      if (v.kind === 'explode_context') ui.dispatch({ op: 'explode_entity', entity_id: v.id || ui.selectedId, factor: v.factor ?? 0.85 });
+      if (v.kind === 'explode_context') {
+        const scope = resolveExplodeContext(v.id || ui.selectedId, design?.parts ?? [], design?.assemblies ?? []);
+        ui.setStrategy('SYSTEM');
+        ui.dispatch({ op: 'explode_entity', entity_id: scope, factor: v.factor ?? 0.85 });
+      }
       if (v.kind === 'restore_display') ui.dispatch({ op: 'restore_display' });
       if (v.kind === 'previous_view') ui.dispatch({ op: 'previous_view' });
       if (v.kind === 'set_explosion') ui.dispatch({ op: 'set_explosion', progress: v.factor ?? 0.7 });
@@ -372,7 +376,11 @@ export default function App() {
     if (id === 'focus' && sid) ui.dispatch({ op: 'focus_entity', entity_id: sid, ghost_others: true });
     else if (id === 'isolate' && sid) ui.dispatch({ op: 'isolate_entity', entity_id: sid });
     else if (id === 'track' && sid) ui.dispatch({ op: 'track_entity', entity_id: sid });
-    else if (id === 'explode') ui.dispatch({ op: 'explode_entity', entity_id: sid, factor: 0.85 });
+    else if (id === 'explode') {
+      const scope = resolveExplodeContext(sid, doc?.parts ?? [], doc?.assemblies ?? []);
+      ui.setStrategy('SYSTEM');
+      ui.dispatch({ op: 'explode_entity', entity_id: scope, factor: 0.85 });
+    }
     else if (id === 'xray') ui.setView('X_RAY');
     else if (id === 'interfaces') ui.dispatch({ op: 'show_overlay', overlay: 'INTERFACES' });
     else if (id === 'affected') ui.dispatch({ op: 'show_affected' });
@@ -399,7 +407,11 @@ export default function App() {
   function onPalette(item: PaletteItem) {
     const ui = useUi.getState();
     if (item.kind === 'COMMAND') {
-      if (item.id === 'cmd.explode') ui.dispatch({ op: 'explode_entity', entity_id: ui.selectedId, factor: 0.85 });
+      if (item.id === 'cmd.explode') {
+        const scope = resolveExplodeContext(ui.selectedId, doc?.parts ?? [], doc?.assemblies ?? []);
+        ui.setStrategy('SYSTEM');
+        ui.dispatch({ op: 'explode_entity', entity_id: scope, factor: 0.85 });
+      }
       else if (item.id === 'cmd.restore') ui.dispatch({ op: 'restore_display' });
       else if (item.id === 'cmd.home') ui.dispatch({ op: 'home_view' });
     } else if (item.kind === 'VIEW') {
@@ -440,9 +452,8 @@ export default function App() {
           <span>EXPLODE</span>
           <input type="range" min={0} max={1} step={0.01} value={explosion} onChange={(e) => {
             const n = Number(e.target.value);
-            useUi.getState().setExplosion(n);
-            if (n > 0 && view === 'ASSEMBLED') useUi.getState().setView('EXPLODED');
-          }} />
+            useUi.getState().dispatch({ op: 'set_explosion', progress: n });
+          }} onPointerUp={() => useUi.getState().bumpFit()} />
           <select value={spread} onChange={(e) => useUi.getState().setSpread(e.target.value as SpreadPreset)} title="Explosion spread">
             {(['COMPACT', 'NORMAL', 'ENGINEERING', 'WIDE', 'EXTREME'] as SpreadPreset[]).map((s) => <option key={s}>{s}</option>)}
           </select>

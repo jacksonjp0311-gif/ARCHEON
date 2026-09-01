@@ -81,6 +81,7 @@ interface Ui {
   setHudCollapsed: (v: boolean) => void;
   setAgentTab: (t: AgentTab) => void;
   requestFit: (center: [number, number, number], radius: number) => void;
+  bumpFit: () => void;
   resetView: () => void;
   clearProjectSelection: () => void;
   dispatch: (cmd: SceneCommand) => void;
@@ -177,12 +178,21 @@ export const useUi = create<Ui>((set) => ({
       return { selectedId: id, recentIds: pushRecent(s.recentIds, id), huds };
     }),
   setHovered: (hoveredId) => set({ hoveredId }),
-  clearSelection: () => set({ selectedId: null, isolate: null, neighborhoodIds: [], ghostOthers: false, focusId: null }),
+  clearSelection: () => set({ selectedId: null, neighborhoodIds: [], ghostOthers: false, focusId: null }),
   track: (id) => set((s) => ({ trackedIds: s.trackedIds.includes(id) ? s.trackedIds : [...s.trackedIds, id], trackerExpanded: true })),
   untrack: (id) => set((s) => ({ trackedIds: s.trackedIds.filter((x) => x !== id) })),
   setNeighborhood: (neighborhoodIds) => set({ neighborhoodIds }),
   setGhostOthers: (ghostOthers) => set({ ghostOthers }),
-  setFocusId: (focusId) => set({ focusId, spatial: focusId ? 'FOCUS' : 'ASSEMBLED' }),
+  setFocusId: (focusId) =>
+    set((s) => ({
+      focusId,
+      spatial:
+        s.explosion > 0.02 || s.spatial === 'PART_EXPLODED' || s.spatial === 'SYSTEM_EXPLODED' || s.spatial === 'EXPLODED'
+          ? s.spatial
+          : focusId
+            ? 'FOCUS'
+            : 'ASSEMBLED'
+    })),
   setView: (view) =>
     set((s) => {
       const composed = composeFromLegacy(view);
@@ -241,6 +251,7 @@ export const useUi = create<Ui>((set) => ({
       fitRadius,
       fitNonce: s.fitNonce + 1
     })),
+  bumpFit: () => set((s) => ({ fitNonce: s.fitNonce + 1 })),
   resetView: () =>
     set((s) => ({
       view: 'ASSEMBLED',
