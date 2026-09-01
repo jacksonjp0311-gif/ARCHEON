@@ -25,6 +25,14 @@ export type Primitive =
   | { kind: 'box'; sx: number; sy: number; sz: number }
   | { kind: 'cylinder'; radius: number; height: number };
 
+export interface CadRef {
+  format: string;
+  path: string;
+  preview?: string | null;
+  truth: string;
+  note: string;
+}
+
 export interface Spatial {
   origin_m: [number, number, number];
   rpy_rad: [number, number, number];
@@ -35,6 +43,7 @@ export interface Spatial {
   radial_group: string | null;
   parent_axis: string | null;
   service_path: [number, number, number][];
+  cad?: CadRef | null;
 }
 
 export interface Part {

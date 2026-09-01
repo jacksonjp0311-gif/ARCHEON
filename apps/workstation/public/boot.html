@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#050b12" />
+  <meta http-equiv="Cache-Control" content="no-store" />
+  <title>ARCHEON compiler</title>
+  <link rel="icon" href="/archeon.png" />
+  <style>
+    :root {
+      --bg0: #050b12; --ice: #d7f3ff; --ice-2: #8ec8de; --muted: #6f8a9a;
+      --line: #1f4c64; --orange: #ff981b; --cyan: #38d7ff; --green: #6ce391; --fault: #e85b6a;
+      font-family: Rajdhani, Bahnschrift, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; min-height: 100%; color: var(--ice); background:
+        radial-gradient(ellipse at 50% 18%, rgba(255,152,27,.16), transparent 42%),
+        radial-gradient(ellipse at 80% 90%, rgba(56,215,255,.08), transparent 40%),
+        var(--bg0);
+    }
+    .wrap { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; }
+    .card {
+      width: min(560px, 100%); padding: 28px 24px 22px; border: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(12,28,42,.96), rgba(5,11,18,.98));
+      position: relative;
+    }
+    .card:before, .card:after { content: ""; position: absolute; width: 12px; height: 12px; }
+    .card:before { left: -1px; top: -1px; border-left: 2px solid var(--ice-2); border-top: 2px solid var(--ice-2); }
+    .card:after { right: -1px; bottom: -1px; border-right: 2px solid var(--ice-2); border-bottom: 2px solid var(--ice-2); }
+    .mark { width: 96px; height: 96px; margin: 0 auto 12px; border: 1px solid var(--line); background: #040b14; display: block; }
+    .eyebrow { margin: 0; color: var(--orange); letter-spacing: .16em; font-size: 12px; font-weight: 700; text-align: center; }
+    h1 { margin: 6px 0 10px; font-size: 28px; letter-spacing: .12em; text-align: center; color: var(--ice); }
+    .chip {
+      display: block; width: max-content; margin: 0 auto 14px; padding: 4px 12px;
+      border: 1px solid var(--cyan); color: var(--orange); letter-spacing: .12em; font-size: 14px;
+    }
+    .lede { margin: 0 0 14px; color: var(--ice-2); text-align: center; font-size: 14px; }
+    .stream { display: grid; gap: 4px; min-height: 132px; text-align: left; font-family: "IBM Plex Mono", Consolas, monospace; font-size: 12px; }
+    .line { display: grid; grid-template-columns: 22px 1fr 72px; gap: 8px; padding: 6px 8px; border-left: 3px solid transparent; color: var(--ice-2); }
+    .line.is-active { border-left-color: var(--cyan); color: var(--ice); background: rgba(56,215,255,.08); }
+    .line.is-pass { border-left-color: var(--green); color: var(--green); }
+    .line.is-fail { border-left-color: var(--fault); color: var(--fault); }
+    .glyph { color: var(--orange); }
+    .status { margin: 14px 0 0; text-align: center; color: var(--cyan); letter-spacing: .08em; font-size: 13px; font-weight: 700; }
+    .boundary { margin: 12px 0 0; color: var(--muted); font-size: 11px; letter-spacing: .06em; text-align: center; }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="card" role="status" aria-live="polite" aria-busy="true">
+      <img class="mark" src="/archeon.png" alt="" />
+      <p class="eyebrow">ARCHEON · ICON COMPILER</p>
+      <h1>DESIGNIR GATE</h1>
+      <div class="chip" id="version-chip">v…</div>
+      <p class="lede">Icon click stamps a build, compiles the workstation, verifies the API, then admits DesignIR.</p>
+      <div class="stream" id="stream"></div>
+      <p class="status" id="status">Starting compiler…</p>
+      <p class="boundary">this splash does not mutate canonical state · receipts are local health + UI stamp</p>
+    </div>
+  </main>
+  <script>
+(function () {
+  const params = new URLSearchParams(location.search);
+  const forcedV = String(params.get("v") || "").trim().replace(/^v/i, "");
+  const status = document.getElementById("status");
+  const chip = document.getElementById("version-chip");
+  const stream = document.getElementById("stream");
+  const started = Date.now();
+  let liveVersion = forcedV || "";
+  if (forcedV) {
+    chip.textContent = "v" + forcedV;
+    document.title = "ARCHEON compiler v" + forcedV;
+  }
+
+  const gates = [
+    { id: "syntax", name: "syntax", glyph: "◇", state: "INFO", detail: "boot document" },
+    { id: "host", name: "host", glyph: "▣", state: "INFO", detail: "/api/health" },
+    { id: "compiler", name: "compiler", glyph: "⬡", state: "INFO", detail: "waiting stamp" },
+    { id: "authority", name: "authority", glyph: "◆", state: "INFO", detail: "DesignIR admit" },
+    { id: "closure", name: "closed", glyph: "◇", state: "INFO", detail: "opening workstation" }
+  ];
+
+  function render() {
+    stream.innerHTML = gates.map((g) => {
+      const word = g.state === "ACTIVE" ? "ACTIVE" : g.state === "PASS" ? "PASS" : g.state === "FAIL" ? "FAIL" : "WAIT";
+      return `<div class="line is-${g.state.toLowerCase()}"><span class="glyph">${g.glyph}</span><span>${g.name} · ${g.detail}</span><span>${word}</span></div>`;
+    }).join("");
+  }
+  function mark(id, state, detail) {
+    const g = gates.find((x) => x.id === id);
+    if (!g) return;
+    g.state = state;
+    if (detail) g.detail = detail;
+    render();
+  }
+  render();
+  mark("syntax", "PASS", "boot document");
+  mark("host", "ACTIVE", "/api/health");
+
+  function go() {
+    const v = liveVersion || forcedV || "0.1.0";
+    status.textContent = "All done. Opening workstation v" + v;
+    mark("authority", "PASS", "DesignIR admitted");
+    mark("closure", "PASS", "opening workstation");
+    const q = new URLSearchParams();
+    q.set("v", v);
+    q.set("boot", String(Date.now()));
+    q.set("force", "1");
+    window.setTimeout(() => { location.replace("/?" + q.toString()); }, 480);
+  }
+
+  async function readJson(url) {
+    const r = await fetch(url, { cache: "no-store" });
+    if (!r.ok) throw new Error(String(r.status));
+    const text = await r.text();
+    return JSON.parse(text.replace(/^\uFEFF/, ""));
+  }
+
+  let lastPhase = "";
+  async function probe() {
+    let health = false;
+    let stamp = "";
+    let phase = lastPhase;
+    try {
+      const body = await readJson("/api/health?_=" + Date.now());
+      health = true;
+      stamp = String(body.version || "").trim();
+    } catch (_) {}
+    try {
+      const body = await readJson("/compiler-status.json?_=" + Date.now());
+      phase = String(body.phase || phase);
+      lastPhase = phase;
+      if (body.version) stamp = String(body.version);
+      if (body.ok === false) {
+        mark("compiler", "FAIL", body.error || "compile failed");
+        status.textContent = body.error || "Compiler failed — see logs/last-launch.txt";
+        return { health, stamp, phase, failed: true };
+      }
+    } catch (_) {}
+    return { health, stamp, phase, failed: false };
+  }
+
+  (async function loop() {
+    for (;;) {
+      const elapsed = Date.now() - started;
+      const p = await probe();
+      if (p.stamp) {
+        liveVersion = p.stamp;
+        chip.textContent = "v" + liveVersion;
+        document.title = "ARCHEON compiler v" + liveVersion;
+      }
+      if (p.failed) return;
+      if (p.health) mark("host", "PASS", "backend ready");
+      else mark("host", "ACTIVE", "rebuilding — API briefly offline");
+
+      const phase = p.phase || lastPhase;
+      if (phase === "ready") {
+        mark("compiler", "PASS", "v" + (liveVersion || forcedV));
+        status.textContent = "v" + (liveVersion || forcedV) + " · compiler sealed";
+      } else if (phase === "compiling-ui") {
+        mark("compiler", "ACTIVE", "compiling workstation UI");
+        status.textContent = "Compiler · UI";
+      } else if (phase === "compiling-native") {
+        mark("compiler", "ACTIVE", "compiling archeon.exe");
+        status.textContent = "Compiler · native (first release build can take a minute)";
+      } else if (phase) {
+        mark("compiler", "ACTIVE", phase);
+        status.textContent = "Compiler · " + phase;
+      } else if (!p.health) {
+        mark("compiler", "ACTIVE", "waiting for API");
+        status.textContent = "Waiting for DesignIR executive…";
+      } else {
+        mark("compiler", "ACTIVE", "waiting stamp");
+        status.textContent = "Server up — waiting for compiler stamp";
+      }
+
+      const stampMatch = !forcedV || !p.stamp || p.stamp === forcedV || p.stamp.replace(/\+dev\.\d+$/, "") === forcedV.replace(/\+dev\.\d+$/, "");
+      if (p.health && phase === "ready") {
+        go();
+        return;
+      }
+      if (p.health && stampMatch && p.stamp && elapsed > 8000 && (phase === "ready" || !phase)) {
+        mark("compiler", "PASS", "v" + (liveVersion || forcedV));
+        go();
+        return;
+      }
+      if (elapsed > 480000) {
+        mark("host", p.health ? "PASS" : "FAIL", p.health ? "backend ready" : "backend not ready");
+        mark("compiler", "FAIL", "timeout");
+        status.textContent = "Compiler timed out — click the ARCHEON icon again";
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 450));
+    }
+  })();
+})();
+  </script>
+</body>
+</html>

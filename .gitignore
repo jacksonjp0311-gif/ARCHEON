@@ -23,3 +23,5 @@
 Thumbs.db
 .DS_Store
 secrets.json
+/DEV_BUILD
+*.lnk

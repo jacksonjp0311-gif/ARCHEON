@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 description = "ARCHEON workstation API and transaction authority"
+build = "build.rs"
 
 [[bin]]
 name = "archeon"
@@ -16,7 +17,7 @@ archeon-transactions = { workspace = true }
 archeon-validation = { workspace = true }
 archeon-assembly = { workspace = true }
 archeon-agents = { workspace = true }
-axum = { version = "0.8", features = ["json"] }
+axum = { version = "0.8", features = ["json", "multipart"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "process", "io-util"] }
@@ -25,3 +26,6 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }
+
+[build-dependencies]
+winresource = "0.1"

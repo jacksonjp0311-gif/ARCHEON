@@ -323,6 +323,7 @@ fn apply_one(doc: &mut DesignDocument, op: &Operation) -> Result<(), TxError> {
                     radial_group: None,
                     parent_axis: None,
                     service_path: vec![],
+                    cad: None,
                 },
                 provenance: Provenance::generated("transaction", "create_part"),
             });

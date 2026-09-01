@@ -62,14 +62,21 @@ button.danger { border-color: var(--fault); color: var(--fault); }
   border-bottom: 1px solid var(--line);
   background: var(--bg1);
 }
-.brand { display: flex; flex-direction: column; line-height: 1.05; min-width: 140px; }
+.brand { display: flex; align-items: center; gap: 10px; line-height: 1.05; min-width: 168px; }
+.brand__mark { width: 32px; height: 32px; border: 1px solid var(--line); display: block; background: #040b14; }
 .brand strong {
   font-family: Rajdhani, "Bahnschrift", sans-serif;
   font-size: 20px;
   letter-spacing: 0.18em;
   color: var(--ice);
+  display: block;
 }
 .brand small { color: var(--muted); font-size: 10px; letter-spacing: 0.12em; }
+.top-btn { letter-spacing: 0.08em; }
+.top-btn--reset { border-color: var(--fault); color: var(--fault); letter-spacing: 0.1em; }
+.top-btn--reset:disabled { opacity: 0.5; }
+.project-select { background: transparent; border: 0; color: var(--cyan); padding: 0; max-width: 160px; }
+.cad-flag { margin-top: 6px; color: var(--amber); font-size: 10px; letter-spacing: 0.06em; max-width: 420px; }
 .meta { display: flex; gap: 16px; flex: 1; }
 .meta b { color: var(--cyan); font-weight: 500; }
 .meta .warn { color: var(--amber); }

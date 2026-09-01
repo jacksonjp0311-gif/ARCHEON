@@ -1,4 +1,6 @@
 mod cad;
+mod compiler;
+mod projects;
 
 use archeon_agents::{
     authorize_commit, authorize_tx, critic_notes, parse_command, roster,
@@ -12,8 +14,9 @@ use archeon_transactions::{
 };
 use archeon_validation::validate;
 use axum::{
-    extract::State,
-    http::StatusCode,
+    extract::{Multipart, Path, State},
+    http::{header, StatusCode},
+    response::IntoResponse,
     routing::{get, post},
     Json, Router,
 };
@@ -21,7 +24,7 @@ use chrono::Utc;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::{
-    env, net::SocketAddr, path::PathBuf, sync::{Arc, Mutex},
+    env, net::SocketAddr, path::PathBuf, process::Command, sync::{Arc, Mutex},
 };
 use tower_http::{cors::CorsLayer, services::ServeDir, trace::TraceLayer};
 
@@ -29,7 +32,7 @@ const BIND: ([u8; 4], u16) = ([127, 0, 0, 1], 8799);
 
 struct App {
     root: PathBuf,
-    project_dir: PathBuf,
+    project_dir: Mutex<PathBuf>,
     doc: Mutex<DesignDocument>,
     ledger: Mutex<Ledger>,
     proposal: Mutex<Option<ProposalState>>,
@@ -45,12 +48,55 @@ struct ProposalState {
 #[derive(Clone)]
 struct AppState(Arc<App>);
 
+struct LaunchOpts {
+    open_browser: bool,
+    print_version_only: bool,
+}
+
+fn parse_opts() -> LaunchOpts {
+    let mut open_browser = env::var("ARCHEON_NO_OPEN").ok().as_deref() != Some("1");
+    let mut print_version_only = false;
+    for arg in env::args().skip(1) {
+        match arg.as_str() {
+            "--version" | "-V" => print_version_only = true,
+            "--no-open" => open_browser = false,
+            "--open" => open_browser = true,
+            "--help" | "-h" => {
+                eprintln!(
+                    "ARCHEON v{version}
+
+USAGE:
+    archeon [--open | --no-open]
+    archeon --version
+",
+                    version = compiler::product_version()
+                );
+                std::process::exit(0);
+            }
+            other => {
+                eprintln!("unknown argument: {other}");
+                std::process::exit(2);
+            }
+        }
+    }
+    LaunchOpts {
+        open_browser,
+        print_version_only,
+    }
+}
+
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(env::var("RUST_LOG").unwrap_or_else(|_| "info,archeon_api=debug".into()))
         .json()
         .init();
+
+    let opts = parse_opts();
+    if opts.print_version_only {
+        println!("{}", compiler::product_version());
+        return;
+    }
 
     let root = find_root();
     let rel = env::var("ARCHEON_PROJECT").unwrap_or_else(|_| "projects/archeon-arm".into());
@@ -59,10 +105,11 @@ async fn main() {
     } else {
         root.join(&rel)
     };
-    let doc = load_project_dir(&project_dir).unwrap_or_else(|e| {
+    let mut doc = load_project_dir(&project_dir).unwrap_or_else(|e| {
         eprintln!("failed to load {}: {e}", project_dir.display());
         std::process::exit(1);
     });
+    projects::attach_cad_files(&mut doc, &project_dir);
     tracing::info!(
         event = "api.start",
         project = %doc.project.id.as_str(),
@@ -73,7 +120,7 @@ async fn main() {
     let memory_dir = root.join(env::var("ARCHEON_MEMORY_DIR").unwrap_or_else(|_| "memory".into()));
     let app = Arc::new(App {
         root: root.clone(),
-        project_dir,
+        project_dir: Mutex::new(project_dir),
         doc: Mutex::new(doc),
         ledger: Mutex::new(Ledger::default()),
         proposal: Mutex::new(None),
@@ -81,9 +128,11 @@ async fn main() {
         memory: LocalMemoryProvider::new(memory_dir),
     });
 
-    let ui = root.join("apps").join("workstation").join("dist");
+    let ui = compiler::find_ui_dir(&root);
     let mut router = Router::new()
         .route("/api/health", get(health))
+        .route("/api/version", get(health))
+        .route("/api/control/reset", post(control_reset))
         .route("/api/project", get(project))
         .route("/api/design", get(design))
         .route("/api/entities", get(entities))
@@ -95,6 +144,10 @@ async fn main() {
         .route("/api/validation", get(validation_now))
         .route("/api/memory/status", get(memory_status))
         .route("/api/cad/status", get(cad_status))
+        .route("/api/cad/import", post(cad_import))
+        .route("/api/projects", get(list_projects))
+        .route("/api/projects/load", post(load_project))
+        .route("/api/media/{*rest}", get(media))
         .route("/api/commands", post(commands))
         .route("/api/transactions/propose", post(propose))
         .route("/api/transactions/validate", post(validate_tx))
@@ -109,14 +162,21 @@ async fn main() {
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http());
 
-    if ui.join("index.html").is_file() {
+    if let Some(ui) = ui {
+        tracing::info!(event = "ui.serve", path = %ui.display());
         router = router.fallback_service(ServeDir::new(ui));
+    } else {
+        tracing::warn!("no operator UI found; build apps/workstation/dist or set ARCHEON_UI_DIR");
     }
 
     let bind = env::var("ARCHEON_BIND").unwrap_or_else(|_| format!("127.0.0.1:{}", BIND.1));
     let addr: SocketAddr = bind.parse().expect("ARCHEON_BIND");
     tracing::info!(event = "api.listen", %addr);
     let listener = tokio::net::TcpListener::bind(addr).await.expect("bind");
+    if opts.open_browser {
+        let url = format!("http://{addr}/");
+        let _ = Command::new("cmd").args(["/C", "start", "", &url]).spawn();
+    }
     axum::serve(listener, router).await.expect("serve");
 }
 
@@ -152,7 +212,8 @@ async fn health(State(st): State<AppState>) -> Json<Value> {
     let doc = st.0.doc.lock().unwrap();
     Json(json!({
         "product": archeon_design_ir::PRODUCT,
-        "version": archeon_design_ir::VERSION,
+        "version": compiler::product_version(),
+        "release": compiler::release(),
         "status": "ok",
         "project": doc.project.name,
         "revision": doc.project.revision_id,
@@ -160,6 +221,24 @@ async fn health(State(st): State<AppState>) -> Json<Value> {
         "provider": provider::info(),
         "phase": "1-semantic-assembly"
     }))
+}
+
+async fn control_reset(State(st): State<AppState>) -> (StatusCode, Json<Value>) {
+    match compiler::queue_update_compiler(&st.0.root) {
+        Ok(compiler) => (
+            StatusCode::ACCEPTED,
+            Json(json!({
+                "kind": "hard",
+                "version": compiler::product_version(),
+                "compiler": compiler,
+                "note": "Update compiler queued. The workstation will reopen through boot verification."
+            })),
+        ),
+        Err(error) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": error })),
+        ),
+    }
 }
 
 async fn project(State(st): State<AppState>) -> Json<Value> {
@@ -478,10 +557,144 @@ fn next_revision(current: &str) -> String {
 
 async fn cad_regen(State(st): State<AppState>) -> Json<Value> {
     log_line(&st.0, "cad.regen", "requested");
-    match cad::regenerate(&st.0.root, &st.0.project_dir).await {
-        Ok(v) => Json(v),
+    let dir = st.0.project_dir.lock().unwrap().clone();
+    match cad::regenerate(&st.0.root, &dir).await {
+        Ok(v) => {
+            if let Ok(mut doc) = st.0.doc.lock() {
+                projects::attach_cad_files(&mut doc, &dir);
+            }
+            Json(v)
+        }
         Err(e) => Json(json!({ "ok": false, "error": e, "note": "UI geometry remains a DesignIR projection until CAD succeeds." })),
     }
+}
+
+async fn list_projects(State(st): State<AppState>) -> Json<Value> {
+    let current = st.0.project_dir.lock().unwrap().clone();
+    Json(json!({
+        "projects": projects::list_projects(&st.0.root),
+        "current": current.file_name().and_then(|s| s.to_str())
+    }))
+}
+
+#[derive(Deserialize)]
+struct LoadProjectIn {
+    id: String,
+}
+
+async fn load_project(State(st): State<AppState>, Json(body): Json<LoadProjectIn>) -> Result<Json<Value>, (StatusCode, String)> {
+    let dir = projects::resolve_project_dir(&st.0.root, &body.id)
+        .ok_or((StatusCode::NOT_FOUND, format!("unknown project {}", body.id)))?;
+    let mut doc = load_project_dir(&dir).map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+    projects::attach_cad_files(&mut doc, &dir);
+    log_line(&st.0, "project.load", dir.display().to_string().as_str());
+    *st.0.doc.lock().unwrap() = doc;
+    *st.0.project_dir.lock().unwrap() = dir.clone();
+    *st.0.proposal.lock().unwrap() = None;
+    *st.0.ledger.lock().unwrap() = Default::default();
+    Ok(Json(json!({
+        "ok": true,
+        "folder": dir.file_name().and_then(|s| s.to_str()),
+        "hash": st.0.doc.lock().unwrap().design_hash()
+    })))
+}
+
+async fn media(State(st): State<AppState>, Path(rest): Path<String>) -> impl IntoResponse {
+    if !projects::media_is_allowed(&rest) {
+        return (StatusCode::FORBIDDEN, "path not allowed").into_response();
+    }
+    let dir = st.0.project_dir.lock().unwrap().clone();
+    let full = dir.join(rest.replace('/', std::path::MAIN_SEPARATOR_STR));
+    match std::fs::read(&full) {
+        Ok(bytes) => {
+            let mime = match full.extension().and_then(|s| s.to_str()).unwrap_or("").to_ascii_lowercase().as_str() {
+                "stl" => "model/stl",
+                "step" | "stp" => "model/step",
+                "glb" => "model/gltf-binary",
+                "gltf" => "model/gltf+json",
+                "obj" => "text/plain",
+                _ => "application/octet-stream",
+            };
+            ([(header::CONTENT_TYPE, mime)], bytes).into_response()
+        }
+        Err(_) => (StatusCode::NOT_FOUND, "missing CAD media").into_response(),
+    }
+}
+
+async fn cad_import(State(st): State<AppState>, mut multipart: Multipart) -> Result<Json<Value>, (StatusCode, String)> {
+    let mut filename = String::from("import.bin");
+    let mut bytes: Vec<u8> = Vec::new();
+    let mut attach_to: Option<String> = None;
+    while let Some(field) = multipart.next_field().await.map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))? {
+        let name = field.name().unwrap_or("").to_string();
+        if name == "part_id" {
+            attach_to = field.text().await.ok().map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+            continue;
+        }
+        if name == "file" || name == "cad" || name.is_empty() {
+            if let Some(f) = field.file_name().map(|s| s.to_string()) {
+                filename = f;
+            }
+            bytes = field.bytes().await.map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?.to_vec();
+        }
+    }
+    if bytes.is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "no CAD file in upload".into()));
+    }
+    if bytes.len() > 80 * 1024 * 1024 {
+        return Err((StatusCode::PAYLOAD_TOO_LARGE, "CAD file exceeds 80 MiB".into()));
+    }
+    let ext = projects::ext_of(&filename);
+    if !matches!(ext.as_str(), "stl" | "step" | "stp" | "glb" | "gltf" | "obj") {
+        return Err((StatusCode::BAD_REQUEST, format!("unsupported CAD format .{ext} — use stl, step, glb, gltf, or obj")));
+    }
+    let dir = st.0.project_dir.lock().unwrap().clone();
+    let cad_dir = dir.join("cad");
+    std::fs::create_dir_all(&cad_dir).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let safe = projects::safe_filename(&filename);
+    let rel = format!("cad/{safe}");
+    let dest = dir.join(&rel);
+    std::fs::write(&dest, &bytes).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let bbox = if ext == "stl" { projects::stl_bbox(&bytes) } else { None };
+    let preview = if ext == "stl" { Some(rel.clone()) } else { None };
+    let format = if ext == "stp" { "step" } else { ext.as_str() };
+    let mut doc = st.0.doc.lock().unwrap();
+    let part_id = if let Some(existing) = attach_to {
+        if let Some(part) = doc.part_mut(&existing) {
+            part.spatial.cad = Some(archeon_design_ir::CadRef {
+                format: format.into(),
+                path: rel.clone(),
+                preview: preview.clone(),
+                truth: "SOURCE".into(),
+                note: "Imported CAD attached to existing semantic part.".into(),
+            });
+            if let Some([sx, sy, sz]) = bbox {
+                if let archeon_design_ir::Primitive::Box { sx: psx, sy: psy, sz: psz } = &mut part.spatial.primitive {
+                    *psx = sx;
+                    *psy = sy;
+                    *psz = sz;
+                }
+            }
+            existing
+        } else {
+            projects::create_imported_part(&mut doc, &safe, &rel, format, bbox, preview)
+        }
+    } else {
+        projects::create_imported_part(&mut doc, &safe, &rel, format, bbox, preview)
+    };
+    log_line(&st.0, "cad.import", &format!("{rel} -> {part_id}"));
+    Ok(Json(json!({
+        "ok": true,
+        "part_id": part_id,
+        "path": rel,
+        "format": format,
+        "bbox_m": bbox,
+        "note": if format == "step" {
+            "STEP stored as exact CAD. Spatial view uses envelope until a tessellation exists."
+        } else {
+            "Mesh imported for spatial view. Not a BREP kernel solid."
+        }
+    })))
 }
 
 #[derive(Deserialize)]

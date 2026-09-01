@@ -71,6 +71,22 @@ pub struct Part {
     pub provenance: Provenance,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CadRef {
+    /// File format: stl | step | glb | gltf | obj
+    pub format: String,
+    /// Path relative to the project directory (exact CAD if STEP, mesh if STL/GLB).
+    pub path: String,
+    /// Optional tessellation used by the spatial view. Never the source of truth for STEP.
+    #[serde(default)]
+    pub preview: Option<String>,
+    /// Provenance of the CAD file itself (SOURCE imported, GENERATED kernel).
+    #[serde(default)]
+    pub truth: String,
+    #[serde(default)]
+    pub note: String,
+}
+
 fn one() -> u32 {
     1
 }
@@ -94,6 +110,9 @@ pub struct Spatial {
     pub parent_axis: Option<EntityId>,
     #[serde(default)]
     pub service_path: Vec<[f64; 3]>,
+    /// Optional exact/imported CAD. The primitive remains the DesignIR fallback envelope.
+    #[serde(default)]
+    pub cad: Option<CadRef>,
 }
 
 fn unit_x() -> [f64; 3] {
@@ -116,6 +135,7 @@ impl Default for Spatial {
             radial_group: None,
             parent_axis: None,
             service_path: vec![],
+            cad: None,
         }
     }
 }

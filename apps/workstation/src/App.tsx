@@ -4,6 +4,7 @@ import { LOCAL_COMMANDS, type Part, type Requirement } from '@archeon/design-pro
 import { ArmScene } from './scene/ArmScene';
 import { getJson, postJson } from './api';
 import { useUi } from './store';
+import { ARCHEON_PRODUCT, ARCHEON_VERSION } from './version';
 
 interface DesignDoc {
   project: { id: string; name: string; revision_id: string; branch: string; kernel: string };
@@ -60,6 +61,10 @@ export default function App() {
   ]);
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [displayVersion, setDisplayVersion] = useState(ARCHEON_VERSION);
+  const [projects, setProjects] = useState<{ id: string; name: string; folder: string; revision: string; parts: number }[]>([]);
+  const [currentFolder, setCurrentFolder] = useState('archeon-arm');
 
   const selectedId = useUi((s) => s.selectedId);
   const view = useUi((s) => s.view);
@@ -70,20 +75,24 @@ export default function App() {
 
   async function refresh() {
     try {
-      const [d, p, h, c, v, t] = await Promise.all([
+      const [d, p, h, c, v, t, plist] = await Promise.all([
         getJson<DesignDoc>('/api/design'),
         getJson<ProjectMeta>('/api/project'),
         getJson<{ version: string; status: string }>('/api/health'),
         getJson<{ kernel: string; build123d: boolean; note: string }>('/api/cad/status'),
         getJson<{ findings: never[]; error_count: number }>('/api/validation'),
-        getJson<{ items: never[] }>('/api/transactions')
+        getJson<{ items: never[] }>('/api/transactions'),
+        getJson<{ projects: { id: string; name: string; folder: string; revision: string; parts: number }[]; current?: string }>('/api/projects')
       ]);
       setDoc(d);
       setMeta(p);
       setHealth(h);
+      if (h.version) setDisplayVersion(h.version);
       setCad(c);
       setVal(v);
       setLedger(t);
+      setProjects(plist.projects ?? []);
+      if (plist.current) setCurrentFolder(plist.current);
       useUi.getState().setConnected(true);
       if (p.proposal?.preview_parts) {
         setPreview({ ...(d as DesignDoc), parts: p.proposal.preview_parts });
@@ -134,6 +143,61 @@ export default function App() {
     }
   }
 
+  async function hardReset() {
+    if (resetting) return;
+    setResetting(true);
+    try {
+      const response = await fetch('/api/control/reset', { method: 'POST' });
+      const body = await response.json().catch(() => ({})) as {
+        compiler?: { queued?: boolean; version?: string };
+        error?: string;
+      };
+      if (!response.ok || body.compiler?.queued !== true) {
+        throw new Error(body.error ?? `update compiler unavailable (${response.status})`);
+      }
+      const url = new URL('/boot.html', window.location.origin);
+      url.searchParams.set('v', body.compiler.version ?? displayVersion);
+      url.searchParams.set('r', String(Date.now()));
+      url.searchParams.set('force', '1');
+      window.location.replace(url.toString());
+    } catch (err) {
+      setChat((c) => [...c, { who: 'ERROR', text: `HARD RESET failed · ${err instanceof Error ? err.message : 'compiler unavailable'}` }]);
+      setResetting(false);
+    }
+  }
+
+  async function loadProject(id: string) {
+    setBusy(true);
+    try {
+      await postJson('/api/projects/load', { id });
+      await refresh();
+      setChat((c) => [...c, { who: 'SYSTEM', text: `Loaded project ${id}. CAD meshes attach from cad/ and generated/.` }]);
+    } catch (e) {
+      setChat((c) => [...c, { who: 'ERROR', text: String(e) }]);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function importCad(file: File) {
+    setBusy(true);
+    try {
+      const body = new FormData();
+      body.append('file', file);
+      if (selectedId) body.append('part_id', selectedId);
+      const r = await fetch('/api/cad/import', { method: 'POST', body });
+      const out = await r.json() as { ok?: boolean; part_id?: string; note?: string; error?: string };
+      if (!r.ok) throw new Error(out.error ?? `import failed ${r.status}`);
+      if (out.part_id) useUi.getState().setSelected(out.part_id);
+      await refresh();
+      setChat((c) => [...c, { who: 'CAD', text: `${file.name} → ${out.part_id}\n${out.note ?? ''}` }]);
+    } catch (e) {
+      setChat((c) => [...c, { who: 'ERROR', text: String(e) }]);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function decide(kind: 'commit' | 'reject') {
     const id = meta?.proposal?.transaction.transaction_id;
     if (!id) return;
@@ -172,11 +236,20 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <div className="brand">
-          <strong>ARCHEON</strong>
-          <small>SPATIAL ENGINEERING OS</small>
+          <img className="brand__mark" src="/archeon.png" alt="" />
+          <div>
+            <strong>{ARCHEON_PRODUCT}</strong>
+            <small>{displayVersion}</small>
+          </div>
         </div>
         <div className="meta">
-          <div className="chip"><span>PROJECT</span><b>{doc?.project.name ?? '…'}</b></div>
+          <div className="chip"><span>PROJECT</span>
+            <select className="project-select" value={currentFolder} disabled={busy} onChange={(e) => void loadProject(e.target.value)}>
+              {(projects.length ? projects : [{ folder: currentFolder, name: doc?.project.name ?? currentFolder, id: currentFolder, revision: '', parts: 0 }]).map((p) => (
+                <option key={p.folder} value={p.folder}>{p.name}</option>
+              ))}
+            </select>
+          </div>
           <div className="chip"><span>REVISION</span><b>{doc?.project.revision_id ?? '—'}</b></div>
           <div className="chip"><span>BRANCH</span><b>{doc?.project.branch ?? 'main'}</b></div>
           <div className="chip"><span>KERNEL</span><b className={cad?.build123d ? 'ok' : 'warn'}>{cad?.kernel ?? doc?.project.kernel ?? '—'}</b></div>
@@ -196,6 +269,18 @@ export default function App() {
             useUi.getState().setExplosion(n);
             if (n > 0 && view === 'ASSEMBLED') useUi.getState().setView('EXPLODED');
           }} />
+          <label className="top-btn">
+            IMPORT CAD
+            <input type="file" hidden accept=".stl,.step,.stp,.glb,.gltf,.obj" onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = '';
+              if (f) void importCad(f);
+            }} />
+          </label>
+          <button type="button" className="top-btn" disabled={busy} onClick={() => void postJson('/api/cad/regenerate', {}).then(() => refresh())}>REGEN CAD</button>
+          <button type="button" className="top-btn top-btn--reset" disabled={resetting} onClick={() => void hardReset()}>
+            {resetting ? 'RESET…' : 'HARD RESET'}
+          </button>
         </div>
       </header>
 
@@ -226,6 +311,9 @@ export default function App() {
           <div className="tag">SPATIAL PROJECTION · NOT MANUFACTURING CAD</div>
           <h1>{selected?.name ?? 'ARCHEON ARM'}</h1>
           <div>{selectedId} · {view}</div>
+          {selected?.spatial.cad && (
+            <div className="cad-flag">{selected.spatial.cad.format.toUpperCase()} · {selected.spatial.cad.truth} · {selected.spatial.cad.note}</div>
+          )}
         </div>
         {doc && (
           <ArmScene
@@ -234,7 +322,7 @@ export default function App() {
             proposalParts={preview?.parts ?? null}
           />
         )}
-        <div className="legend">v{health?.version ?? '0.1.0'} · hash {meta?.hash?.slice(0, 10) ?? '—'}</div>
+        <div className="legend">v{displayVersion} · hash {meta?.hash?.slice(0, 10) ?? '—'}</div>
       </section>
 
       <aside className="agent">

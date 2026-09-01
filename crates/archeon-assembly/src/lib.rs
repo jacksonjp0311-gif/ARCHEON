@@ -90,6 +90,7 @@ mod tests {
                 radial_group: None,
                 parent_axis: None,
                 service_path: vec![],
+                cad: None,
             },
             provenance: Provenance::generated("t", "t"),
         }

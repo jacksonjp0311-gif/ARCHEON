@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
-import { Canvas } from '@react-three/fiber';
+import { Suspense, useMemo } from 'react';
+import { Canvas, useLoader } from '@react-three/fiber';
 import { Edges, Line, OrbitControls } from '@react-three/drei';
+import { STLLoader } from 'three-stdlib';
 import * as THREE from 'three';
 import { explosionOffset, renderTransform } from '@archeon/scene-engine';
 import { useUi } from '../store';
@@ -20,6 +21,50 @@ function provenanceTint(cls: string): string {
     case 'VALIDATED': return '#6ce391';
     default: return STEEL;
   }
+}
+
+function meshUrl(part: Part): string | null {
+  const cad = part.spatial.cad;
+  if (!cad) return null;
+  const rel = cad.preview || (cad.format === 'stl' ? cad.path : null);
+  if (!rel) return null;
+  return `/api/media/${rel.split('\\').join('/')}`;
+}
+
+function StlMesh({
+  url,
+  color,
+  opacity,
+  ghost,
+  selected,
+  clip
+}: {
+  url: string;
+  color: string;
+  opacity: number;
+  ghost?: boolean;
+  selected: boolean;
+  clip: THREE.Plane[];
+}) {
+  const geom = useLoader(STLLoader, url);
+  useMemo(() => {
+    geom.computeVertexNormals();
+    geom.center();
+  }, [geom]);
+  return (
+    <mesh geometry={geom}>
+      <meshStandardMaterial
+        color={color}
+        transparent={opacity < 0.95}
+        opacity={opacity}
+        wireframe={!!ghost}
+        metalness={0.35}
+        roughness={0.45}
+        clippingPlanes={clip}
+      />
+      {!ghost && <Edges threshold={15} color={selected ? ORANGE : '#173445'} />}
+    </mesh>
+  );
 }
 
 function Solid({
@@ -43,9 +88,21 @@ function Solid({
   const opacity = ghost ? 0.35 : xray ? 0.22 : 0.92;
   const clip = cutaway ? [new THREE.Plane(new THREE.Vector3(0, -1, 0), 0.002)] : [];
   const rot = part.spatial.rpy_rad as [number, number, number];
+  const cadUrl = meshUrl(part);
   return (
-    <group position={pos} rotation={rot}>
-      {prim.kind === 'box' ? (
+    <group
+      position={pos}
+      rotation={rot}
+      onClick={(e) => {
+        e.stopPropagation();
+        useUi.getState().setSelected(part.id);
+      }}
+    >
+      {cadUrl ? (
+        <Suspense fallback={null}>
+          <StlMesh url={cadUrl} color={color} opacity={opacity} ghost={ghost} selected={selected} clip={clip} />
+        </Suspense>
+      ) : prim.kind === 'box' ? (
         <mesh
           onClick={(e) => {
             e.stopPropagation();
@@ -131,6 +188,7 @@ export function ArmScene({
       <directionalLight position={[-2, 1, -1]} intensity={0.25} color={ICE} />
       <gridHelper args={[3, 30, '#1f4c64', '#0c1c2a']} position={[0.4, 0, 0]} />
       <axesHelper args={[0.25]} />
+      <Suspense fallback={null}>
       {visible.map((p) => {
         const off = explosionOffset(
           {
@@ -182,6 +240,7 @@ export function ArmScene({
             <meshBasicMaterial color="#38d7ff" />
           </mesh>
         ))}
+      </Suspense>
       {showIfaces && ports.length > 1 && (
         <Line
           points={ports.map((p) => p.origin_m)}
