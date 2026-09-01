@@ -1,5 +1,7 @@
 //! Project discovery, load, and CAD import. Geometry files are attachments to DesignIR.
-use archeon_design_ir::{load_project_dir, CadRef, DesignDocument, EntityId, Part, Primitive, Spatial};
+use archeon_design_ir::{
+    load_project_dir, CadRef, DesignDocument, EntityId, Part, Primitive, Spatial,
+};
 use archeon_provenance::{Provenance, ProvenanceClass};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
@@ -181,7 +183,13 @@ pub fn create_imported_part(
     }
     let [sx, sy, sz] = bbox.unwrap_or([0.08, 0.08, 0.08]);
     let parent = doc.assemblies.first().map(|a| a.id.clone());
-    let stage = doc.parts.iter().map(|p| p.spatial.assembly_stage).max().unwrap_or(0) + 1;
+    let stage = doc
+        .parts
+        .iter()
+        .map(|p| p.spatial.assembly_stage)
+        .max()
+        .unwrap_or(0)
+        + 1;
     doc.parts.push(Part {
         id: EntityId::new(id.clone()),
         name: filename.to_string(),
@@ -207,7 +215,8 @@ pub fn create_imported_part(
                 preview,
                 truth: "SOURCE".into(),
                 note: if format == "step" || format == "stp" {
-                    "Imported STEP stored as exact CAD. Spatial mesh is tessellation if present.".into()
+                    "Imported STEP stored as exact CAD. Spatial mesh is tessellation if present."
+                        .into()
                 } else {
                     "Imported mesh. Visualization only — not a BREP kernel solid.".into()
                 },
@@ -265,7 +274,9 @@ fn ascii_stl_bbox(bytes: &[u8]) -> Option<[f64; 3]> {
     for line in text.lines() {
         let t = line.trim();
         if let Some(rest) = t.strip_prefix("vertex ") {
-            let mut nums = rest.split_whitespace().filter_map(|s| s.parse::<f64>().ok());
+            let mut nums = rest
+                .split_whitespace()
+                .filter_map(|s| s.parse::<f64>().ok());
             let x = nums.next()?;
             let y = nums.next()?;
             let z = nums.next()?;

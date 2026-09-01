@@ -112,7 +112,14 @@ fn scale3(v: [f64; 3], s: f64) -> [f64; 3] {
 
 /// Deterministic explosion offset. Default spread is ENGINEERING.
 pub fn offset_for(part: &Part, strategy: ExplosionStrategy, t: f64, sequence_len: u32) -> [f64; 3] {
-    offset_for_profile(part, strategy, t, sequence_len, SpreadPreset::Engineering, 0)
+    offset_for_profile(
+        part,
+        strategy,
+        t,
+        sequence_len,
+        SpreadPreset::Engineering,
+        0,
+    )
 }
 
 pub fn offset_for_profile(
@@ -144,11 +151,15 @@ pub fn offset_for_profile(
             mag *= 0.55 + profile.stage_spacing * rank + profile.hierarchy_spacing * 0.15 * depth;
         }
         ExplosionStrategy::Axial => {
-            dir = [0.0, 0.0, if part.spatial.explosion_vector[2] == 0.0 {
-                1.0
-            } else {
-                part.spatial.explosion_vector[2].signum()
-            }];
+            dir = [
+                0.0,
+                0.0,
+                if part.spatial.explosion_vector[2] == 0.0 {
+                    1.0
+                } else {
+                    part.spatial.explosion_vector[2].signum()
+                },
+            ];
             mag *= 0.7 + profile.hierarchy_spacing * 0.2 * depth;
         }
         ExplosionStrategy::System => {
@@ -163,7 +174,8 @@ pub fn offset_for_profile(
                 * profile.hierarchy_spacing
                 * assembly_k
                 * if depth == 0.0 { 1.15 } else { 0.35 };
-            let child_mag = base * profile.spread_scale * profile.stage_spacing * child_k * (1.0 + depth);
+            let child_mag =
+                base * profile.spread_scale * profile.stage_spacing * child_k * (1.0 + depth);
             mag = assembly_mag + child_mag;
         }
         ExplosionStrategy::BomFocus => mag *= 0.22 + 0.08 * depth,
@@ -202,7 +214,11 @@ fn assembly_depth(doc: &DesignDocument, parent: Option<&EntityId>) -> u32 {
     d
 }
 
-pub fn explode_document(doc: &DesignDocument, strategy: ExplosionStrategy, t: f64) -> Vec<ExplosionOffset> {
+pub fn explode_document(
+    doc: &DesignDocument,
+    strategy: ExplosionStrategy,
+    t: f64,
+) -> Vec<ExplosionOffset> {
     explode_document_spread(doc, strategy, t, SpreadPreset::Engineering)
 }
 
@@ -217,7 +233,14 @@ pub fn explode_document_spread(
         .iter()
         .map(|p| ExplosionOffset {
             part: p.id.0.clone(),
-            delta_m: offset_for_profile(p, strategy, t, n, preset, assembly_depth(doc, p.parent.as_ref())),
+            delta_m: offset_for_profile(
+                p,
+                strategy,
+                t,
+                n,
+                preset,
+                assembly_depth(doc, p.parent.as_ref()),
+            ),
         })
         .collect()
 }
@@ -277,10 +300,28 @@ mod tests {
     #[test]
     fn engineering_spread_exceeds_compact() {
         let p = part("part.a", 3, [1.0, 0.0, 0.0], 0.2);
-        let compact = offset_for_profile(&p, ExplosionStrategy::Radial, 1.0, 7, SpreadPreset::Compact, 1);
-        let engineering = offset_for_profile(&p, ExplosionStrategy::Radial, 1.0, 7, SpreadPreset::Engineering, 1);
-        let c = (compact[0] * compact[0] + compact[1] * compact[1] + compact[2] * compact[2]).sqrt();
-        let e = (engineering[0] * engineering[0] + engineering[1] * engineering[1] + engineering[2] * engineering[2]).sqrt();
+        let compact = offset_for_profile(
+            &p,
+            ExplosionStrategy::Radial,
+            1.0,
+            7,
+            SpreadPreset::Compact,
+            1,
+        );
+        let engineering = offset_for_profile(
+            &p,
+            ExplosionStrategy::Radial,
+            1.0,
+            7,
+            SpreadPreset::Engineering,
+            1,
+        );
+        let c =
+            (compact[0] * compact[0] + compact[1] * compact[1] + compact[2] * compact[2]).sqrt();
+        let e = (engineering[0] * engineering[0]
+            + engineering[1] * engineering[1]
+            + engineering[2] * engineering[2])
+            .sqrt();
         assert!(e > c);
     }
 }

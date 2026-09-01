@@ -45,6 +45,22 @@ interface Props {
   onApprove: () => void;
   onReject: () => void;
   onValidate: () => void;
+  contextName?: string;
+  working?: boolean;
+  cadStatus?: string | null;
+  card?: {
+    kind: string;
+    title: string;
+    happened: string;
+    why: string;
+    changed: string;
+    attention: string;
+    actions: { id: string; label: string }[];
+  } | null;
+  steps?: { n: number; name: string; status: string; note?: string | null }[];
+  variants?: { id: string; status: string; metrics?: { reach_m?: number | null; note?: string } }[];
+  onStop?: () => void;
+  onAction?: (id: string) => void;
 }
 
 const HUD_KEY = 'archeon.agentHud.v1';
@@ -153,13 +169,13 @@ export function AgentHud(props: Props) {
     if (edge === 'BOTTOM') setGeom((g) => ({ ...g, x: Math.max(8, (pw - g.w) / 2), y: Math.max(8, ph - g.h - 8) }));
   }
 
-  const proposing = props.proposal ? 'PROPOSING' : 'IDLE';
-  const active = props.proposal?.transaction.agent_id ?? 'spatial-director';
+  const proposing = props.working ? 'WORKING' : props.proposal ? 'PROPOSAL ACTIVE' : 'IDLE';
+  const active = props.working ? 'CAD DESIGNER' : (props.proposal?.transaction.agent_id ?? 'spatial-director');
 
   if (!open) {
     return (
-      <button type="button" className="agent-fab" onClick={() => setOpen(true)} title="Open ARCHEON Agent">
-        ◈ AGENT
+      <button type="button" className={`agent-fab ${props.working ? 'is-working' : ''} ${props.proposal ? 'is-decide' : ''}`} onClick={() => setOpen(true)} title="Open ARCHEON Agent">
+        ◈ ARCHEON{props.working ? ' ●' : props.proposal ? ' !' : ''}
       </button>
     );
   }
@@ -183,8 +199,11 @@ export function AgentHud(props: Props) {
         onPointerMove={onTitleMove}
         onPointerUp={onTitleUp}
       >
-        <span>◈ ARCHEON AGENT</span>
-        <small>ACTIVE {active.toUpperCase()} · {proposing}</small>
+        <span>◈ ARCHEON</span>
+        <small>
+          {props.contextName ? `CONTEXT ${props.contextName}` : `ACTIVE ${active.toUpperCase()}`} · {proposing}
+          {props.cadStatus ? ` · CAD ${props.cadStatus}` : ''}
+        </small>
         <button type="button" onClick={() => setCollapsed(!collapsed)} title="Collapse">{collapsed ? '▢' : '—'}</button>
         <button type="button" onClick={() => dock('RIGHT')} title="Dock right">⊞</button>
         <button type="button" onClick={() => setOpen(false)} title="Morph closed">×</button>
@@ -197,17 +216,51 @@ export function AgentHud(props: Props) {
             ))}
           </div>
           <div className="agent-hud__body">
-            {tab === 'CHAT' && props.chat.map((c, i) => (
-              <div className="log" key={i}><span className="who">{c.who}</span> {c.text}</div>
-            ))}
+            {tab === 'CHAT' && (
+              <>
+                {props.card && (
+                  <div className={`reply-card kind-${props.card.kind}`}>
+                    <h3>{props.card.title}</h3>
+                    <p>{props.card.happened}</p>
+                    <p className="notes">{props.card.why}</p>
+                    <p>{props.card.changed}</p>
+                    <p className="warn">{props.card.attention}</p>
+                    <div className="row">
+                      {props.card.actions.map((a) => (
+                        <button key={a.id} type="button" onClick={() => props.onAction?.(a.id)}>{a.label}</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {props.steps && props.steps.length > 0 && (
+                  <ol className="live-steps">
+                    {props.steps.map((s) => (
+                      <li key={s.n}><span className={s.status === 'COMPLETE' ? 'ok' : s.status === 'RUNNING' || s.status === 'WORKING' ? 'warn' : 'notes'}>{s.status === 'COMPLETE' ? '✓' : s.status === 'WAITING' || s.status === 'NOT_CHECKED' ? '○' : '●'}</span> {s.name} <small>{s.status}{s.note ? ` · ${s.note}` : ''}</small></li>
+                    ))}
+                  </ol>
+                )}
+                {props.chat.map((c, i) => (
+                  <div className="log" key={i}><span className="who">{c.who}</span> {c.text}</div>
+                ))}
+              </>
+            )}
             {tab === 'AGENTS' && AGENTS.map(([id, name]) => (
               <div className="agent-row" key={id}>
                 <b>{name}</b>
-                <span className={id === active && props.proposal ? 'warn' : 'ok'}>
-                  {id === active && props.proposal ? 'PROPOSING' : 'IDLE'}
+                <span className={id === 'cad-designer' && props.working ? 'warn' : id === active && props.proposal ? 'warn' : 'ok'}>
+                  {id === 'cad-designer' && props.working ? 'WORKING' : id === active && props.proposal ? 'PROPOSING' : 'IDLE'}
                 </span>
               </div>
             ))}
+            {props.variants && props.variants.length > 0 && tab === 'PLAN' && (
+              <div className="variant-list">
+                {props.variants.map((v) => (
+                  <button key={v.id} type="button" onClick={() => props.onAction?.(`variant:${v.id}`)}>
+                    Variant {v.id} · {v.status} · reach {v.metrics?.reach_m != null ? `${Math.round(v.metrics.reach_m * 1000)} mm` : '—'}
+                  </button>
+                ))}
+              </div>
+            )}
             {tab === 'PLAN' && (
               <div className="notes">
                 {(props.plan.length ? props.plan : ['No structured plan. Local commands map directly to Spatial Director / DTP.']).map((n, i) => <p key={i}>{n}</p>)}
@@ -245,6 +298,7 @@ export function AgentHud(props: Props) {
           <form className="agent-hud__cmd" onSubmit={(e) => { e.preventDefault(); props.onSend(props.msg); }}>
             <input value={props.msg} onChange={(e) => props.setMsg(e.target.value)} placeholder="engineering command…" />
             <button className="primary" disabled={props.busy}>SEND</button>
+            {props.working && <button type="button" className="danger" onClick={() => props.onStop?.()}>STOP</button>}
           </form>
           <div
             className="agent-hud__resize"

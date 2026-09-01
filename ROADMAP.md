@@ -13,7 +13,19 @@ Status language: **shipped**, **partial**, **not started**. Nothing here is a cl
 
 ## Phase 1 — Semantic assembly + spatial workstation — shipped
 
-## Phase 1.1 / v0.2 — Spatial engineering workstation — this tree
+## Phase 1.2 / v0.3 — Live Design — this tree
+
+- Three clocks (render / engineering / agent)
+- Scene command bus (deterministic, no agent frame animation)
+- LiveDesignSession isolated from canonical DesignIR
+- Async CAD jobs + geometry hot-swap nonce
+- Variant A/B/C parameter previews (envelope, not independent kernels)
+- Ctrl+K command palette, context ribbon, object HUD
+- Camera history + spatial undo (view undo ≠ design rollback)
+- SSE engineering events
+- Human-readable agent cards and structured steps (not chain-of-thought)
+
+## Phase 1.1 / v0.2 — Spatial engineering workstation — shipped
 
 - Floating morphing Agent HUD (not a permanent right rail)
 - Selection nullability + Item Tracker + CAD Inspector

@@ -6,12 +6,13 @@ members = [
   "crates/archeon-validation",
   "crates/archeon-assembly",
   "crates/archeon-agents",
+  "crates/archeon-live",
   "crates/archeon-api",
 ]
 resolver = "2"
 
 [workspace.package]
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 license = "MIT"
 authors = ["ARCHEON"]
@@ -24,6 +25,7 @@ archeon-transactions = { path = "crates/archeon-transactions" }
 archeon-validation = { path = "crates/archeon-validation" }
 archeon-assembly = { path = "crates/archeon-assembly" }
 archeon-agents = { path = "crates/archeon-agents" }
+archeon-live = { path = "crates/archeon-live" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"

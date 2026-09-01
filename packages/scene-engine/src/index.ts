@@ -244,3 +244,151 @@ export function hierarchicalOffsets(
   }
   return out;
 }
+
+/** Semantic scene commands. Agents never animate frames; the scene engine interpolates. */
+export type SceneCommand =
+  | { op: 'focus_entity'; entity_id: string; ghost_others?: boolean; duration_ms?: number }
+  | { op: 'focus_assembly'; entity_id: string; ghost_others?: boolean; duration_ms?: number }
+  | { op: 'explode_entity'; entity_id?: string | null; factor?: number }
+  | { op: 'explode_system'; factor?: number }
+  | { op: 'set_explosion'; progress: number }
+  | { op: 'set_explosion_spread'; spread: SpreadPreset }
+  | { op: 'ghost_others'; enabled: boolean }
+  | { op: 'restore_display' }
+  | { op: 'show_overlay'; overlay: string }
+  | { op: 'hide_overlay' }
+  | { op: 'fit_scene' }
+  | { op: 'fit_selection' }
+  | { op: 'align_camera'; axis?: 'x' | 'y' | 'z' }
+  | { op: 'track_entity'; entity_id: string }
+  | { op: 'untrack_entity'; entity_id: string }
+  | { op: 'clear_selection' }
+  | { op: 'select_entity'; entity_id: string }
+  | { op: 'isolate_entity'; entity_id: string }
+  | { op: 'compare_variants'; mode: 'SPREAD' | 'STACK' | 'OVERLAY' | 'FOCUS' | 'COMPARE' }
+  | { op: 'select_variant'; id: string }
+  | { op: 'previous_view' }
+  | { op: 'home_view' }
+  | { op: 'show_affected' };
+
+export const SPREAD_ORDER: SpreadPreset[] = ['COMPACT', 'NORMAL', 'ENGINEERING', 'WIDE', 'EXTREME'];
+
+export interface SceneSnapshot {
+  selectedId: string | null;
+  trackedIds: string[];
+  neighborhoodIds: string[];
+  ghostOthers: boolean;
+  focusId: string | null;
+  explosion: number;
+  spread: SpreadPreset;
+  explodeContext: string | null;
+  isolate: string | null;
+  overlay: string;
+  spatial: string;
+  variantMode: 'NONE' | 'SPREAD' | 'STACK' | 'OVERLAY' | 'FOCUS' | 'COMPARE';
+  activeVariant: string | null;
+  cameraAxis: 'x' | 'y' | 'z' | null;
+  fitRequest: 'none' | 'scene' | 'selection' | 'home' | 'previous';
+}
+
+export function emptyScene(): SceneSnapshot {
+  return {
+    selectedId: null,
+    trackedIds: [],
+    neighborhoodIds: [],
+    ghostOthers: false,
+    focusId: null,
+    explosion: 0,
+    spread: 'ENGINEERING',
+    explodeContext: null,
+    isolate: null,
+    overlay: 'NONE',
+    spatial: 'ASSEMBLED',
+    variantMode: 'NONE',
+    activeVariant: null,
+    cameraAxis: null,
+    fitRequest: 'none'
+  };
+}
+
+export function applySceneCommand(state: SceneSnapshot, cmd: SceneCommand): SceneSnapshot {
+  switch (cmd.op) {
+    case 'select_entity':
+      return { ...state, selectedId: cmd.entity_id, fitRequest: 'selection' };
+    case 'clear_selection':
+      return { ...state, selectedId: null, isolate: null, neighborhoodIds: [], ghostOthers: false, focusId: null, fitRequest: 'none' };
+    case 'focus_entity':
+    case 'focus_assembly':
+      return {
+        ...state,
+        selectedId: cmd.entity_id,
+        focusId: cmd.entity_id,
+        ghostOthers: cmd.ghost_others !== false,
+        isolate: null,
+        fitRequest: 'selection'
+      };
+    case 'explode_entity':
+      return {
+        ...state,
+        explodeContext: cmd.entity_id ?? state.selectedId,
+        explosion: cmd.factor ?? 0.85,
+        spatial: 'PART_EXPLODED',
+        fitRequest: 'selection'
+      };
+    case 'explode_system':
+      return { ...state, explosion: cmd.factor ?? 0.7, spatial: 'SYSTEM_EXPLODED', explodeContext: null, fitRequest: 'scene' };
+    case 'set_explosion':
+      return { ...state, explosion: Math.min(1, Math.max(0, cmd.progress)), spatial: cmd.progress > 0 ? 'EXPLODED' : 'ASSEMBLED' };
+    case 'set_explosion_spread':
+      return { ...state, spread: cmd.spread };
+    case 'ghost_others':
+      return { ...state, ghostOthers: cmd.enabled };
+    case 'restore_display':
+      return {
+        ...state,
+        ghostOthers: false,
+        isolate: null,
+        focusId: null,
+        explosion: 0,
+        explodeContext: null,
+        spatial: 'ASSEMBLED',
+        overlay: 'NONE',
+        variantMode: 'NONE',
+        fitRequest: 'home'
+      };
+    case 'show_overlay':
+      return { ...state, overlay: cmd.overlay };
+    case 'hide_overlay':
+      return { ...state, overlay: 'NONE' };
+    case 'fit_scene':
+      return { ...state, fitRequest: 'scene' };
+    case 'fit_selection':
+      return { ...state, fitRequest: 'selection' };
+    case 'align_camera':
+      return { ...state, cameraAxis: cmd.axis ?? 'y', fitRequest: 'scene' };
+    case 'track_entity':
+      return { ...state, trackedIds: state.trackedIds.includes(cmd.entity_id) ? state.trackedIds : [...state.trackedIds, cmd.entity_id] };
+    case 'untrack_entity':
+      return { ...state, trackedIds: state.trackedIds.filter((id) => id !== cmd.entity_id) };
+    case 'isolate_entity':
+      return { ...state, isolate: cmd.entity_id, selectedId: cmd.entity_id, spatial: 'ISOLATE', fitRequest: 'selection' };
+    case 'compare_variants':
+      return { ...state, variantMode: cmd.mode, fitRequest: 'scene' };
+    case 'select_variant':
+      return { ...state, activeVariant: cmd.id, variantMode: state.variantMode === 'NONE' ? 'FOCUS' : state.variantMode };
+    case 'previous_view':
+      return { ...state, fitRequest: 'previous' };
+    case 'home_view':
+      return { ...state, fitRequest: 'home', explosion: 0, isolate: null, ghostOthers: false, spatial: 'ASSEMBLED' };
+    case 'show_affected':
+      return { ...state, ghostOthers: true, overlay: 'AGENT_DIFF', fitRequest: 'selection' };
+    default:
+      return state;
+  }
+}
+
+export function nudgeSpread(current: SpreadPreset, dir: 1 | -1): SpreadPreset {
+  const i = SPREAD_ORDER.indexOf(current);
+  return SPREAD_ORDER[Math.min(SPREAD_ORDER.length - 1, Math.max(0, i + dir))];
+}
+

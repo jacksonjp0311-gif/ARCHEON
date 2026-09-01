@@ -146,16 +146,24 @@ impl Operation {
 
     pub fn affected(&self) -> Vec<String> {
         match self {
-            Self::CreatePart { id, .. } | Self::DeletePart { id } | Self::MoveComponent { id, .. } => {
+            Self::CreatePart { id, .. }
+            | Self::DeletePart { id }
+            | Self::MoveComponent { id, .. } => {
                 vec![id.clone()]
             }
             Self::ChangeParameter { name, .. } => vec![name.clone()],
-            Self::ChangeDimension { part, .. } | Self::ChangeMaterial { part, .. } => vec![part.clone()],
-            Self::CreateRequirement { id, .. } | Self::ModifyRequirement { id, .. } => vec![id.clone()],
+            Self::ChangeDimension { part, .. } | Self::ChangeMaterial { part, .. } => {
+                vec![part.clone()]
+            }
+            Self::CreateRequirement { id, .. } | Self::ModifyRequirement { id, .. } => {
+                vec![id.clone()]
+            }
             Self::CreatePort { id, host, .. } => vec![id.clone(), host.clone()],
             Self::CreateInterface { id, a, b, .. } => vec![id.clone(), a.clone(), b.clone()],
             Self::CreateMate { id, interface, .. } => vec![id.clone(), interface.clone()],
-            Self::CreateDatum { id, host, .. } | Self::CreateSketch { id, part: host, .. } | Self::Extrude { id, part: host, .. } => {
+            Self::CreateDatum { id, host, .. }
+            | Self::CreateSketch { id, part: host, .. }
+            | Self::Extrude { id, part: host, .. } => {
                 vec![id.clone(), host.clone()]
             }
             Self::RunAnalysis { kind } => vec![kind.clone()],
@@ -334,7 +342,12 @@ fn apply_one(doc: &mut DesignDocument, op: &Operation) -> Result<(), TxError> {
                 .ok_or_else(|| TxError::Apply(format!("unknown part {part}")))?;
             p.material = Some(EntityId::new(material.clone()));
         }
-        Operation::CreateRequirement { id, text, value, unit } => {
+        Operation::CreateRequirement {
+            id,
+            text,
+            value,
+            unit,
+        } => {
             doc.requirements.push(Requirement {
                 id: EntityId::new(id.clone()),
                 text: text.clone(),
@@ -410,9 +423,21 @@ fn sync_geometry_from_parameters(doc: &mut DesignDocument, name: &str) {
 }
 
 fn relayout_arm(doc: &mut DesignDocument) {
-    let upper = doc.parameters.get("upper_arm.length").map(|p| p.si_value()).unwrap_or(0.4);
-    let forearm = doc.parameters.get("forearm.length").map(|p| p.si_value()).unwrap_or(0.33);
-    let wrist = doc.parameters.get("wrist.length").map(|p| p.si_value()).unwrap_or(0.07);
+    let upper = doc
+        .parameters
+        .get("upper_arm.length")
+        .map(|p| p.si_value())
+        .unwrap_or(0.4);
+    let forearm = doc
+        .parameters
+        .get("forearm.length")
+        .map(|p| p.si_value())
+        .unwrap_or(0.33);
+    let wrist = doc
+        .parameters
+        .get("wrist.length")
+        .map(|p| p.si_value())
+        .unwrap_or(0.07);
     let z = 0.20;
     if let Some(p) = doc.part_mut("part.upper_arm.tube") {
         p.spatial.origin_m = [upper / 2.0, 0.0, z];
@@ -467,7 +492,8 @@ mod tests {
 
     #[test]
     fn arm_parameter_change_is_dry_runnable() {
-        let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../projects/archeon-arm");
+        let dir =
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../projects/archeon-arm");
         let doc = archeon_design_ir::load_project_dir(&dir).unwrap();
         let tx = DesignTransaction::propose(
             "cad-designer",

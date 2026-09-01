@@ -50,7 +50,10 @@ pub fn validate(doc: &DesignDocument) -> Report {
         .iter()
         .filter(|f| matches!(f.severity, Severity::Error | Severity::Fatal))
         .count();
-    let warning_count = findings.iter().filter(|f| f.severity == Severity::Warning).count();
+    let warning_count = findings
+        .iter()
+        .filter(|f| f.severity == Severity::Warning)
+        .count();
     Report {
         findings,
         error_count,
@@ -58,7 +61,13 @@ pub fn validate(doc: &DesignDocument) -> Report {
     }
 }
 
-fn push(out: &mut Vec<Finding>, severity: Severity, code: &str, entity: Option<&str>, message: &str) {
+fn push(
+    out: &mut Vec<Finding>,
+    severity: Severity,
+    code: &str,
+    entity: Option<&str>,
+    message: &str,
+) {
     out.push(Finding {
         severity,
         code: code.into(),
@@ -75,7 +84,13 @@ fn duplicate_ids(doc: &DesignDocument, out: &mut Vec<Finding>) {
     }
     for (id, n) in seen {
         if n > 1 {
-            push(out, Severity::Error, "duplicate_semantic_id", Some(&id), &format!("id occurs {n} times"));
+            push(
+                out,
+                Severity::Error,
+                "duplicate_semantic_id",
+                Some(&id),
+                &format!("id occurs {n} times"),
+            );
         }
     }
 }
@@ -99,14 +114,26 @@ fn missing_parents(doc: &DesignDocument, out: &mut Vec<Finding>) {
     for a in &doc.assemblies {
         if let Some(p) = &a.parent {
             if !ids.contains(&p.0) {
-                push(out, Severity::Error, "missing_parent_assembly", Some(a.id.as_str()), &format!("parent {} missing", p.0));
+                push(
+                    out,
+                    Severity::Error,
+                    "missing_parent_assembly",
+                    Some(a.id.as_str()),
+                    &format!("parent {} missing", p.0),
+                );
             }
         }
     }
     for p in &doc.parts {
         if let Some(parent) = &p.parent {
             if !ids.contains(&parent.0) {
-                push(out, Severity::Error, "missing_parent_assembly", Some(p.id.as_str()), &format!("parent {} missing", parent.0));
+                push(
+                    out,
+                    Severity::Error,
+                    "missing_parent_assembly",
+                    Some(p.id.as_str()),
+                    &format!("parent {} missing", parent.0),
+                );
             }
         }
     }
@@ -118,13 +145,25 @@ fn missing_part_refs(doc: &DesignDocument, out: &mut Vec<Finding>) {
     for p in &doc.parts {
         if let Some(m) = &p.material {
             if !mats.contains(&m.0) {
-                push(out, Severity::Error, "missing_part_reference", Some(p.id.as_str()), &format!("material {} missing", m.0));
+                push(
+                    out,
+                    Severity::Error,
+                    "missing_part_reference",
+                    Some(p.id.as_str()),
+                    &format!("material {} missing", m.0),
+                );
             }
         }
     }
     for f in &doc.features {
         if !parts.contains(&f.part.0) {
-            push(out, Severity::Error, "missing_part_reference", Some(f.id.as_str()), &format!("part {} missing", f.part.0));
+            push(
+                out,
+                Severity::Error,
+                "missing_part_reference",
+                Some(f.id.as_str()),
+                &format!("part {} missing", f.part.0),
+            );
         }
     }
 }
@@ -133,10 +172,22 @@ fn interface_endpoints(doc: &DesignDocument, out: &mut Vec<Finding>) {
     let ports: BTreeSet<_> = doc.ports.iter().map(|p| p.id.0.clone()).collect();
     for i in &doc.interfaces {
         if !ports.contains(&i.a.0) {
-            push(out, Severity::Error, "missing_interface_endpoint", Some(i.id.as_str()), &format!("port {} missing", i.a.0));
+            push(
+                out,
+                Severity::Error,
+                "missing_interface_endpoint",
+                Some(i.id.as_str()),
+                &format!("port {} missing", i.a.0),
+            );
         }
         if !ports.contains(&i.b.0) {
-            push(out, Severity::Error, "missing_interface_endpoint", Some(i.id.as_str()), &format!("port {} missing", i.b.0));
+            push(
+                out,
+                Severity::Error,
+                "missing_interface_endpoint",
+                Some(i.id.as_str()),
+                &format!("port {} missing", i.b.0),
+            );
         }
     }
 }
@@ -145,7 +196,13 @@ fn mate_refs(doc: &DesignDocument, out: &mut Vec<Finding>) {
     let ifaces: BTreeSet<_> = doc.interfaces.iter().map(|i| i.id.0.clone()).collect();
     for m in &doc.mates {
         if !ifaces.contains(&m.interface.0) {
-            push(out, Severity::Error, "invalid_mate_reference", Some(m.id.as_str()), &format!("interface {} missing", m.interface.0));
+            push(
+                out,
+                Severity::Error,
+                "invalid_mate_reference",
+                Some(m.id.as_str()),
+                &format!("interface {} missing", m.interface.0),
+            );
         }
     }
 }
@@ -154,7 +211,13 @@ fn orphan_features(doc: &DesignDocument, out: &mut Vec<Finding>) {
     let parts: BTreeSet<_> = doc.parts.iter().map(|p| p.id.0.clone()).collect();
     for f in &doc.features {
         if !parts.contains(&f.part.0) {
-            push(out, Severity::Error, "orphan_feature", Some(f.id.as_str()), "feature has no part");
+            push(
+                out,
+                Severity::Error,
+                "orphan_feature",
+                Some(f.id.as_str()),
+                "feature has no part",
+            );
         }
     }
 }
@@ -164,7 +227,13 @@ fn requirement_refs(doc: &DesignDocument, out: &mut Vec<Finding>) {
     for p in &doc.parts {
         for rid in &p.provenance.requirement_ids {
             if !reqs.contains(rid) {
-                push(out, Severity::Error, "unknown_requirement_reference", Some(p.id.as_str()), &format!("requirement {rid} missing"));
+                push(
+                    out,
+                    Severity::Error,
+                    "unknown_requirement_reference",
+                    Some(p.id.as_str()),
+                    &format!("requirement {rid} missing"),
+                );
             }
         }
     }
@@ -214,7 +283,8 @@ mod tests {
 
     #[test]
     fn archeon_arm_has_no_graph_errors() {
-        let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../projects/archeon-arm");
+        let dir =
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../projects/archeon-arm");
         let doc = archeon_design_ir::load_project_dir(&dir).unwrap();
         let r = validate(&doc);
         assert_eq!(r.error_count, 0, "{:?}", r.findings);
@@ -247,6 +317,9 @@ mod tests {
             provenance: Provenance::generated("t", "t"),
         });
         let r = validate(&doc);
-        assert!(r.findings.iter().any(|f| f.code == "orphan_feature" || f.code == "missing_part_reference"));
+        assert!(r
+            .findings
+            .iter()
+            .any(|f| f.code == "orphan_feature" || f.code == "missing_part_reference"));
     }
 }

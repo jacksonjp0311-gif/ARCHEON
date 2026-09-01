@@ -1,6 +1,6 @@
 # ARCHEON architecture
 
-Version 0.2.0 — Spatial engineering workstation.
+Version 0.3.0 — Live Design.
 
 > Geometry is only one projection of an engineered system.
 
@@ -37,8 +37,11 @@ Memory provides evidence and context. It cannot grant mutation rights or bypass 
 ### 7. Distinct clocks / states
 
 ```text
+render clock  ≠  engineering clock  ≠  agent clock
 render loop ≠ DesignIR canonical state ≠ CAD regeneration ≠ simulation
 ```
+
+Live Design sessions, CAD jobs, and variants live on the engineering clock. They never freeze the viewport. Events (`GET /api/events/stream`) describe state; they do not grant COMMIT.
 
 ### 8. Replaceable CAD kernel
 

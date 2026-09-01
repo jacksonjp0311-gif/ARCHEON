@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { explosionOffset, hierarchicalOffsets, profileFor, type SpatialPart } from '@archeon/scene-engine';
+import { applySceneCommand, emptyScene, explosionOffset, hierarchicalOffsets, nudgeSpread, profileFor, type SpatialPart } from '@archeon/scene-engine';
 
 const part: SpatialPart = {
   id: 'part.a',
@@ -56,5 +56,51 @@ describe('hierarchicalOffsets SYSTEM', () => {
     const dy = off.a[1] - off.b[1];
     const dz = off.a[2] - off.b[2];
     expect(Math.hypot(dx, dy, dz)).toBeGreaterThan(0.05);
+  });
+});
+
+describe('scene command bus', () => {
+  it('focus_entity is deterministic', () => {
+    const a = applySceneCommand(emptyScene(), { op: 'focus_entity', entity_id: 'asm.shoulder', ghost_others: true });
+    const b = applySceneCommand(emptyScene(), { op: 'focus_entity', entity_id: 'asm.shoulder', ghost_others: true });
+    expect(a).toEqual(b);
+    expect(a.selectedId).toBe('asm.shoulder');
+    expect(a.ghostOthers).toBe(true);
+  });
+
+  it('explode_entity uses selected context', () => {
+    const s = applySceneCommand({ ...emptyScene(), selectedId: 'asm.shoulder' }, { op: 'explode_entity', factor: 0.85 });
+    expect(s.explodeContext).toBe('asm.shoulder');
+    expect(s.explosion).toBe(0.85);
+  });
+
+  it('restore_display clears automation', () => {
+    const s = applySceneCommand(
+      applySceneCommand(emptyScene(), { op: 'focus_entity', entity_id: 'p', ghost_others: true }),
+      { op: 'restore_display' }
+    );
+    expect(s.ghostOthers).toBe(false);
+    expect(s.explosion).toBe(0);
+    expect(s.isolate).toBeNull();
+  });
+
+  it('clear_selection and track_entity', () => {
+    let s = applySceneCommand(emptyScene(), { op: 'track_entity', entity_id: 'part.a' });
+    s = applySceneCommand(s, { op: 'select_entity', entity_id: 'part.a' });
+    s = applySceneCommand(s, { op: 'clear_selection' });
+    expect(s.selectedId).toBeNull();
+    expect(s.trackedIds).toEqual(['part.a']);
+  });
+
+  it('ghost_others and fit_scene', () => {
+    const s = applySceneCommand(emptyScene(), { op: 'ghost_others', enabled: true });
+    expect(applySceneCommand(s, { op: 'fit_scene' }).fitRequest).toBe('scene');
+  });
+
+  it('compare_variants is deterministic', () => {
+    const s = applySceneCommand(emptyScene(), { op: 'compare_variants', mode: 'SPREAD' });
+    expect(s.variantMode).toBe('SPREAD');
+    expect(nudgeSpread('ENGINEERING', 1)).toBe('WIDE');
+    expect(nudgeSpread('COMPACT', -1)).toBe('COMPACT');
   });
 });

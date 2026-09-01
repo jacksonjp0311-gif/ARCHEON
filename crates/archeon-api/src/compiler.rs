@@ -68,10 +68,18 @@ pub fn find_ui_dir(root: &Path) -> Option<PathBuf> {
         }
     }
     candidates.push(root.join("apps").join("workstation").join("dist"));
-    candidates.into_iter().find(|p| p.join("index.html").is_file())
+    candidates
+        .into_iter()
+        .find(|p| p.join("index.html").is_file())
 }
 
-pub fn write_compiler_status(root: &Path, phase: &str, version: &str, ok: Option<bool>, error: &str) -> Result<(), String> {
+pub fn write_compiler_status(
+    root: &Path,
+    phase: &str,
+    version: &str,
+    ok: Option<bool>,
+    error: &str,
+) -> Result<(), String> {
     let ui = env::var("ARCHEON_UI_DIR")
         .map(PathBuf::from)
         .ok()
@@ -122,7 +130,9 @@ pub fn queue_update_compiler(root: &Path) -> Result<Value, String> {
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .creation_flags(0x0800_0000);
-        command.spawn().map_err(|err| format!("start update compiler: {err}"))?;
+        command
+            .spawn()
+            .map_err(|err| format!("start update compiler: {err}"))?;
         return Ok(json!({
             "queued": true,
             "phase": "queued-hard-reset",

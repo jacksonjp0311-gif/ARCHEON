@@ -64,7 +64,8 @@ mod tests {
 
     #[test]
     fn load_archeon_arm_seed() {
-        let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../projects/archeon-arm");
+        let dir =
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../projects/archeon-arm");
         let doc = load_project_dir(&dir).expect("load arm");
         assert!(doc.parts.len() >= 8);
         assert_eq!(doc.interfaces.len(), 7);

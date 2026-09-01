@@ -41,7 +41,7 @@ export function ItemTracker({ parts, assemblies, requirements, proposalIds }: Pr
   return (
     <section className="rail-panel tracker">
       <h2>ITEM TRACKER</h2>
-      {tracked.length === 0 && <p className="empty">No tracked items. Use TRACK in the inspector.</p>}
+      {tracked.length === 0 && <p className="empty">Nothing tracked.<br />Track important parts, requirements, or interfaces while you work.</p>}
       {tracked.map((id) => (
         <button
           key={id}

@@ -1,0 +1,19 @@
+[package]
+name = "archeon-live"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Live Design sessions, CAD jobs, variants, and engineering events"
+
+[dependencies]
+archeon-design-ir = { workspace = true }
+archeon-transactions = { workspace = true }
+archeon-validation = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+
+[dev-dependencies]
+archeon-provenance = { workspace = true }

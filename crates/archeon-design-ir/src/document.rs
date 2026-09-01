@@ -100,11 +100,7 @@ impl DesignDocument {
 
     /// Derived reach along the serial chain. ASSUMED kinematic model: sum of named lengths.
     pub fn derived_reach_m(&self) -> Option<f64> {
-        let keys = [
-            "upper_arm.length",
-            "forearm.length",
-            "wrist.length",
-        ];
+        let keys = ["upper_arm.length", "forearm.length", "wrist.length"];
         let mut sum = 0.0;
         for k in keys {
             sum += self.parameters.get(k)?.si_value();

@@ -60,8 +60,15 @@ pub async fn ping(root: &Path) -> CadStatus {
             kernel: "offline".into(),
             build123d: false,
             worker: dir.display().to_string(),
-            last_error: Some(String::from_utf8_lossy(&out.stderr).chars().take(400).collect()),
-            note: "CAD worker failed. Geometry in the UI is a DesignIR spatial projection, not BREP.".into(),
+            last_error: Some(
+                String::from_utf8_lossy(&out.stderr)
+                    .chars()
+                    .take(400)
+                    .collect(),
+            ),
+            note:
+                "CAD worker failed. Geometry in the UI is a DesignIR spatial projection, not BREP."
+                    .into(),
         },
         Err(e) => CadStatus {
             kernel: "offline".into(),

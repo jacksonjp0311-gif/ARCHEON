@@ -102,10 +102,11 @@ pub fn load_project_dir(dir: &Path) -> Result<DesignDocument, LoadError> {
     if dir.join("parameters.json").exists() {
         let v = read_json(&dir.join("parameters.json"))?;
         if let Some(map) = v.get("parameters") {
-            doc.parameters = serde_json::from_value(map.clone()).map_err(|source| LoadError::Json {
-                path: "parameters.json".into(),
-                source,
-            })?;
+            doc.parameters =
+                serde_json::from_value(map.clone()).map_err(|source| LoadError::Json {
+                    path: "parameters.json".into(),
+                    source,
+                })?;
         }
     }
     if dir.join("provenance.json").exists() {
@@ -122,12 +123,12 @@ pub fn load_project_dir(dir: &Path) -> Result<DesignDocument, LoadError> {
 fn take_array<T: serde::de::DeserializeOwned>(v: &Value, key: &str) -> Result<Vec<T>, LoadError> {
     match v.get(key) {
         None => Ok(vec![]),
-        Some(Value::Array(_)) => serde_json::from_value(v.get(key).cloned().unwrap()).map_err(|source| {
-            LoadError::Json {
+        Some(Value::Array(_)) => {
+            serde_json::from_value(v.get(key).cloned().unwrap()).map_err(|source| LoadError::Json {
                 path: key.into(),
                 source,
-            }
-        }),
+            })
+        }
         Some(_) => Err(LoadError::Other(format!("{key} must be an array"))),
     }
 }

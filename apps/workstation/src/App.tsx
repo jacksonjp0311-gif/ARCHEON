@@ -4,9 +4,15 @@ import { neighborhoodOf, type Part, type Requirement } from '@archeon/design-pro
 import type { SpreadPreset } from '@archeon/scene-engine';
 import { ArmScene } from './scene/ArmScene';
 import { AgentHud } from './components/AgentHud';
+import { CommandPalette } from './components/CommandPalette';
+import { ContextRibbon } from './components/ContextRibbon';
 import { Inspector } from './components/Inspector';
 import { ItemTracker } from './components/ItemTracker';
 import { Navigator } from './components/Navigator';
+import { ObjectHud } from './components/ObjectHud';
+import { ViewNav } from './components/ViewNav';
+import type { PaletteItem } from './services/palette';
+import type { ContextKind } from './services/palette';
 import { getJson, postJson } from './api';
 import { useUi } from './store';
 import { ARCHEON_PRODUCT, ARCHEON_VERSION } from './version';
@@ -44,13 +50,21 @@ interface ProjectMeta {
   };
   provider: { id: string; model: string; configured: boolean; note: string };
   logs: string[];
+  live?: { geom_rev?: number };
 }
 
 interface ChatOut {
   reply: string;
-  views?: { kind: string; factor?: number; id?: string; layer?: string; mode?: string; enabled?: boolean; strategy?: string }[];
+  views?: { kind: string; factor?: number; id?: string; layer?: string; mode?: string; enabled?: boolean; strategy?: string; spread?: string; prompt?: string }[];
   notes?: string[];
   transaction?: { transaction_id: string };
+  card?: { kind: string; title: string; happened: string; why: string; changed: string; attention: string; actions: { id: string; label: string }[] } | null;
+  steps?: { n: number; name: string; status: string; note?: string | null }[];
+  session?: { session_id: string; status: string; operations?: ChatOut['steps'] };
+  cad_job?: { id: string; status: string };
+  variants?: { id: string; status: string; metrics?: { reach_m?: number | null }; preview_parts?: Part[] }[];
+  best?: string;
+  preview_parts?: Part[];
 }
 
 export default function App() {
@@ -70,6 +84,10 @@ export default function App() {
   const [displayVersion, setDisplayVersion] = useState(ARCHEON_VERSION);
   const [projects, setProjects] = useState<{ id: string; name: string; folder: string; revision: string; parts: number }[]>([]);
   const [currentFolder, setCurrentFolder] = useState('archeon-arm');
+  const [card, setCard] = useState<ChatOut['card']>(null);
+  const [steps, setSteps] = useState<ChatOut['steps']>([]);
+  const [variants, setVariants] = useState<NonNullable<ChatOut['variants']>>([]);
+  const [cadStatus, setCadStatus] = useState<string | null>(null);
 
   const selectedId = useUi((s) => s.selectedId);
   const view = useUi((s) => s.view);
@@ -101,6 +119,7 @@ export default function App() {
       setProjects(plist.projects ?? []);
       if (plist.current) setCurrentFolder(plist.current);
       useUi.getState().setConnected(true);
+      if (p.live?.geom_rev != null) useUi.getState().setGeomRev(p.live.geom_rev);
       if (p.proposal?.preview_parts) {
         setPreview({ ...(d as DesignDoc), parts: p.proposal.preview_parts });
       } else {
@@ -129,30 +148,30 @@ export default function App() {
     const ui = useUi.getState();
     for (const v of views || []) {
       if (v.kind === 'explode') {
-        ui.setExplosion(v.factor ?? 0.7);
-        ui.setView('EXPLODED');
+        ui.dispatch({ op: 'explode_system', factor: v.factor ?? 0.7 });
         if (v.strategy) ui.setStrategy(v.strategy as 'SEQUENCE' | 'RADIAL' | 'AXIAL' | 'SYSTEM' | 'BOM_FOCUS' | 'SERVICE' | 'GRAPH' | 'CUSTOM');
       }
-      if (v.kind === 'isolate' && v.id) ui.setIsolate(v.id);
-      if (v.kind === 'select' && v.id) ui.setSelected(v.id);
-      if (v.kind === 'reset_view') ui.resetView();
+      if (v.kind === 'isolate' && v.id) ui.dispatch({ op: 'isolate_entity', entity_id: v.id });
+      if (v.kind === 'select' && v.id) ui.dispatch({ op: 'select_entity', entity_id: v.id });
+      if (v.kind === 'reset_view' || v.kind === 'home_view') ui.dispatch({ op: 'home_view' });
       if (v.kind === 'set_mode' && v.mode) ui.setView(v.mode as ViewMode);
-      if (v.kind === 'show' && v.layer === 'interfaces') ui.setOverlay('INTERFACES');
+      if (v.kind === 'show' && v.layer === 'interfaces') ui.dispatch({ op: 'show_overlay', overlay: 'INTERFACES' });
       if (v.kind === 'focus' && v.id) {
-        ui.setSelected(v.id);
-        ui.setFocusId(v.id);
-        ui.setGhostOthers(true);
+        ui.dispatch({ op: 'focus_entity', entity_id: v.id, ghost_others: true });
         ui.setHudOpen(true);
       }
-      if (v.kind === 'ghost') ui.setGhostOthers(v.enabled !== false);
-      if (v.kind === 'clear_selection') ui.clearSelection();
-      if (v.kind === 'track' && v.id) ui.track(v.id);
+      if (v.kind === 'ghost') ui.dispatch({ op: 'ghost_others', enabled: v.enabled !== false });
+      if (v.kind === 'clear_selection') ui.dispatch({ op: 'clear_selection' });
+      if (v.kind === 'track' && v.id) ui.dispatch({ op: 'track_entity', entity_id: v.id });
       if (v.kind === 'open_hud') ui.setHudOpen(true);
-      if (v.kind === 'explode_context') {
-        ui.setExplodeContext(v.id || ui.selectedId);
-        ui.setSpatial('PART_EXPLODED');
-        ui.setExplosion(v.factor ?? 0.85);
-      }
+      if (v.kind === 'explode_context') ui.dispatch({ op: 'explode_entity', entity_id: v.id || ui.selectedId, factor: v.factor ?? 0.85 });
+      if (v.kind === 'restore_display') ui.dispatch({ op: 'restore_display' });
+      if (v.kind === 'previous_view') ui.dispatch({ op: 'previous_view' });
+      if (v.kind === 'set_explosion') ui.dispatch({ op: 'set_explosion', progress: v.factor ?? 0.7 });
+      if (v.kind === 'set_spread' && v.spread) ui.dispatch({ op: 'set_explosion_spread', spread: v.spread as 'COMPACT' });
+      if (v.kind === 'compare_variants' && v.mode) ui.dispatch({ op: 'compare_variants', mode: v.mode as 'SPREAD' });
+      if (v.kind === 'select_variant' && v.id) ui.dispatch({ op: 'select_variant', id: v.id });
+      if (v.kind === 'show_affected') ui.dispatch({ op: 'show_affected' });
       if (v.kind === 'neighborhood') {
         const seed = v.id || ui.selectedId;
         if (seed && design) {
@@ -178,20 +197,46 @@ export default function App() {
   async function send(text: string) {
     if (!text.trim() || busy) return;
     setBusy(true);
+    useUi.getState().setAgentWorking(true);
     setChat((c) => [...c, { who: 'YOU', text }]);
     setMsg('');
     try {
-      const out = await postJson<ChatOut>('/api/commands', { message: text });
+      const ui = useUi.getState();
+      const out = await postJson<ChatOut>('/api/commands', {
+        message: text,
+        selected_id: ui.selectedId,
+        focused_id: ui.focusId,
+        tracked_ids: ui.trackedIds
+      });
       applyViews(out.views, doc);
       setChat((c) => [...c, { who: 'ARCHEON', text: out.reply }]);
       if (out.notes?.length) setChat((c) => [...c, { who: 'NOTES', text: out.notes!.join('\n') }]);
+      setCard(out.card ?? null);
+      setSteps(out.steps ?? out.session?.operations ?? []);
+      if (out.variants) setVariants(out.variants);
+      if (out.best) useUi.getState().setActiveVariant(out.best);
+      if (out.preview_parts) setPreview({ ...(doc as DesignDoc), parts: out.preview_parts });
+      if (out.cad_job) setCadStatus(out.cad_job.status);
+      if (out.views?.some((v) => v.kind === 'open_hud' || v.kind === 'focus')) useUi.getState().setHudOpen(true);
       await refresh();
     } catch (e) {
       setChat((c) => [...c, { who: 'ERROR', text: String(e) }]);
     } finally {
       setBusy(false);
+      useUi.getState().setAgentWorking(false);
     }
   }
+
+  useEffect(() => {
+    const es = new EventSource('/api/events/stream');
+    es.addEventListener('CAD_JOB_STARTED', () => setCadStatus('RUNNING'));
+    es.addEventListener('CAD_JOB_COMPLETE', () => {
+      setCadStatus('COMPLETE');
+      void refresh();
+    });
+    es.addEventListener('CAD_JOB_FAILED', () => setCadStatus('FAILED'));
+    return () => es.close();
+  }, []);
 
   async function hardReset() {
     if (resetting) return;
@@ -257,6 +302,21 @@ export default function App() {
   }
 
   const selected = doc?.parts.find((p) => p.id === selectedId);
+  const selectedAsm = doc?.assemblies.find((a) => a.id === selectedId);
+  const selectedReq = doc?.requirements.find((r) => r.id === selectedId);
+  const selectedIface = doc?.interfaces.find((i) => i.id === selectedId);
+  const contextKind: ContextKind = meta?.proposal
+    ? 'proposal'
+    : selected
+      ? 'part'
+      : selectedAsm
+        ? 'assembly'
+        : selectedReq
+          ? 'requirement'
+          : selectedIface
+            ? 'interface'
+            : 'none';
+  const contextName = selected?.name ?? selectedAsm?.name ?? selectedReq?.id ?? selectedIface?.name;
   const reachMm = meta?.reach_m != null ? Math.round(meta.reach_m * 1000) : '—';
   const propReach = meta?.proposal?.reach_m != null ? Math.round(meta.proposal.reach_m * 1000) : null;
   const proposalIds = [
@@ -265,6 +325,58 @@ export default function App() {
   ].filter(Boolean);
   const plan = chat.filter((c) => c.who === 'NOTES' || c.who === 'ARCHEON').slice(-6).map((c) => c.text);
   const activity = (meta?.logs ?? []).slice(-12);
+
+  const paletteCatalog: PaletteItem[] = [
+    ...(doc?.parts.map((p) => ({ id: p.id, label: p.name, kind: 'PART' as const })) ?? []),
+    ...(doc?.assemblies.map((a) => ({ id: a.id, label: a.name, kind: 'ASSEMBLY' as const })) ?? []),
+    ...(doc?.requirements.map((r) => ({ id: r.id, label: r.id, kind: 'REQUIREMENT' as const })) ?? []),
+    ...(doc?.interfaces.map((i) => ({ id: i.id, label: i.name, kind: 'INTERFACE' as const })) ?? []),
+    { id: 'cmd.explode', label: 'explode', kind: 'COMMAND', hint: 'explode selected' },
+    { id: 'cmd.restore', label: 'restore display', kind: 'COMMAND' },
+    { id: 'cmd.home', label: 'home view', kind: 'COMMAND' },
+    { id: 'cmd.section', label: 'section', kind: 'VIEW' },
+    { id: 'cad-designer', label: 'CAD Designer', kind: 'AGENT' },
+    { id: 'spatial-director', label: 'Spatial Director', kind: 'AGENT' }
+  ];
+
+  function onContextAction(id: string) {
+    const ui = useUi.getState();
+    const sid = ui.selectedId;
+    if (id === 'focus' && sid) ui.dispatch({ op: 'focus_entity', entity_id: sid, ghost_others: true });
+    else if (id === 'isolate' && sid) ui.dispatch({ op: 'isolate_entity', entity_id: sid });
+    else if (id === 'track' && sid) ui.dispatch({ op: 'track_entity', entity_id: sid });
+    else if (id === 'explode') ui.dispatch({ op: 'explode_entity', entity_id: sid, factor: 0.85 });
+    else if (id === 'xray') ui.setView('X_RAY');
+    else if (id === 'interfaces') ui.dispatch({ op: 'show_overlay', overlay: 'INTERFACES' });
+    else if (id === 'affected') ui.dispatch({ op: 'show_affected' });
+    else if (id === 'home') ui.dispatch({ op: 'home_view' });
+    else if (id === 'fit') ui.dispatch({ op: 'fit_scene' });
+    else if (id === 'compare') ui.setView('DIFF');
+    else if (id === 'validate') void send('validate proposal');
+    else if (id === 'approve') void decide('commit');
+    else if (id === 'reject') void decide('reject');
+    else if (id === 'restore') ui.dispatch({ op: 'restore_display' });
+    else if (id.startsWith('variant:')) ui.dispatch({ op: 'select_variant', id: id.slice(8) });
+    else if (id === 'ask' || id === 'more') {
+      ui.setHudOpen(true);
+      if (sid) setMsg(`what is this`);
+    }
+  }
+
+  function onPalette(item: PaletteItem) {
+    const ui = useUi.getState();
+    if (item.kind === 'COMMAND') {
+      if (item.id === 'cmd.explode') ui.dispatch({ op: 'explode_entity', entity_id: ui.selectedId, factor: 0.85 });
+      else if (item.id === 'cmd.restore') ui.dispatch({ op: 'restore_display' });
+      else if (item.id === 'cmd.home') ui.dispatch({ op: 'home_view' });
+    } else if (item.kind === 'VIEW') {
+      ui.setSectionOn(true);
+    } else if (item.kind === 'AGENT') {
+      ui.setHudOpen(true);
+    } else {
+      ui.dispatch({ op: 'focus_entity', entity_id: item.id, ghost_others: true });
+    }
+  }
 
   return (
     <div className="app">
@@ -353,9 +465,12 @@ export default function App() {
             interfaces={doc.interfaces}
             assemblies={doc.assemblies}
             proposalParts={preview?.parts ?? null}
+            variantSets={variants.map((v) => ({ id: v.id, parts: v.preview_parts ?? [] }))}
           />
         )}
         <div className="legend">v{displayVersion} · hash {meta?.hash?.slice(0, 10) ?? '—'}</div>
+        <ViewNav />
+        <ObjectHud kind={contextKind === 'proposal' ? (selected ? 'part' : 'assembly') : contextKind} name={contextName} onAction={onContextAction} />
         <AgentHud
           chat={chat}
           msg={msg}
@@ -371,10 +486,20 @@ export default function App() {
           onApprove={() => void decide('commit')}
           onReject={() => void decide('reject')}
           onValidate={() => void send('validate proposal')}
+          contextName={contextName}
+          working={busy}
+          cadStatus={cadStatus}
+          card={card}
+          steps={steps}
+          variants={variants}
+          onStop={() => { useUi.getState().setAgentWorking(false); setBusy(false); void postJson('/api/live-design/cancel', {}); }}
+          onAction={onContextAction}
         />
       </section>
+      <CommandPalette catalog={paletteCatalog} onCommand={onPalette} />
 
       <aside className="inspector-rail">
+        <ContextRibbon kind={contextKind} name={contextName} onAction={onContextAction} />
         <ItemTracker
           parts={doc?.parts ?? []}
           assemblies={doc?.assemblies ?? []}

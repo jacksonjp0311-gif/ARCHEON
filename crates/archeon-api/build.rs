@@ -52,8 +52,14 @@ fn main() {
     res.set("FileVersion", &version);
     res.set("OriginalFilename", "archeon.exe");
     res.set("InternalName", "archeon");
-    res.set_version_info(winresource::VersionInfo::PRODUCTVERSION, pack_file_version(&version));
-    res.set_version_info(winresource::VersionInfo::FILEVERSION, pack_file_version(&version));
+    res.set_version_info(
+        winresource::VersionInfo::PRODUCTVERSION,
+        pack_file_version(&version),
+    );
+    res.set_version_info(
+        winresource::VersionInfo::FILEVERSION,
+        pack_file_version(&version),
+    );
     if let Err(err) = res.compile() {
         println!("cargo:warning=failed to embed ARCHEON Windows icon: {err}");
     }

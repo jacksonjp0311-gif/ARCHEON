@@ -75,16 +75,12 @@ export interface Requirement {
 export const LOCAL_COMMANDS = [
   'give me the shoulder',
   'break it apart',
-  'show interfaces',
-  'show me what this connects to',
-  'where is the weakest assumption',
-  'try a larger bearing',
-  'clear selection',
-  'explode assembly',
-  'isolate shoulder',
-  'increase upper arm length by 25 mm',
-  'validate proposal',
-  'commit proposal'
+  'show connections',
+  'make the arm 50 mm longer',
+  'try three versions',
+  'put it back together',
+  'run the checks',
+  'clear selection'
 ];
 
 export function neighborhoodOf(

@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useMemo, useRef } from 'react';
 import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber';
-import { ContactShadows, Edges, Line, OrbitControls } from '@react-three/drei';
+import { ContactShadows, Edges, Html, Line, OrbitControls } from '@react-three/drei';
 import { STLLoader } from 'three-stdlib';
 import * as THREE from 'three';
 import { fitSphere, hierarchicalOffsets, renderTransform, worldBox } from '@archeon/scene-engine';
@@ -49,7 +49,8 @@ function meshUrl(part: Part): string | null {
   if (!cad) return null;
   const rel = cad.preview || (cad.format === 'stl' ? cad.path : null);
   if (!rel) return null;
-  return `/api/media/${rel.split('\\').join('/')}`;
+  const rev = useUi.getState().geomRev;
+  return `/api/media/${rel.split('\\').join('/')}?g=${rev}`;
 }
 
 function depthOf(part: Part, assemblies: { id: string; parent: string | null }[]): number {
@@ -173,6 +174,14 @@ function Solid({
         </mesh>
       )}
       {!ghosted && <Edges threshold={18} color={edge} />}
+      {(selected || hovered) && !proposal && (
+        <Html center sprite occlude={false} style={{ pointerEvents: 'none' }}>
+          <div className="spatial-label">
+            {part.name}
+            <small>{selected ? 'PART' : 'HOVER'}</small>
+          </div>
+        </Html>
+      )}
       {tracked && !selected && (
         <mesh position={[0, prim.kind === 'box' ? prim.sz * 0.55 : prim.height * 0.55, 0]}>
           <octahedronGeometry args={[0.012, 0]} />
@@ -221,13 +230,15 @@ export function ArmScene({
   ports,
   interfaces,
   assemblies,
-  proposalParts
+  proposalParts,
+  variantSets = []
 }: {
   parts: Part[];
   ports: { id: string; origin_m: [number, number, number]; host: string }[];
   interfaces: { id: string; a: string; b: string }[];
   assemblies: { id: string; parent: string | null }[];
   proposalParts: Part[] | null;
+  variantSets?: { id: string; parts: Part[] }[];
 }) {
   const selected = useUi((s) => s.selectedId);
   const hovered = useUi((s) => s.hoveredId);
@@ -244,6 +255,8 @@ export function ArmScene({
   const focusId = useUi((s) => s.focusId);
   const explodeContext = useUi((s) => s.explodeContext);
   const sectionOn = useUi((s) => s.sectionOn);
+  const variantMode = useUi((s) => s.variantMode);
+  const activeVariant = useUi((s) => s.activeVariant);
   const requestFit = useUi((s) => s.requestFit);
   const xray = style === 'XRAY';
   const wire = style === 'WIREFRAME' || style === 'HIDDEN_LINE';
@@ -355,7 +368,28 @@ export function ArmScene({
             />
           );
         })}
-        {proposalParts &&
+        {variantMode === 'SPREAD' &&
+          variantSets.map((set, i) =>
+            set.parts.map((p) => (
+              <group key={`var-${set.id}-${p.id}`} position={[i * 0.55, 0, 0]}>
+                <Solid
+                  part={p}
+                  selected={activeVariant === set.id}
+                  hovered={false}
+                  tracked={false}
+                  neighbor={false}
+                  ghosted={activeVariant != null && activeVariant !== set.id}
+                  xray={false}
+                  cutaway={false}
+                  wire
+                  provenanceOverlay={false}
+                  proposal
+                  offset={[0, 0, 0]}
+                />
+              </group>
+            ))
+          )}
+        {proposalParts && variantMode !== 'SPREAD' &&
           proposalParts.map((p) => {
             const orig = parts.find((o) => o.id === p.id);
             if (!orig) return null;

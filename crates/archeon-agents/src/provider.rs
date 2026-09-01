@@ -64,7 +64,11 @@ fn mock_reply(messages: &[ChatMessage]) -> String {
     )
 }
 
-async fn openai_compatible(system: &str, messages: &[ChatMessage], meta: &ProviderInfo) -> Result<String, String> {
+async fn openai_compatible(
+    system: &str,
+    messages: &[ChatMessage],
+    meta: &ProviderInfo,
+) -> Result<String, String> {
     let key = api_key().ok_or("missing API key")?;
     let base = env::var("ARCHEON_AI_BASE_URL").unwrap_or_else(|_| "https://api.x.ai/v1".into());
     let url = format!("{}/chat/completions", base.trim_end_matches('/'));

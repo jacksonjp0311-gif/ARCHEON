@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.2.0-38d7ff?style=for-the-badge&labelColor=050b12" alt="0.2.0" />
+  <img src="https://img.shields.io/badge/version-0.3.0-38d7ff?style=for-the-badge&labelColor=050b12" alt="0.3.0" />
   <img src="https://img.shields.io/badge/license-MIT-ff981b?style=for-the-badge&labelColor=050b12" alt="MIT" />
   <img src="https://img.shields.io/badge/kernel-DesignIR-6ce391?style=for-the-badge&labelColor=050b12" alt="DesignIR" />
   <img src="https://img.shields.io/badge/CAD-STEP%20%2B%20STL-8ec8de?style=for-the-badge&labelColor=050b12" alt="CAD" />
@@ -33,7 +33,7 @@ off-the-shelf bearings, and a parts budget below $2,000.
 
 …and get a semantic assembly, interfaces, parametric features, exact solids, critique, visual diffs, and a human commit gate.
 
-This repository is **v0.2 / Phase 1.1**: a spatial engineering workstation (navigator, viewport, inspector, item tracker, floating Agent HUD), Design Transaction Protocol, local agents, CAD import, and the ARCHEON Arm example. It does **not** claim a production robot, FEA, or autonomous CAD.
+This repository is **v0.3 LIVE DESIGN**: a spatial engineering workstation where humans and bounded agents inspect, preview, and propose changes in real time. DesignIR, DTP, and human COMMIT remain the law. It does **not** claim a production robot, FEA, or autonomous CAD.
 
 ---
 
@@ -102,6 +102,8 @@ Agents refer to **semantic topology** (`Part: ShoulderHousing / Feature: Bearing
 | Semantic six-axis arm (DesignIR JSON) | Live |
 | Spatial workstation (navigator, inspector, tracker, explode v2) | Live |
 | Floating morphing Agent HUD | Live |
+| Live Design sessions + async CAD jobs | Live |
+| Scene command bus + Ctrl+K palette | Live |
 | Design Transaction Protocol + human COMMIT | Live |
 | Local agent commands (no API key required) | Live |
 | Project load (`projects/<name>/`) | Live |
@@ -172,7 +174,7 @@ cd ARCHEON
 
 That is the **icon compiler** (HELIX-style):
 
-1. Bump `DEV_BUILD` so the UI shows `0.2.0+dev.N`  
+1. Bump `DEV_BUILD` so the UI shows `0.3.0+dev.N`  
 2. Compile the workstation if source is newer  
 3. Rebuild `archeon.exe` only if Rust / canon changed  
 4. Publish `%LOCALAPPDATA%\ARCHEON\ui`  

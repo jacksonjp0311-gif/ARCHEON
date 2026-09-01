@@ -1,14 +1,16 @@
 mod cad;
 mod compiler;
+mod live;
 mod projects;
 
 use archeon_agents::{
-    authorize_commit, authorize_tx, critic_notes, parse_command, roster,
+    authorize_commit, authorize_tx, critic_notes,
     memory::{LocalMemoryProvider, MemoryProvider},
-    provider, AgentCard, ViewCommand,
+    parse_command_ctx, provider, roster, AgentCard, OperatorContext, ViewCommand,
 };
 use archeon_assembly::{explode_document, ExplosionStrategy};
 use archeon_design_ir::{load_project_dir, DesignDocument, Revision};
+use archeon_live::{pick_heuristic_best, three_length_variants, tracked_deltas, LiveDesignSession};
 use archeon_transactions::{
     apply_operations, dry_run, DesignTransaction, Ledger, TxStatus, UserDecision,
 };
@@ -24,7 +26,11 @@ use chrono::Utc;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::{
-    env, net::SocketAddr, path::PathBuf, process::Command, sync::{Arc, Mutex},
+    env,
+    net::SocketAddr,
+    path::PathBuf,
+    process::Command,
+    sync::{Arc, Mutex},
 };
 use tower_http::{cors::CorsLayer, services::ServeDir, trace::TraceLayer};
 
@@ -38,6 +44,7 @@ struct App {
     proposal: Mutex<Option<ProposalState>>,
     logs: Mutex<Vec<String>>,
     memory: LocalMemoryProvider,
+    live: live::LiveRuntime,
 }
 
 struct ProposalState {
@@ -126,6 +133,7 @@ async fn main() {
         proposal: Mutex::new(None),
         logs: Mutex::new(vec![]),
         memory: LocalMemoryProvider::new(memory_dir),
+        live: live::LiveRuntime::new(),
     });
 
     let ui = compiler::find_ui_dir(&root);
@@ -156,6 +164,16 @@ async fn main() {
         .route("/api/agents/run", post(agents_run))
         .route("/api/agents/chat", post(agents_chat))
         .route("/api/cad/regenerate", post(cad_regen))
+        .route("/api/cad/jobs", get(live::jobs_list))
+        .route("/api/cad/jobs/{id}", get(live::job_get))
+        .route("/api/live-design/start", post(live::session_start))
+        .route("/api/live-design/cancel", post(live::session_cancel))
+        .route("/api/live-design", get(live::session_get))
+        .route("/api/live-design/{id}", get(live::session_get_id))
+        .route("/api/variants", get(live::variants_list))
+        .route("/api/variants/create", post(live::variants_create))
+        .route("/api/variants/{id}", get(live::variant_get))
+        .route("/api/events/stream", get(live::events_stream))
         .route("/api/memory/remember", post(memory_remember))
         .route("/api/memory/query", post(memory_query))
         .with_state(AppState(app))
@@ -219,7 +237,7 @@ async fn health(State(st): State<AppState>) -> Json<Value> {
         "revision": doc.project.revision_id,
         "kernel": doc.project.kernel,
         "provider": provider::info(),
-        "phase": "1-semantic-assembly"
+        "phase": "1.2-live-design"
     }))
 }
 
@@ -256,7 +274,8 @@ async fn project(State(st): State<AppState>) -> Json<Value> {
         })),
         "provider": provider::info(),
         "agents": roster().iter().map(|a| a.id.clone()).collect::<Vec<_>>(),
-        "logs": st.0.logs.lock().unwrap().clone()
+        "logs": st.0.logs.lock().unwrap().clone(),
+        "live": live::job_snapshot(&st.0)
     }))
 }
 
@@ -318,6 +337,12 @@ struct ChatIn {
     message: String,
     #[serde(default)]
     agent_id: Option<String>,
+    #[serde(default)]
+    selected_id: Option<String>,
+    #[serde(default)]
+    focused_id: Option<String>,
+    #[serde(default)]
+    tracked_ids: Vec<String>,
 }
 
 async fn commands(State(st): State<AppState>, Json(body): Json<ChatIn>) -> Json<Value> {
@@ -333,14 +358,122 @@ async fn agents_run(State(st): State<AppState>, Json(body): Json<ChatIn>) -> Jso
 }
 
 async fn handle_chat(st: AppState, body: ChatIn) -> Json<Value> {
-    let app = st.0;
+    let app = st.0.clone();
     log_line(
         &app,
         "agent.run",
-        &format!("agent={} chat: {}", body.agent_id.as_deref().unwrap_or("operator"), body.message),
+        &format!(
+            "agent={} chat: {}",
+            body.agent_id.as_deref().unwrap_or("operator"),
+            body.message
+        ),
     );
     let doc = app.doc.lock().unwrap().clone();
-    let parsed = parse_command(&body.message, &doc);
+    let ctx = OperatorContext {
+        selected_id: body.selected_id.clone(),
+        focused_id: body.focused_id.clone(),
+        tracked_ids: body.tracked_ids.clone(),
+    };
+    let parsed = parse_command_ctx(&body.message, &doc, &ctx);
+
+    if parsed.action.as_deref() == Some("variants") {
+        let param = if body.message.to_lowercase().contains("wrist") {
+            "wrist.length"
+        } else {
+            "upper_arm.length"
+        };
+        match three_length_variants(&doc, param, [25.0, 50.0, 75.0]) {
+            Ok(v) => {
+                *app.live.variants.lock().unwrap() = v.clone();
+                live::emit_kind(
+                    &app,
+                    "PROPOSAL_UPDATED",
+                    json!({ "variants": v.len(), "param": param }),
+                );
+                return Json(json!({
+                    "reply": format!("Three PREVIEW variants of {param} (+25 / +50 / +75 mm). Canonical DesignIR unchanged. Not independent CAD kernels."),
+                    "views": parsed.views,
+                    "notes": parsed.notes,
+                    "card": parsed.card,
+                    "variants": v.iter().map(|x| json!({"id": x.id, "metrics": x.metrics, "status": x.status, "preview_parts": x.preview.parts})).collect::<Vec<_>>(),
+                    "provider": "local-dtp"
+                }));
+            }
+            Err(e) => {
+                return Json(json!({ "reply": e, "views": parsed.views, "notes": parsed.notes }))
+            }
+        }
+    }
+    if parsed.action.as_deref() == Some("best") {
+        let vars = app.live.variants.lock().unwrap().clone();
+        let id = pick_heuristic_best(&vars, 0.8);
+        return Json(json!({
+            "reply": format!("HEURISTIC pick: {:?}. Closest derived reach ≥ 800 mm. Not an optimizer.", id),
+            "views": parsed.views,
+            "notes": parsed.notes,
+            "best": id,
+            "provider": "local-dtp"
+        }));
+    }
+    if parsed.action.as_deref() == Some("explain") {
+        let prop = app.proposal.lock().unwrap();
+        let reason = prop
+            .as_ref()
+            .map(|p| p.tx.reason.clone())
+            .unwrap_or_else(|| "No active proposal. Nothing to explain.".into());
+        let intent = prop
+            .as_ref()
+            .map(|p| p.tx.intent.clone())
+            .unwrap_or_default();
+        return Json(json!({
+            "reply": format!("Decision: {intent}\nReason: {reason}\nValidation: graph only. FEA NOT RUN."),
+            "views": parsed.views,
+            "notes": parsed.notes,
+            "card": {
+                "kind": "explain",
+                "title": "WHY",
+                "happened": intent,
+                "why": reason,
+                "changed": "Proposal only until COMMIT.",
+                "attention": "Do not treat this as FEA evidence.",
+                "actions": [{"id":"validate","label":"VALIDATE"},{"id":"reject","label":"REJECT"}]
+            },
+            "provider": "local-dtp"
+        }));
+    }
+    if parsed.action.as_deref() == Some("impact") {
+        let current = doc
+            .parameters
+            .get("upper_arm.length")
+            .map(|p| p.value)
+            .unwrap_or(400.0);
+        let next = (current - 25.0).max(50.0);
+        let mut tx = archeon_transactions::DesignTransaction::propose(
+            "cad-designer",
+            &format!("Impact: upper arm {current} → {next} mm"),
+            "Dry-run smaller envelope. Not committed.",
+            vec![archeon_transactions::Operation::ChangeParameter {
+                name: "upper_arm.length".into(),
+                value: next,
+                unit: Some("mm".into()),
+            }],
+        );
+        tx.requirements = vec!["req.reach".into()];
+        match dry_run(&doc, &tx) {
+            Ok(preview) => {
+                let reach = preview.derived_reach_m();
+                let deltas = tracked_deltas(&body.tracked_ids, &doc, &preview);
+                return Json(json!({
+                    "reply": format!("If shorter by 25 mm, derived reach becomes {:?} m. REQ-002 is 0.8 m. Canonical unchanged.", reach),
+                    "views": parsed.views,
+                    "notes": parsed.notes,
+                    "impact": { "reach_m": reach, "tracked": deltas },
+                    "provider": "local-dtp"
+                }));
+            }
+            Err(e) => return Json(json!({ "reply": e.to_string() })),
+        }
+    }
 
     if let Some(mut tx) = parsed.tx {
         match authorize_tx(&tx.agent_id, &tx) {
@@ -349,29 +482,60 @@ async fn handle_chat(st: AppState, body: ChatIn) -> Json<Value> {
                     tx.geometry_hash_before = Some(doc.design_hash());
                     tx.geometry_hash_after = Some(preview.design_hash());
                     let report = validate(&preview);
-                    tx.validation_results = vec![serde_json::to_value(&report).unwrap_or(json!({}))];
+                    tx.validation_results =
+                        vec![serde_json::to_value(&report).unwrap_or(json!({}))];
                     let _ = tx.transition(TxStatus::Validating);
-                    let next = if report.ok() { TxStatus::Valid } else { TxStatus::Invalid };
+                    let next = if report.ok() {
+                        TxStatus::Valid
+                    } else {
+                        TxStatus::Invalid
+                    };
                     let _ = tx.transition(next);
                     log_line(&app, "transaction.propose", &tx.transaction_id);
                     let id = tx.transaction_id.clone();
+                    let mut session = LiveDesignSession::start(&tx.agent_id, &doc);
+                    session.attach_proposal(&tx, preview.clone());
+                    let deltas = tracked_deltas(&body.tracked_ids, &doc, &preview);
                     app.ledger.lock().unwrap().push(tx.clone());
-                    *app.proposal.lock().unwrap() = Some(ProposalState { tx: tx.clone(), preview });
+                    *app.proposal.lock().unwrap() = Some(ProposalState {
+                        tx: tx.clone(),
+                        preview: preview.clone(),
+                    });
+                    *app.live.session.lock().unwrap() = Some(session.clone());
+                    live::emit_kind(
+                        &app,
+                        "PROPOSAL_UPDATED",
+                        json!({ "transaction_id": id, "session_id": session.session_id }),
+                    );
+                    let job = live::spawn_cad_job(st.clone(), Some(id.clone()));
+                    let reply = parsed.notes.first().cloned().unwrap_or_else(|| {
+                        format!("Proposed {} — status {:?}. APPROVE / REJECT required. CAD job {} is async.", tx.intent, tx.status, job.id)
+                    });
                     return Json(json!({
-                        "reply": format!("Proposed {} — status {:?}. APPROVE / REJECT required.", tx.intent, tx.status),
+                        "reply": reply,
                         "views": parsed.views,
                         "notes": parsed.notes,
+                        "card": parsed.card,
+                        "steps": session.operations,
+                        "session": session,
+                        "cad_job": job,
+                        "tracked_changes": deltas,
                         "transaction": tx,
                         "transaction_id": id,
+                        "preview_parts": preview.parts,
                         "provider": "local-dtp"
                     }));
                 }
                 Err(e) => {
-                    return Json(json!({ "reply": format!("Dry-run failed: {e}"), "views": parsed.views, "notes": parsed.notes }));
+                    return Json(
+                        json!({ "reply": format!("Dry-run failed: {e}"), "views": parsed.views, "notes": parsed.notes }),
+                    );
                 }
             },
             Err(e) => {
-                return Json(json!({ "reply": format!("Unauthorized: {e}"), "views": parsed.views, "notes": parsed.notes }));
+                return Json(
+                    json!({ "reply": format!("Unauthorized: {e}"), "views": parsed.views, "notes": parsed.notes }),
+                );
             }
         }
     }
@@ -380,22 +544,42 @@ async fn handle_chat(st: AppState, body: ChatIn) -> Json<Value> {
         return validate_inner(&app, None);
     }
     if parsed.action.as_deref() == Some("commit") {
-        if let Some(id) = app.proposal.lock().unwrap().as_ref().map(|p| p.tx.transaction_id.clone()) {
+        if let Some(id) = app
+            .proposal
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|p| p.tx.transaction_id.clone())
+        {
             return commit_inner(&app, &id, "operator");
         }
-        return Json(json!({ "reply": "No proposal to commit.", "views": parsed.views, "notes": parsed.notes }));
+        return Json(
+            json!({ "reply": "No proposal to commit.", "views": parsed.views, "notes": parsed.notes }),
+        );
     }
     if parsed.action.as_deref() == Some("reject") {
-        if let Some(id) = app.proposal.lock().unwrap().as_ref().map(|p| p.tx.transaction_id.clone()) {
+        if let Some(id) = app
+            .proposal
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|p| p.tx.transaction_id.clone())
+        {
             return reject_inner(&app, &id);
         }
     }
 
     let reply = if parsed.views.is_empty() && parsed.notes.iter().any(|n| n.contains("No local")) {
         let sys = "You are an ARCHEON engineering copilot. Do not claim FEA, collision-free, or prices. Do not mutate design state. Suggest DTP operations only.";
-        provider::complete(sys, &[archeon_agents::provider::ChatMessage { role: "user".into(), content: body.message.clone() }])
-            .await
-            .unwrap_or_else(|e| format!("provider error: {e}"))
+        provider::complete(
+            sys,
+            &[archeon_agents::provider::ChatMessage {
+                role: "user".into(),
+                content: body.message.clone(),
+            }],
+        )
+        .await
+        .unwrap_or_else(|e| format!("provider error: {e}"))
     } else {
         parsed.notes.join("\n")
     };
@@ -404,6 +588,7 @@ async fn handle_chat(st: AppState, body: ChatIn) -> Json<Value> {
         "reply": reply,
         "views": parsed.views,
         "notes": parsed.notes,
+        "card": parsed.card,
         "critic": critic_notes(&doc),
         "provider": provider::info()
     }))
@@ -417,8 +602,12 @@ struct ProposeIn {
     operations: Vec<archeon_transactions::Operation>,
 }
 
-async fn propose(State(st): State<AppState>, Json(body): Json<ProposeIn>) -> Result<Json<Value>, (StatusCode, String)> {
-    let mut tx = DesignTransaction::propose(&body.agent_id, &body.intent, &body.reason, body.operations);
+async fn propose(
+    State(st): State<AppState>,
+    Json(body): Json<ProposeIn>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let mut tx =
+        DesignTransaction::propose(&body.agent_id, &body.intent, &body.reason, body.operations);
     authorize_tx(&body.agent_id, &tx).map_err(|e| (StatusCode::FORBIDDEN, e.to_string()))?;
     let doc = st.0.doc.lock().unwrap().clone();
     let preview = dry_run(&doc, &tx).map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
@@ -427,10 +616,17 @@ async fn propose(State(st): State<AppState>, Json(body): Json<ProposeIn>) -> Res
     let report = validate(&preview);
     tx.validation_results = vec![serde_json::to_value(&report).unwrap_or(json!({}))];
     let _ = tx.transition(TxStatus::Validating);
-    let _ = tx.transition(if report.ok() { TxStatus::Valid } else { TxStatus::Invalid });
+    let _ = tx.transition(if report.ok() {
+        TxStatus::Valid
+    } else {
+        TxStatus::Invalid
+    });
     log_line(&st.0, "transaction.propose", &tx.transaction_id);
     st.0.ledger.lock().unwrap().push(tx.clone());
-    *st.0.proposal.lock().unwrap() = Some(ProposalState { tx: tx.clone(), preview });
+    *st.0.proposal.lock().unwrap() = Some(ProposalState {
+        tx: tx.clone(),
+        preview,
+    });
     Ok(Json(json!({ "transaction": tx })))
 }
 
@@ -458,7 +654,11 @@ fn validate_inner(app: &App, id: Option<&str>) -> Json<Value> {
     } else {
         None
     };
-    log_line(app, "validation", "graph validators (not FEA, not exact collision)");
+    log_line(
+        app,
+        "validation",
+        "graph validators (not FEA, not exact collision)",
+    );
     Json(json!({
         "canonical": base,
         "proposal": preview,
@@ -514,12 +714,24 @@ fn commit_inner(app: &App, id: &str, agent: &str) -> Json<Value> {
         geometry_hash: geom,
         design_hash: Some(hash.clone()),
     });
-    log_line(app, "transaction.commit", &format!("{id} -> {rev} hash={hash}"));
+    log_line(
+        app,
+        "transaction.commit",
+        &format!("{id} -> {rev} hash={hash}"),
+    );
     let tx = p.tx.clone();
     if let Some(slot) = app.ledger.lock().unwrap().get_mut(id) {
         *slot = tx.clone();
     }
     *proposal = None;
+    if let Some(s) = app.live.session.lock().unwrap().as_mut() {
+        s.approve();
+    }
+    live::emit_kind(
+        app,
+        "REVISION_COMMITTED",
+        json!({ "revision": rev, "hash": hash }),
+    );
     Json(json!({ "committed": tx, "revision": rev, "hash": hash }))
 }
 
@@ -540,6 +752,10 @@ fn reject_inner(app: &App, id: &str) -> Json<Value> {
             }
             log_line(app, "transaction.reject", &tx.transaction_id);
             *proposal = None;
+            if let Some(s) = app.live.session.lock().unwrap().as_mut() {
+                s.reject();
+            }
+            live::emit_kind(app, "PROPOSAL_UPDATED", json!({ "status": "REJECTED" }));
             return Json(json!({ "rejected": tx }));
         }
     }
@@ -556,17 +772,14 @@ fn next_revision(current: &str) -> String {
 }
 
 async fn cad_regen(State(st): State<AppState>) -> Json<Value> {
-    log_line(&st.0, "cad.regen", "requested");
-    let dir = st.0.project_dir.lock().unwrap().clone();
-    match cad::regenerate(&st.0.root, &dir).await {
-        Ok(v) => {
-            if let Ok(mut doc) = st.0.doc.lock() {
-                projects::attach_cad_files(&mut doc, &dir);
-            }
-            Json(v)
-        }
-        Err(e) => Json(json!({ "ok": false, "error": e, "note": "UI geometry remains a DesignIR projection until CAD succeeds." })),
-    }
+    log_line(&st.0, "cad.regen", "async job");
+    let job = live::spawn_cad_job(st, None);
+    Json(json!({
+        "ok": true,
+        "queued": true,
+        "job": job,
+        "note": "CAD regeneration is asynchronous. Viewport stays interactive. Geometry hot-swaps when COMPLETE."
+    }))
 }
 
 async fn list_projects(State(st): State<AppState>) -> Json<Value> {
@@ -582,9 +795,14 @@ struct LoadProjectIn {
     id: String,
 }
 
-async fn load_project(State(st): State<AppState>, Json(body): Json<LoadProjectIn>) -> Result<Json<Value>, (StatusCode, String)> {
-    let dir = projects::resolve_project_dir(&st.0.root, &body.id)
-        .ok_or((StatusCode::NOT_FOUND, format!("unknown project {}", body.id)))?;
+async fn load_project(
+    State(st): State<AppState>,
+    Json(body): Json<LoadProjectIn>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let dir = projects::resolve_project_dir(&st.0.root, &body.id).ok_or((
+        StatusCode::NOT_FOUND,
+        format!("unknown project {}", body.id),
+    ))?;
     let mut doc = load_project_dir(&dir).map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
     projects::attach_cad_files(&mut doc, &dir);
     log_line(&st.0, "project.load", dir.display().to_string().as_str());
@@ -592,6 +810,8 @@ async fn load_project(State(st): State<AppState>, Json(body): Json<LoadProjectIn
     *st.0.project_dir.lock().unwrap() = dir.clone();
     *st.0.proposal.lock().unwrap() = None;
     *st.0.ledger.lock().unwrap() = Default::default();
+    *st.0.live.session.lock().unwrap() = None;
+    *st.0.live.variants.lock().unwrap() = vec![];
     Ok(Json(json!({
         "ok": true,
         "folder": dir.file_name().and_then(|s| s.to_str()),
@@ -607,7 +827,13 @@ async fn media(State(st): State<AppState>, Path(rest): Path<String>) -> impl Int
     let full = dir.join(rest.replace('/', std::path::MAIN_SEPARATOR_STR));
     match std::fs::read(&full) {
         Ok(bytes) => {
-            let mime = match full.extension().and_then(|s| s.to_str()).unwrap_or("").to_ascii_lowercase().as_str() {
+            let mime = match full
+                .extension()
+                .and_then(|s| s.to_str())
+                .unwrap_or("")
+                .to_ascii_lowercase()
+                .as_str()
+            {
                 "stl" => "model/stl",
                 "step" | "stp" => "model/step",
                 "glb" => "model/gltf-binary",
@@ -621,42 +847,77 @@ async fn media(State(st): State<AppState>, Path(rest): Path<String>) -> impl Int
     }
 }
 
-async fn cad_import(State(st): State<AppState>, mut multipart: Multipart) -> Result<Json<Value>, (StatusCode, String)> {
+async fn cad_import(
+    State(st): State<AppState>,
+    mut multipart: Multipart,
+) -> Result<Json<Value>, (StatusCode, String)> {
     let mut filename = String::from("import.bin");
     let mut bytes: Vec<u8> = Vec::new();
     let mut attach_to: Option<String> = None;
-    while let Some(field) = multipart.next_field().await.map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))? {
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?
+    {
         let name = field.name().unwrap_or("").to_string();
         if name == "part_id" {
-            attach_to = field.text().await.ok().map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+            attach_to = field
+                .text()
+                .await
+                .ok()
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty());
             continue;
         }
         if name == "file" || name == "cad" || name.is_empty() {
             if let Some(f) = field.file_name().map(|s| s.to_string()) {
                 filename = f;
             }
-            bytes = field.bytes().await.map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?.to_vec();
+            bytes = field
+                .bytes()
+                .await
+                .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?
+                .to_vec();
         }
     }
     if bytes.is_empty() {
         return Err((StatusCode::BAD_REQUEST, "no CAD file in upload".into()));
     }
     if bytes.len() > 80 * 1024 * 1024 {
-        return Err((StatusCode::PAYLOAD_TOO_LARGE, "CAD file exceeds 80 MiB".into()));
+        return Err((
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "CAD file exceeds 80 MiB".into(),
+        ));
     }
     let ext = projects::ext_of(&filename);
-    if !matches!(ext.as_str(), "stl" | "step" | "stp" | "glb" | "gltf" | "obj") {
-        return Err((StatusCode::BAD_REQUEST, format!("unsupported CAD format .{ext} — use stl, step, glb, gltf, or obj")));
+    if !matches!(
+        ext.as_str(),
+        "stl" | "step" | "stp" | "glb" | "gltf" | "obj"
+    ) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!("unsupported CAD format .{ext} — use stl, step, glb, gltf, or obj"),
+        ));
     }
     let dir = st.0.project_dir.lock().unwrap().clone();
     let cad_dir = dir.join("cad");
-    std::fs::create_dir_all(&cad_dir).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    std::fs::create_dir_all(&cad_dir)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     let safe = projects::safe_filename(&filename);
     let rel = format!("cad/{safe}");
     let dest = dir.join(&rel);
-    std::fs::write(&dest, &bytes).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    let bbox = if ext == "stl" { projects::stl_bbox(&bytes) } else { None };
-    let preview = if ext == "stl" { Some(rel.clone()) } else { None };
+    std::fs::write(&dest, &bytes)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let bbox = if ext == "stl" {
+        projects::stl_bbox(&bytes)
+    } else {
+        None
+    };
+    let preview = if ext == "stl" {
+        Some(rel.clone())
+    } else {
+        None
+    };
     let format = if ext == "stp" { "step" } else { ext.as_str() };
     let mut doc = st.0.doc.lock().unwrap();
     let part_id = if let Some(existing) = attach_to {
@@ -669,7 +930,12 @@ async fn cad_import(State(st): State<AppState>, mut multipart: Multipart) -> Res
                 note: "Imported CAD attached to existing semantic part.".into(),
             });
             if let Some([sx, sy, sz]) = bbox {
-                if let archeon_design_ir::Primitive::Box { sx: psx, sy: psy, sz: psz } = &mut part.spatial.primitive {
+                if let archeon_design_ir::Primitive::Box {
+                    sx: psx,
+                    sy: psy,
+                    sz: psz,
+                } = &mut part.spatial.primitive
+                {
                     *psx = sx;
                     *psy = sy;
                     *psz = sz;

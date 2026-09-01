@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { ViewMode, TreeTab, DockTab, SpatialView, RenderStyle, Overlay, WorkstationMode, AgentTab } from '@archeon/spatial-grammar';
 import { composeFromLegacy } from '@archeon/spatial-grammar';
-import type { ExplosionStrategy, SpreadPreset } from '@archeon/scene-engine';
+import { applySceneCommand, nudgeSpread, type ExplosionStrategy, type SceneCommand, type SceneSnapshot, type SpreadPreset } from '@archeon/scene-engine';
 
 export type DisplayState = 'VISIBLE' | 'HIDDEN' | 'GHOSTED' | 'ISOLATED';
 
@@ -35,6 +35,15 @@ interface Ui {
   fitNonce: number;
   fitCenter: [number, number, number];
   fitRadius: number;
+  variantMode: SceneSnapshot['variantMode'];
+  activeVariant: string | null;
+  geomRev: number;
+  agentWorking: boolean;
+  cadStatus: string | null;
+  paletteOpen: boolean;
+  inspectSection: 'SUMMARY' | 'ENGINEERING' | 'PROVENANCE' | 'GRAPH';
+  cameraHistory: { center: [number, number, number]; radius: number }[];
+  spatialHistory: SceneSnapshot[];
   setSelected: (id: string | null) => void;
   toggleSelected: (id: string) => void;
   setHovered: (id: string | null) => void;
@@ -66,6 +75,14 @@ interface Ui {
   requestFit: (center: [number, number, number], radius: number) => void;
   resetView: () => void;
   clearProjectSelection: () => void;
+  dispatch: (cmd: SceneCommand) => void;
+  spatialUndo: () => void;
+  setPaletteOpen: (v: boolean) => void;
+  setInspectSection: (s: 'SUMMARY' | 'ENGINEERING' | 'PROVENANCE' | 'GRAPH') => void;
+  setGeomRev: (n: number) => void;
+  setAgentWorking: (v: boolean) => void;
+  setCadStatus: (s: string | null) => void;
+  setActiveVariant: (id: string | null) => void;
 }
 
 function pushRecent(recent: string[], id: string): string[] {
@@ -102,6 +119,15 @@ export const useUi = create<Ui>((set) => ({
   fitNonce: 0,
   fitCenter: [0.4, 0.15, 0],
   fitRadius: 1.4,
+  variantMode: 'NONE',
+  activeVariant: null,
+  geomRev: 0,
+  agentWorking: false,
+  cadStatus: null,
+  paletteOpen: false,
+  inspectSection: 'SUMMARY',
+  cameraHistory: [],
+  spatialHistory: [],
   setSelected: (selectedId) =>
     set((s) => ({
       selectedId,
@@ -169,7 +195,13 @@ export const useUi = create<Ui>((set) => ({
   setHudOpen: (hudOpen) => set((s) => ({ hudOpen, hudCollapsed: hudOpen ? false : s.hudCollapsed })),
   setHudCollapsed: (hudCollapsed) => set({ hudCollapsed }),
   setAgentTab: (agentTab) => set({ agentTab }),
-  requestFit: (fitCenter, fitRadius) => set((s) => ({ fitCenter, fitRadius, fitNonce: s.fitNonce + 1 })),
+  requestFit: (fitCenter, fitRadius) =>
+    set((s) => ({
+      cameraHistory: [...s.cameraHistory, { center: s.fitCenter, radius: s.fitRadius }].slice(-12),
+      fitCenter,
+      fitRadius,
+      fitNonce: s.fitNonce + 1
+    })),
   resetView: () =>
     set((s) => ({
       view: 'ASSEMBLED',
@@ -196,6 +228,86 @@ export const useUi = create<Ui>((set) => ({
       focusId: null,
       explodeContext: null,
       trackedIds: [],
-      recentIds: []
+      recentIds: [],
+      variantMode: 'NONE',
+      activeVariant: null
+    }),
+  setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
+  setInspectSection: (inspectSection) => set({ inspectSection }),
+  setGeomRev: (geomRev) => set({ geomRev }),
+  setAgentWorking: (agentWorking) => set({ agentWorking }),
+  setCadStatus: (cadStatus) => set({ cadStatus }),
+  setActiveVariant: (activeVariant) => set({ activeVariant }),
+  spatialUndo: () =>
+    set((s) => {
+      const prev = s.spatialHistory[s.spatialHistory.length - 1];
+      if (!prev) return s;
+      return { ...fromSnap(prev), spatialHistory: s.spatialHistory.slice(0, -1), fitNonce: s.fitNonce + 1 };
+    }),
+  dispatch: (cmd) =>
+    set((s) => {
+      if (cmd.op === 'previous_view') {
+        const prev = s.cameraHistory[s.cameraHistory.length - 1];
+        if (!prev) return s;
+        return {
+          cameraHistory: s.cameraHistory.slice(0, -1),
+          fitCenter: prev.center,
+          fitRadius: prev.radius,
+          fitNonce: s.fitNonce + 1
+        };
+      }
+      let nextCmd = cmd;
+      if (cmd.op === 'set_explosion_spread') {
+        const raw = (cmd as { spread: string }).spread;
+        if (raw === 'up' || raw === 'down') {
+          nextCmd = { op: 'set_explosion_spread', spread: nudgeSpread(s.spread, raw === 'up' ? 1 : -1) };
+        }
+      }
+      const snap = toSnap(s);
+      const next = applySceneCommand(snap, nextCmd);
+      const record = ['restore_display', 'explode_entity', 'explode_system', 'isolate_entity', 'focus_entity', 'ghost_others'].includes(cmd.op);
+      return {
+        ...fromSnap(next),
+        spatialHistory: record ? [...s.spatialHistory, snap].slice(-16) : s.spatialHistory,
+        fitNonce: next.fitRequest !== 'none' ? s.fitNonce + 1 : s.fitNonce
+      };
     })
 }));
+
+function toSnap(s: Ui): SceneSnapshot {
+  return {
+    selectedId: s.selectedId,
+    trackedIds: s.trackedIds,
+    neighborhoodIds: s.neighborhoodIds,
+    ghostOthers: s.ghostOthers,
+    focusId: s.focusId,
+    explosion: s.explosion,
+    spread: s.spread,
+    explodeContext: s.explodeContext,
+    isolate: s.isolate,
+    overlay: s.overlay,
+    spatial: s.spatial,
+    variantMode: s.variantMode,
+    activeVariant: s.activeVariant,
+    cameraAxis: null,
+    fitRequest: 'none'
+  };
+}
+
+function fromSnap(n: SceneSnapshot): Partial<Ui> {
+  return {
+    selectedId: n.selectedId,
+    trackedIds: n.trackedIds,
+    neighborhoodIds: n.neighborhoodIds,
+    ghostOthers: n.ghostOthers,
+    focusId: n.focusId,
+    explosion: n.explosion,
+    spread: n.spread,
+    explodeContext: n.explodeContext,
+    isolate: n.isolate,
+    overlay: n.overlay as Ui['overlay'],
+    spatial: n.spatial as Ui['spatial'],
+    variantMode: n.variantMode,
+    activeVariant: n.activeVariant
+  };
+}
