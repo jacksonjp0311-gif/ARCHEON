@@ -81,6 +81,7 @@ interface Ui {
   fitCenter: [number, number, number];
   fitRadius: number;
   fitSize: [number, number, number];
+  cameraAxis: 'x' | 'y' | 'z' | null;
   variantMode: SceneSnapshot['variantMode'];
   activeVariant: string | null;
   geomRev: number;
@@ -184,7 +185,7 @@ export const useUi = create<Ui>((set) => ({
   isolate: null,
   connected: false,
   sectionOn: false,
-  sectionAxis: 'y',
+  sectionAxis: 'z',
   sectionPos: 0,
   ghostRoles: [],
   hudOpen: false,
@@ -192,9 +193,10 @@ export const useUi = create<Ui>((set) => ({
   agentTab: 'CHAT',
   fitNonce: 0,
   fitEpoch: 0,
-  fitCenter: [0.4, 0.15, 0],
+  fitCenter: [0.4, 0, 0.15],
   fitRadius: 1.4,
-  fitSize: [1.2, 0.6, 0.8],
+  fitSize: [1.2, 0.8, 0.4],
+  cameraAxis: null,
   variantMode: 'NONE',
   activeVariant: null,
   geomRev: 0,
@@ -360,8 +362,9 @@ export const useUi = create<Ui>((set) => ({
       explodeContext: null,
       neighborhoodIds: [],
       fitNonce: s.fitNonce + 1,
-      fitCenter: [0.4, 0.15, 0],
-      fitRadius: 1.4
+      fitCenter: [0.4, 0, 0.15],
+      fitRadius: 1.4,
+      cameraAxis: null as Ui['cameraAxis']
     })),
   clearProjectSelection: () =>
     set({
@@ -478,7 +481,7 @@ function toSnap(s: Ui): SceneSnapshot {
     spatial: s.spatial,
     variantMode: s.variantMode,
     activeVariant: s.activeVariant,
-    cameraAxis: null,
+    cameraAxis: s.cameraAxis,
     fitRequest: 'none'
   };
 }
@@ -497,6 +500,7 @@ function fromSnap(n: SceneSnapshot): Partial<Ui> {
     overlay: n.overlay as Ui['overlay'],
     spatial: n.spatial as Ui['spatial'],
     variantMode: n.variantMode,
-    activeVariant: n.activeVariant
+    activeVariant: n.activeVariant,
+    cameraAxis: n.cameraAxis
   };
 }

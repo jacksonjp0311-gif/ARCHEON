@@ -200,6 +200,25 @@ export type { LocalAabb, RenderedBounds } from './bounds';
 export { BOUNDS_MAX_M, BOUNDS_MIN_M, CENTER_MAX_M } from './bounds';
 
 export {
+  ARCHEON_WORLD_FRAME,
+  THREE_Y_UP_FRAME,
+  CAMERA_UP_Z,
+  HOME_EYE_OFFSET,
+  framesEqual,
+  isArcheonWorld,
+  axisIndex,
+  frameFromCadMeta,
+  cadFrameMismatch,
+  homeEyeDirection,
+  alignEyeDirection,
+  groundClearanceM,
+  engineeringGroundFromBounds,
+  groundIntersectsBounds,
+  zIncreasesUp
+} from './frame';
+export type { EngineeringFrame, EngineeringGround, Handedness, AxisName, LengthUnit } from './frame';
+
+export {
   recursiveExplosionOffsets,
   resolveExplodeContext,
   partsInScope,
@@ -401,7 +420,8 @@ export function applySceneCommand(state: SceneSnapshot, cmd: SceneCommand): Scen
         ghostOthers: false,
         spatial: 'ASSEMBLED',
         explodeContext: null,
-        focusId: null
+        focusId: null,
+        cameraAxis: null
       };
     case 'show_affected':
       return { ...state, ghostOthers: true, overlay: 'AGENT_DIFF', fitRequest: 'selection' };

@@ -947,7 +947,7 @@ async fn cad_import(
                 rel.clone(),
                 preview.clone(),
                 "SOURCE",
-                "Imported CAD attached to existing semantic part. Frame CAD_LOCAL, units m.",
+                "Imported CAD attached to existing semantic part. Declared CAD_LOCAL Z-UP; not silently rotated.",
                 "SOURCE",
             ));
             if let Some([sx, sy, sz]) = bbox {

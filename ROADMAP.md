@@ -13,6 +13,12 @@ Status language: **shipped**, **partial**, **not started**. Nothing here is a cl
 
 ## Phase 1 — Semantic assembly + spatial workstation — shipped
 
+## Phase 1.4.4 / v0.5.4 — Engineering Z-UP frame — this tree
+
+- DesignIR world is RIGHT_HANDED Z-UP X-FORWARD meters
+- Camera / OrbitControls use camera.up = +Z; construction floor is the XY plane below minZ
+- CAD import declares source frame; viewer does not Y-up rotate meshes
+
 ## Phase 1.4.3 / v0.5.3 — Render integrity — this tree
 
 - Stray 1 m gray lines were drei `<Edges>` placeholders on `<group>` parents

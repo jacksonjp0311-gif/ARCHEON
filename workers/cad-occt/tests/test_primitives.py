@@ -33,6 +33,19 @@ def test_stl_has_facets(tmp_path: Path):
     assert text.count("facet normal") == 12
 
 
+def test_cylinder_stl_is_z_up(tmp_path: Path):
+    p = tmp_path / "cyl.stl"
+    write_cylinder_stl(str(p), 0.02, 0.08)
+    zs = []
+    for line in p.read_text(encoding="ascii").splitlines():
+        parts = line.split()
+        if len(parts) == 4 and parts[0] == "vertex":
+            zs.append(float(parts[3]))
+    assert zs
+    assert min(zs) == -0.04
+    assert max(zs) == 0.04
+
+
 def test_box_stl_is_cad_local_not_recentered(tmp_path: Path):
     p = tmp_path / "box.stl"
     write_box_stl(str(p), 0.2, 0.1, 0.05)

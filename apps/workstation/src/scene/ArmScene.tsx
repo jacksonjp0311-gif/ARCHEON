@@ -4,6 +4,9 @@ import { ContactShadows, Environment, Grid, Html, Line, OrbitControls } from '@r
 import { STLLoader } from 'three-stdlib';
 import * as THREE from 'three';
 import {
+  alignEyeDirection,
+  CAMERA_UP_Z,
+  engineeringGroundFromBounds,
   fitDistanceForAabb,
   geometryMode,
   getRenderedEntityBounds,
@@ -103,10 +106,10 @@ function StudioRig({ agentAccent }: { agentAccent: boolean }) {
   return (
     <>
       <color attach="background" args={['#030303']} />
-      <hemisphereLight args={['#e8e4dc', '#17181B', 0.38]} />
+      <hemisphereLight args={['#e8e4dc', '#17181B', 0.38]} position={[0, 0, 1]} rotation={[Math.PI / 2, 0, 0]} />
       <directionalLight
         castShadow
-        position={[2.4, 3.9, 2.6]}
+        position={[2.4, 2.6, 3.9]}
         intensity={1.7}
         color="#fff3e4"
         shadow-mapSize-width={2048}
@@ -118,9 +121,9 @@ function StudioRig({ agentAccent }: { agentAccent: boolean }) {
         shadow-camera-top={4}
         shadow-camera-bottom={-4}
       />
-      <directionalLight position={[-2.6, 1.5, -1.4]} intensity={0.48} color="#d8dce2" />
-      <directionalLight position={[-0.4, 1.8, 3.4]} intensity={0.22} color="#F0C45C" />
-      {agentAccent && <directionalLight position={[0.2, 2.4, -2.8]} intensity={0.09} color="#A779FF" />}
+      <directionalLight position={[-2.6, -1.4, 1.5]} intensity={0.48} color="#d8dce2" />
+      <directionalLight position={[-0.4, 3.4, 1.8]} intensity={0.22} color="#F0C45C" />
+      {agentAccent && <directionalLight position={[0.2, -2.8, 2.4]} intensity={0.09} color="#A779FF" />}
       <Environment preset="warehouse" environmentIntensity={0.32} />
     </>
   );
@@ -263,7 +266,11 @@ function Solid({
   const sectionAxis = useUi.getState().sectionAxis;
   const sectionPos = useUi.getState().sectionPos;
   const n =
-    sectionAxis === 'x' ? new THREE.Vector3(-1, 0, 0) : sectionAxis === 'z' ? new THREE.Vector3(0, 0, -1) : new THREE.Vector3(0, -1, 0);
+    sectionAxis === 'x'
+      ? new THREE.Vector3(-1, 0, 0)
+      : sectionAxis === 'y'
+        ? new THREE.Vector3(0, -1, 0)
+        : new THREE.Vector3(0, 0, -1);
   const clip = cutaway ? [new THREE.Plane(n, sectionPos || 0.002)] : [];
   const rot = part.spatial.rpy_rad as [number, number, number];
   const cadUrl = meshUrl(part);
@@ -334,7 +341,7 @@ function Solid({
         </mesh>
       )}
       {mode === 'primitive' && prim.kind === 'cylinder' && (
-        <mesh castShadow={debug.shadows} receiveShadow={debug.shadows}>
+        <mesh rotation={[Math.PI / 2, 0, 0]} castShadow={debug.shadows} receiveShadow={debug.shadows}>
           <cylinderGeometry args={[prim.radius, prim.radius, prim.height, 48]} />
           <meshStandardMaterial
             color={material.color}
@@ -358,7 +365,7 @@ function Solid({
         </Html>
       )}
       {tracked && !selected && (
-        <mesh position={[0, prim.kind === 'box' ? prim.sz * 0.55 : prim.height * 0.55, 0]}>
+        <mesh position={[0, 0, prim.kind === 'box' ? prim.sz * 0.55 : prim.height * 0.55]}>
           <octahedronGeometry args={[0.012, 0]} />
           <meshBasicMaterial color={GOLD} />
         </mesh>
@@ -385,22 +392,30 @@ function CameraRig() {
   const center = useUi((s) => s.fitCenter);
   const radius = useUi((s) => s.fitRadius);
   const fitSize = useUi((s) => s.fitSize);
-  const goal = useRef({ c: new THREE.Vector3(0.4, 0.15, 0), p: new THREE.Vector3(1.35, 0.85, 0.95) });
+  const cameraAxis = useUi((s) => s.cameraAxis);
+  const goal = useRef({ c: new THREE.Vector3(0.4, 0, 0.15), p: new THREE.Vector3(1.35, 0.95, 0.85) });
   const fitting = useRef(0);
   const lastNonce = useRef(-1);
+  useLayoutEffect(() => {
+    camera.up.set(...CAMERA_UP_Z);
+    camera.updateProjectionMatrix();
+  }, [camera]);
   useEffect(() => {
+    camera.up.set(...CAMERA_UP_Z);
     const c = new THREE.Vector3(...center);
     const aspect = size.width / Math.max(1, size.height);
     const fov = 'fov' in camera ? (camera as THREE.PerspectiveCamera).fov : 42;
     const dist = fitDistanceForAabb(fitSize ?? [radius * 2, radius * 2, radius * 2], fov, aspect, 0.78);
-    const p = c.clone().add(new THREE.Vector3(0.92, 0.58, 0.74).normalize().multiplyScalar(dist));
+    const dir = alignEyeDirection(cameraAxis);
+    const p = c.clone().add(new THREE.Vector3(...dir).normalize().multiplyScalar(dist));
     goal.current = { c, p };
     if (nonce !== lastNonce.current) {
       lastNonce.current = nonce;
       fitting.current = 1;
     }
-  }, [nonce, center, radius, fitSize, size.width, size.height]);
+  }, [nonce, center, radius, fitSize, size.width, size.height, cameraAxis]);
   useFrame((state, dt) => {
+    camera.up.set(...CAMERA_UP_Z);
     if (fitting.current <= 0) return;
     const k = 1 - Math.exp(-dt * 6.5);
     camera.position.lerp(goal.current.p, k);
@@ -451,6 +466,21 @@ export function ArmScene({
   const debug = useUi((s) => s.renderDebug);
   const meshBounds = useUi((s) => s.meshBounds);
   const geomRev = useUi((s) => s.geomRev);
+  const projectGround = useMemo(() => {
+    const boxes = parts.map((p) => {
+      const cadUrl = meshUrl(p);
+      const mode = geometryMode(!!cadUrl, debug);
+      const meshLocal = mode === 'cad' && meshBounds[p.id] ? { min: meshBounds[p.id].min, max: meshBounds[p.id].max } : null;
+      const rb = getRenderedEntityBounds({
+        origin: p.spatial.origin_m,
+        rpy: p.spatial.rpy_rad,
+        primitive: p.spatial.primitive,
+        meshLocal
+      });
+      return { min: rb.min, max: rb.max };
+    });
+    return engineeringGroundFromBounds(boxes);
+  }, [parts, meshBounds, debug, geomRev]);
   const xray = style === 'XRAY';
   const wire = style === 'WIREFRAME' || style === 'HIDDEN_LINE';
   const cutaway = sectionOn;
@@ -586,8 +616,10 @@ export function ArmScene({
     <Canvas
       shadows
       gl={{ antialias: true, localClippingEnabled: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.18 }}
-      camera={{ position: [1.35, 0.85, 0.95], fov: 42, near: 0.01, far: 40 }}
-      onCreated={({ gl }) => {
+      camera={{ position: [1.35, 0.95, 0.85], up: CAMERA_UP_Z, fov: 42, near: 0.01, far: 40 }}
+      onCreated={({ gl, camera }) => {
+        camera.up.set(...CAMERA_UP_Z);
+        camera.updateProjectionMatrix();
         gl.localClippingEnabled = true;
         gl.shadowMap.enabled = true;
         gl.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -602,13 +634,23 @@ export function ArmScene({
       <Suspense fallback={null}>
         <StudioRig agentAccent={overlays.agentDiff || !!proposalParts} />
       </Suspense>
-      <mesh rotation-x={-Math.PI / 2} position={[0.4, -0.018, 0]} receiveShadow>
-        <planeGeometry args={[16, 16]} />
-        <meshStandardMaterial color="#080808" roughness={0.88} metalness={0.12} envMapIntensity={0.35} />
+      <mesh position={[projectGround.x, projectGround.y, projectGround.z]} receiveShadow renderOrder={-2}>
+        <planeGeometry args={[24, 24]} />
+        <meshStandardMaterial
+          color="#080808"
+          roughness={0.9}
+          metalness={0.08}
+          envMapIntensity={0.3}
+          depthWrite={false}
+          polygonOffset
+          polygonOffsetFactor={1}
+          polygonOffsetUnits={1}
+        />
       </mesh>
       {debug.grid && (
         <Grid
-          position={[0.4, 0.001, 0]}
+          position={[projectGround.x, projectGround.y, projectGround.z + 0.001]}
+          rotation={[Math.PI / 2, 0, 0]}
           args={[12, 12]}
           cellSize={0.05}
           cellThickness={0.35}
@@ -619,9 +661,14 @@ export function ArmScene({
           fadeDistance={3.6}
           fadeStrength={1.85}
           infiniteGrid
+          side={THREE.DoubleSide}
         />
       )}
-      {debug.shadows && <ContactShadows position={[0.4, 0, 0]} opacity={0.52} scale={10} blur={2.8} far={6} />}
+      {debug.shadows && (
+        <group position={[projectGround.x, projectGround.y, projectGround.z]} rotation={[Math.PI / 2, 0, 0]}>
+          <ContactShadows position={[0, 0, 0]} opacity={0.45} scale={10} blur={2.6} far={8} />
+        </group>
+      )}
       <axesHelper args={[0.16]} />
       <CameraRig />
       <DrawCallProbe />
@@ -778,7 +825,7 @@ export function ArmScene({
               </mesh>
             );
           })}
-      <OrbitControls makeDefault target={[0.4, 0.15, 0]} enableDamping={false} />
+      <OrbitControls makeDefault target={[0.4, 0, 0.15]} enableDamping={false} />
     </Canvas>
   );
 }

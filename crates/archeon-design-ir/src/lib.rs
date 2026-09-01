@@ -43,6 +43,12 @@ mod tests {
         assert_eq!(attached.local_origin, [0.0, 0.0, 0.0]);
         assert_eq!(attached.units, "m");
         assert_eq!(attached.source, "GENERATED");
+        assert_eq!(c.up_axis, "Z");
+        assert_eq!(c.handedness, "RIGHT_HANDED");
+        assert_eq!(c.forward_axis, "X");
+        assert_eq!(attached.up_axis, "Z");
+        assert_eq!(attached.handedness, "RIGHT_HANDED");
+        assert_eq!(attached.forward_axis, "X");
     }
 
     #[test]

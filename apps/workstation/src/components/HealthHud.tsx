@@ -46,6 +46,7 @@ export function HealthHud(props: Props) {
       <p>Memory LOCAL · Agents 11 · Reach {props.reachMm} mm DERIVED</p>
       <p>Provider {props.provider ?? 'local'}</p>
       <p className="notes">{props.cadNote || 'CAD truth: viewport is a spatial projection, not manufacturing BREP.'}</p>
+      <p>World frame RIGHT_HANDED · Z-UP · X-FORWARD · m</p>
       <div className="health-diag">
         <h3>RENDER DIAGNOSTICS</h3>
         <p>Visible parts {stats.visibleParts}</p>

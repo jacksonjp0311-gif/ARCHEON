@@ -87,7 +87,7 @@ pub fn attach_cad_files(doc: &mut DesignDocument, dir: &Path) {
                 format!("generated/{stem}.step"),
                 gen_stl.is_file().then(|| format!("generated/{stem}.stl")),
                 "GENERATED",
-                "Kernel STEP. Spatial view uses STL tessellation if present. Frame CAD_LOCAL, units m.",
+                "Kernel STEP. Spatial view uses STL tessellation if present. Frame CAD_LOCAL, world Z-UP, units m. Viewer does not rotate to Y-up.",
                 "GENERATED",
             ));
         } else if cad_step.is_file() {
@@ -96,7 +96,7 @@ pub fn attach_cad_files(doc: &mut DesignDocument, dir: &Path) {
                 format!("cad/{stem}.step"),
                 cad_stl.is_file().then(|| format!("cad/{stem}.stl")),
                 "SOURCE",
-                "Imported STEP. Exact file is stored; preview may be tessellated. Frame CAD_LOCAL unless noted.",
+                "Imported STEP. Exact file is stored; preview may be tessellated. Declared CAD_LOCAL Z-UP; not silently rotated.",
                 "SOURCE",
             ));
         } else if cad_glb.is_file() {
@@ -114,7 +114,7 @@ pub fn attach_cad_files(doc: &mut DesignDocument, dir: &Path) {
                 format!("cad/{stem}.stl"),
                 Some(format!("cad/{stem}.stl")),
                 "SOURCE",
-                "Imported STL tessellation. Not exact CAD. Frame CAD_LOCAL, units m.",
+                "Imported STL tessellation. Not exact CAD. Declared CAD_LOCAL Z-UP assumption; not silently rotated.",
                 "SOURCE",
             ));
         } else if gen_stl.is_file() {
@@ -123,7 +123,7 @@ pub fn attach_cad_files(doc: &mut DesignDocument, dir: &Path) {
                 format!("generated/{stem}.stl"),
                 Some(format!("generated/{stem}.stl")),
                 "GENERATED",
-                "Kernel STL tessellation. Frame CAD_LOCAL, units m. Viewer must not recenter.",
+                "Kernel STL tessellation. Frame CAD_LOCAL, world Z-UP, units m. Viewer must not recenter or Y-up rotate.",
                 "GENERATED",
             ));
         }
@@ -222,9 +222,9 @@ pub fn create_imported_part(
                 preview,
                 "SOURCE",
                 if format == "step" || format == "stp" {
-                    "Imported STEP stored as exact CAD. Spatial mesh is tessellation if present."
+                    "Imported STEP stored as exact CAD. Declared CAD_LOCAL Z-UP. Spatial mesh is tessellation if present."
                 } else {
-                    "Imported mesh. Visualization only — not a BREP kernel solid."
+                    "Imported mesh. Visualization only — not a BREP kernel solid. Declared CAD_LOCAL Z-UP assumption; not silently rotated."
                 },
                 "SOURCE",
             )),

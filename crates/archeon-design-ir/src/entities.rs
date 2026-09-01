@@ -119,6 +119,13 @@ pub struct CadRef {
     /// GENERATED kernel | SOURCE import. Distinct from `truth` which is the file class.
     #[serde(default)]
     pub source: String,
+    /// Declared source axes. Default ARCHEON engineering world (Z-up). Never inferred by rotating the mesh.
+    #[serde(default = "z_up_axis")]
+    pub up_axis: String,
+    #[serde(default = "right_handed")]
+    pub handedness: String,
+    #[serde(default = "x_forward")]
+    pub forward_axis: String,
 }
 
 fn cad_local_frame() -> String {
@@ -126,6 +133,15 @@ fn cad_local_frame() -> String {
 }
 fn meters_unit() -> String {
     "m".into()
+}
+fn z_up_axis() -> String {
+    "Z".into()
+}
+fn right_handed() -> String {
+    "RIGHT_HANDED".into()
+}
+fn x_forward() -> String {
+    "X".into()
 }
 
 impl CadRef {
@@ -148,6 +164,9 @@ impl CadRef {
             units: meters_unit(),
             geometry_revision: String::new(),
             source: source.into(),
+            up_axis: z_up_axis(),
+            handedness: right_handed(),
+            forward_axis: x_forward(),
         }
     }
 }

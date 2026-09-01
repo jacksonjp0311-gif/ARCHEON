@@ -202,7 +202,9 @@ export function Inspector({
                 v={geometryDisplay(part.spatial.cad, geometryMode(!!(part.spatial.cad?.preview || part.spatial.cad?.path), debug))}
                 note="CAD and primitive are exclusive — never both"
               />
-              <Field k="CAD FRAME" v={part.spatial.cad?.coordinate_frame ?? 'CAD_LOCAL'} note="viewer does not recenter meshes" />
+              <Field k="CAD FRAME" v={part.spatial.cad?.coordinate_frame ?? 'CAD_LOCAL'} note="viewer does not recenter or Y-up rotate meshes" />
+              <Field k="UP AXIS" v={part.spatial.cad?.up_axis ?? 'Z'} note="ARCHEON world is Z-UP" />
+              <Field k="HANDEDNESS" v={part.spatial.cad?.handedness ?? 'RIGHT_HANDED'} />
               <Field k="CAD UNITS" v={part.spatial.cad?.units ?? 'm'} />
               <Field k="BBOX" v={bbox} note="DERIVED from DesignIR primitive — not BREP" />
               <Field k="VOLUME" v={`${volume.toExponential(3)} m³`} note="DERIVED from primitive envelope" />

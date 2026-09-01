@@ -385,10 +385,11 @@ export function fitDistanceForAabb(
   const fillClamped = Math.min(0.82, Math.max(0.75, fill));
   const vFov = (fovDeg * Math.PI) / 180;
   const hFov = 2 * Math.atan(Math.tan(vFov / 2) * Math.max(0.35, aspect));
-  const distV = size[1] / 2 / Math.tan(vFov / 2) / fillClamped;
-  const distH = size[0] / 2 / Math.tan(hFov / 2) / fillClamped;
-  const distD = size[2] / 2 / Math.tan(vFov / 2) / fillClamped;
-  return Math.max(0.45, distV, distH, distD);
+  const vertical = size[2];
+  const horizontal = Math.max(size[0], size[1]);
+  const distV = vertical / 2 / Math.tan(vFov / 2) / fillClamped;
+  const distH = horizontal / 2 / Math.tan(hFov / 2) / fillClamped;
+  return Math.max(0.45, distV, distH);
 }
 
 export type FitIntent = 'assembled' | 'focus' | 'isolate' | 'part_exploded' | 'system_exploded' | 'variant' | 'selection';

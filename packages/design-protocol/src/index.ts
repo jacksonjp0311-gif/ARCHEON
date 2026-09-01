@@ -37,6 +37,10 @@ export interface CadRef {
   units?: string;
   geometry_revision?: string;
   source?: string;
+  /** Declared source axes. Default ARCHEON engineering: Z up, X forward, right-handed. Never inferred by rotating the mesh. */
+  up_axis?: string;
+  handedness?: string;
+  forward_axis?: string;
 }
 
 export type GeometryDisplay =
