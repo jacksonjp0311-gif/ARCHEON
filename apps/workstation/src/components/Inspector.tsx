@@ -61,8 +61,8 @@ export function Inspector({
   const setExplosion = useUi((s) => s.setExplosion);
   const setSpatial = useUi((s) => s.setSpatial);
   const setExplodeContext = useUi((s) => s.setExplodeContext);
-  const section = useUi((s) => s.inspectSection);
-  const setSection = useUi((s) => s.setInspectSection);
+  const inspectOpen = useUi((s) => s.inspectOpen);
+  const toggleInspect = useUi((s) => s.toggleInspect);
 
   const assembly = assemblies.find((a) => a.id === selectedId);
   const requirement = requirements.find((r) => r.id === selectedId);
@@ -180,49 +180,57 @@ export function Inspector({
       <div className="insp-summary">
         {mat?.name ?? part.material ?? 'UNVERIFIED'} · {relatedIfaces.length} interfaces · {featN} features · GRAPH ONLY
       </div>
-      <div className="insp-sects">
-        {(['SUMMARY', 'ENGINEERING', 'PROVENANCE', 'GRAPH'] as const).map((k) => (
-          <button key={k} type="button" className={section === k ? 'active' : ''} onClick={() => setSection(k)}>{k}</button>
-        ))}
-      </div>
-      {(section === 'SUMMARY' || section === 'ENGINEERING') && (
-        <>
-          <Field k="NAME" v={part.name} />
-          {section === 'ENGINEERING' && <Field k="PN / ID" v={part.id} />}
-          <Field k="PARENT ASSEMBLY" v={parentName} />
-          <Field k="SEMANTIC ROLE" v={part.semantic_role || '—'} />
-          <Field k="MATERIAL" v={mat?.name ?? part.material ?? 'UNVERIFIED'} />
-        </>
-      )}
-      {section === 'ENGINEERING' && (
-        <>
-          <Field k="SYSTEM" v={part.system ?? '—'} />
-          <Field k="REVISION" v={revision} />
-          <Field k="QTY" v={String(part.qty)} />
-          <Field k="CAD FORMAT" v={part.spatial.cad?.format?.toUpperCase() ?? 'PRIMITIVE'} />
-          <Field k="CAD SOURCE" v={part.spatial.cad?.path ?? 'DesignIR envelope'} />
-          <Field k="CAD TRUTH" v={part.spatial.cad?.truth ?? 'GENERATED'} />
-          <Field k="BBOX" v={bbox} note="DERIVED from DesignIR primitive — not BREP" />
-          <Field k="VOLUME" v={`${volume.toExponential(3)} m³`} note="DERIVED from primitive envelope" />
-          <Field k="MASS" v={mass != null ? `${mass.toFixed(3)} kg` : 'NOT COMPUTED'} note={mass != null ? 'HEURISTIC · density × primitive volume' : 'no density'} />
-          <Field k="CENTER OF MASS" v="NOT COMPUTED" note="kernel mass properties not on the UI clock" />
-          <Field k="CATALOG REF" v={part.catalog_ref ?? 'NOT AVAILABLE'} />
-          <Field k="VALIDATION STATE" v="GRAPH ONLY" note="not FEA" />
-        </>
-      )}
-      {section === 'PROVENANCE' && (
-        <>
-          <Field k="CLASS" v={part.provenance.class} />
-          <Field k="CREATED BY" v={part.provenance.created_by} />
-          <Field k="REASON" v={part.provenance.reason || '—'} />
-          <Field k="AGENT" v={part.provenance.agent_id ?? '—'} />
-          <Field k="REVISION" v={part.provenance.revision_id || revision} />
-          <Field k="USER APPROVED" v={part.provenance.user_approved ? 'YES' : 'NO'} />
-        </>
-      )}
-      {section === 'GRAPH' && (
-        <Field k="REQUIREMENTS" v={linkedReqs.map((r) => r.id).join(', ') || '—'} />
-      )}
+      <Field k="PARENT" v={parentName} />
+      <Field k="ROLE" v={part.semantic_role || '—'} />
+      <Field k="MATERIAL" v={mat?.name ?? part.material ?? 'UNVERIFIED'} />
+      {([
+        ['GEOMETRY', 'Geometry'],
+        ['CONNECTIONS', 'Connections'],
+        ['REQUIREMENTS', 'Requirements'],
+        ['ANALYSIS', 'Analysis'],
+        ['PROVENANCE', 'Provenance'],
+        ['HISTORY', 'History']
+      ] as const).map(([key, label]) => (
+        <div key={key}>
+          <button type="button" className="insp-acc" onClick={() => toggleInspect(key)}>
+            {inspectOpen[key] ? '▾' : '▸'} {label}
+          </button>
+          {inspectOpen[key] && key === 'GEOMETRY' && (
+            <>
+              <Field k="PN / ID" v={part.id} />
+              <Field k="BBOX" v={bbox} note="DERIVED from DesignIR primitive — not BREP" />
+              <Field k="VOLUME" v={`${volume.toExponential(3)} m³`} note="DERIVED from primitive envelope" />
+              <Field k="MASS" v={mass != null ? `${mass.toFixed(3)} kg` : 'NOT COMPUTED'} note={mass != null ? 'HEURISTIC · density × primitive volume' : 'no density'} />
+              <Field k="CENTER OF MASS" v="NOT COMPUTED" />
+              <Field k="CAD FORMAT" v={part.spatial.cad?.format?.toUpperCase() ?? 'PRIMITIVE'} />
+              <Field k="CAD TRUTH" v={part.spatial.cad?.truth ?? 'GENERATED'} />
+            </>
+          )}
+          {inspectOpen[key] && key === 'CONNECTIONS' && (
+            <>
+              <Field k="PORTS" v={String(portN)} />
+              <Field k="INTERFACES" v={String(relatedIfaces.length)} />
+            </>
+          )}
+          {inspectOpen[key] && key === 'REQUIREMENTS' && (
+            <Field k="LINKED" v={linkedReqs.map((r) => r.id).join(', ') || 'NONE'} />
+          )}
+          {inspectOpen[key] && key === 'ANALYSIS' && (
+            <Field k="VALIDATION" v="GRAPH ONLY" note="not FEA · collision NOT CHECKED" />
+          )}
+          {inspectOpen[key] && key === 'PROVENANCE' && (
+            <>
+              <Field k="CLASS" v={part.provenance.class} />
+              <Field k="CREATED BY" v={part.provenance.created_by} />
+              <Field k="REASON" v={part.provenance.reason || '—'} />
+              <Field k="AGENT" v={part.provenance.agent_id ?? '—'} />
+            </>
+          )}
+          {inspectOpen[key] && key === 'HISTORY' && (
+            <Field k="REVISION" v={part.provenance.revision_id || revision} />
+          )}
+        </div>
+      ))}
 
       <div className="insp-counts">
         <span>FEATURES {featN}</span>

@@ -132,6 +132,12 @@ function Solid({
         e.stopPropagation();
         useUi.getState().toggleSelected(part.id);
       }}
+      onContextMenu={(e) => {
+        e.stopPropagation();
+        e.nativeEvent.preventDefault();
+        useUi.getState().setSelected(part.id);
+        useUi.getState().setContextMenu({ x: e.clientX, y: e.clientY, id: part.id });
+      }}
       onPointerOver={(e) => {
         e.stopPropagation();
         useUi.getState().setHovered(part.id);
@@ -320,7 +326,12 @@ export function ArmScene({
         gl.shadowMap.enabled = true;
         gl.shadowMap.type = THREE.PCFSoftShadowMap;
       }}
-      onPointerMissed={() => useUi.getState().clearSelection()}
+      onPointerMissed={() => {
+        useUi.getState().clearSelection();
+        useUi.getState().setContextMenu(null);
+        useUi.getState().setRadialOpen(false);
+      }}
+      onContextMenu={(e) => e.nativeEvent.preventDefault()}
     >
       <color attach="background" args={['#071018']} />
       <hemisphereLight args={['#d7eef8', '#121c24', 0.55]} />

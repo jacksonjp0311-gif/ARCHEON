@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.3.0-38d7ff?style=for-the-badge&labelColor=050b12" alt="0.3.0" />
+  <img src="https://img.shields.io/badge/version-0.4.0-38d7ff?style=for-the-badge&labelColor=050b12" alt="0.4.0" />
   <img src="https://img.shields.io/badge/license-MIT-ff981b?style=for-the-badge&labelColor=050b12" alt="MIT" />
   <img src="https://img.shields.io/badge/kernel-DesignIR-6ce391?style=for-the-badge&labelColor=050b12" alt="DesignIR" />
   <img src="https://img.shields.io/badge/CAD-STEP%20%2B%20STL-8ec8de?style=for-the-badge&labelColor=050b12" alt="CAD" />
@@ -33,7 +33,7 @@ off-the-shelf bearings, and a parts budget below $2,000.
 
 …and get a semantic assembly, interfaces, parametric features, exact solids, critique, visual diffs, and a human commit gate.
 
-This repository is **v0.3 LIVE DESIGN**: a spatial engineering workstation where humans and bounded agents inspect, preview, and propose changes in real time. DesignIR, DTP, and human COMMIT remain the law. It does **not** claim a production robot, FEA, or autonomous CAD.
+This repository is **v0.4 Adaptive Human Interface**: the machine is the primary surface; engineering complexity is available through search, HUDs, and progressive disclosure. DesignIR, DTP, and human COMMIT remain the law. It does **not** claim a production robot, FEA, or autonomous CAD.
 
 ---
 
@@ -174,7 +174,7 @@ cd ARCHEON
 
 That is the **icon compiler** (HELIX-style):
 
-1. Bump `DEV_BUILD` so the UI shows `0.3.0+dev.N`  
+1. Bump `DEV_BUILD` so the UI shows `0.4.0+dev.N`  
 2. Compile the workstation if source is newer  
 3. Rebuild `archeon.exe` only if Rust / canon changed  
 4. Publish `%LOCALAPPDATA%\ARCHEON\ui`  

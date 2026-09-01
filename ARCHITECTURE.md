@@ -1,6 +1,6 @@
 # ARCHEON architecture
 
-Version 0.3.0 — Live Design.
+Version 0.4.0 — Adaptive Human Interface.
 
 > Geometry is only one projection of an engineered system.
 
@@ -9,6 +9,14 @@ DesignIR is the source of truth. The renderer, the language model, and the CAD k
 ---
 
 ## Invariants
+
+### 0. Human interface
+
+The machine is the primary navigation surface.
+
+The default interface is driven by human intent and selected engineering context.
+
+Complexity must be available without being permanently visible.
 
 ### 1. Semantic identity
 

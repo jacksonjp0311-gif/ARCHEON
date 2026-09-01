@@ -1,18 +1,25 @@
-import { useEffect, useState } from 'react';
-import { VIEW_MODES, DOCK_TABS, WORKSTATION_MODES, type ViewMode, type WorkstationMode } from '@archeon/spatial-grammar';
+﻿import { useEffect, useState } from 'react';
+import { type ViewMode } from '@archeon/spatial-grammar';
 import { neighborhoodOf, type Part, type Requirement } from '@archeon/design-protocol';
 import type { SpreadPreset } from '@archeon/scene-engine';
 import { ArmScene } from './scene/ArmScene';
 import { AgentHud } from './components/AgentHud';
+import { Breadcrumbs } from './components/Breadcrumbs';
 import { CommandPalette } from './components/CommandPalette';
-import { ContextRibbon } from './components/ContextRibbon';
+import { ContextMenu } from './components/ContextMenu';
+import { EngineeringRail } from './components/EngineeringRail';
+import { FloatingHud } from './components/FloatingHud';
+import { HealthHud } from './components/HealthHud';
 import { Inspector } from './components/Inspector';
 import { ItemTracker } from './components/ItemTracker';
-import { Navigator } from './components/Navigator';
 import { ObjectHud } from './components/ObjectHud';
+import { ProjectBrowser } from './components/ProjectBrowser';
+import { RadialMenu } from './components/RadialMenu';
 import { ViewNav } from './components/ViewNav';
+import { Workbench } from './components/Workbench';
 import type { PaletteItem } from './services/palette';
 import type { ContextKind } from './services/palette';
+import { fromWorkstationMode, HUMAN_MODES, loadHuds, toWorkstationMode } from './services/hudManager';
 import { getJson, postJson } from './api';
 import { useUi } from './store';
 import { ARCHEON_PRODUCT, ARCHEON_VERSION } from './version';
@@ -95,8 +102,9 @@ export default function App() {
   const spread = useUi((s) => s.spread);
   const mode = useUi((s) => s.mode);
   const overlay = useUi((s) => s.overlay);
-  const dockTab = useUi((s) => s.dockTab);
   const connected = useUi((s) => s.connected);
+  const workbenchOpen = useUi((s) => s.workbenchOpen);
+  const huds = useUi((s) => s.huds);
 
   async function refresh() {
     try {
@@ -137,8 +145,24 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const loaded = loadHuds();
+    useUi.setState({ huds: loaded, hudOpen: loaded.agent.open });
+  }, []);
+
+  useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') useUi.getState().clearSelection();
+      const tag = (e.target as HTMLElement)?.tagName;
+      const typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+      if (e.key === 'Escape') {
+        useUi.getState().clearSelection();
+        useUi.getState().setRadialOpen(false);
+        useUi.getState().setContextMenu(null);
+      }
+      if (e.code === 'Space' && !typing && !e.repeat) {
+        e.preventDefault();
+        const ui = useUi.getState();
+        if (ui.selectedId) ui.setRadialOpen(!ui.radialOpen);
+      }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -256,7 +280,7 @@ export default function App() {
       url.searchParams.set('force', '1');
       window.location.replace(url.toString());
     } catch (err) {
-      setChat((c) => [...c, { who: 'ERROR', text: `HARD RESET failed · ${err instanceof Error ? err.message : 'compiler unavailable'}` }]);
+      setChat((c) => [...c, { who: 'ERROR', text: `HARD RESET failed Â· ${err instanceof Error ? err.message : 'compiler unavailable'}` }]);
       setResetting(false);
     }
   }
@@ -286,7 +310,7 @@ export default function App() {
       if (!r.ok) throw new Error(out.error ?? `import failed ${r.status}`);
       if (out.part_id) useUi.getState().setSelected(out.part_id);
       await refresh();
-      setChat((c) => [...c, { who: 'CAD', text: `${file.name} → ${out.part_id}\n${out.note ?? ''}` }]);
+      setChat((c) => [...c, { who: 'CAD', text: `${file.name} â†’ ${out.part_id}\n${out.note ?? ''}` }]);
     } catch (e) {
       setChat((c) => [...c, { who: 'ERROR', text: String(e) }]);
     } finally {
@@ -317,7 +341,7 @@ export default function App() {
             ? 'interface'
             : 'none';
   const contextName = selected?.name ?? selectedAsm?.name ?? selectedReq?.id ?? selectedIface?.name;
-  const reachMm = meta?.reach_m != null ? Math.round(meta.reach_m * 1000) : '—';
+  const reachMm = meta?.reach_m != null ? Math.round(meta.reach_m * 1000) : 'â€”';
   const propReach = meta?.proposal?.reach_m != null ? Math.round(meta.proposal.reach_m * 1000) : null;
   const proposalIds = [
     ...(meta?.proposal?.transaction.requirements ?? []),
@@ -331,6 +355,9 @@ export default function App() {
     ...(doc?.assemblies.map((a) => ({ id: a.id, label: a.name, kind: 'ASSEMBLY' as const })) ?? []),
     ...(doc?.requirements.map((r) => ({ id: r.id, label: r.id, kind: 'REQUIREMENT' as const })) ?? []),
     ...(doc?.interfaces.map((i) => ({ id: i.id, label: i.name, kind: 'INTERFACE' as const })) ?? []),
+    ...(doc?.features.map((f) => ({ id: f.id, label: f.id, kind: 'FEATURE' as const, hint: f.kind })) ?? []),
+    ...(doc?.interfaces.filter((i) => i.kind === 'mechanical').map((i) => ({ id: i.id, label: i.name, kind: 'JOINT' as const })) ?? []),
+    { id: 'an.reach', label: 'Reach (link-sum)', kind: 'ANALYSIS' as const, hint: 'DERIVED Â· not FEA' },
     { id: 'cmd.explode', label: 'explode', kind: 'COMMAND', hint: 'explode selected' },
     { id: 'cmd.restore', label: 'restore display', kind: 'COMMAND' },
     { id: 'cmd.home', label: 'home view', kind: 'COMMAND' },
@@ -357,10 +384,16 @@ export default function App() {
     else if (id === 'reject') void decide('reject');
     else if (id === 'restore') ui.dispatch({ op: 'restore_display' });
     else if (id.startsWith('variant:')) ui.dispatch({ op: 'select_variant', id: id.slice(8) });
-    else if (id === 'ask' || id === 'more') {
-      ui.setHudOpen(true);
-      if (sid) setMsg(`what is this`);
+    else if (id === 'measure') ui.openHud('measure');
+    else if (id === 'section') {
+      ui.setSectionOn(true);
+      ui.openHud('section');
     }
+    else if (id === 'ask') {
+      ui.setHudOpen(true);
+      if (sid) setMsg('what is this');
+    }
+    else if (id === 'more') ui.openHud('inspector');
   }
 
   function onPalette(item: PaletteItem) {
@@ -378,8 +411,11 @@ export default function App() {
     }
   }
 
+  const healthy = connected && (val?.error_count ?? 0) === 0;
+  const humanMode = fromWorkstationMode(mode);
+
   return (
-    <div className="app">
+    <div className={`app ${workbenchOpen ? 'app--bench' : ''}`}>
       <header className="topbar">
         <div className="brand">
           <img className="brand__mark" src="/archeon.png" alt="" />
@@ -388,75 +424,48 @@ export default function App() {
             <small>{displayVersion}</small>
           </div>
         </div>
-        <div className="meta">
-          <div className="chip"><span>PROJECT</span>
-            <select className="project-select" value={currentFolder} disabled={busy} onChange={(e) => void loadProject(e.target.value)}>
-              {(projects.length ? projects : [{ folder: currentFolder, name: doc?.project.name ?? currentFolder, id: currentFolder, revision: '', parts: 0 }]).map((p) => (
-                <option key={p.folder} value={p.folder}>{p.name}</option>
-              ))}
-            </select>
-          </div>
-          <div className="chip"><span>REVISION</span><b>{doc?.project.revision_id ?? '—'}</b></div>
-          <div className="chip"><span>BRANCH</span><b>{doc?.project.branch ?? 'main'}</b></div>
-          <div className="chip"><span>KERNEL</span><b className={cad?.build123d ? 'ok' : 'warn'}>{cad?.kernel ?? doc?.project.kernel ?? '—'}</b></div>
-          <div className="chip"><span>MODE</span>
-            <select className="project-select" value={mode} onChange={(e) => useUi.getState().setMode(e.target.value as WorkstationMode)}>
-              {WORKSTATION_MODES.map((m) => <option key={m}>{m}</option>)}
-            </select>
-          </div>
-          <div className="chip"><span>AGENTS</span><b>11</b></div>
-          <div className="chip"><span>VALIDATION</span><b className={(val?.error_count ?? 0) === 0 ? 'ok' : 'err'}>{(val?.error_count ?? '—') === 0 ? 'GRAPH OK' : `${val?.error_count} ERR`}</b></div>
-          <div className="chip"><span>MEMORY</span><b>LOCAL</b></div>
-          <div className="chip"><span>CONNECTION</span><b className={connected ? 'ok' : 'off'}>{connected ? 'API' : 'OFFLINE'}</b></div>
-          <div className="chip"><span>REACH</span><b>{reachMm} mm</b></div>
+        <div className="human-modes">
+          {HUMAN_MODES.map((m) => (
+            <button key={m} type="button" className={humanMode === m ? 'active' : ''} onClick={() => useUi.getState().setMode(toWorkstationMode(m))}>{m}</button>
+          ))}
+        </div>
+        <div className="meta meta--slim">
+          <select className="project-select" value={currentFolder} disabled={busy} onChange={(e) => void loadProject(e.target.value)}>
+            {(projects.length ? projects : [{ folder: currentFolder, name: doc?.project.name ?? currentFolder, id: currentFolder, revision: '', parts: 0 }]).map((p) => (
+              <option key={p.folder} value={p.folder}>{p.name}</option>
+            ))}
+          </select>
         </div>
         <div className="views">
-          <select value={view} onChange={(e) => useUi.getState().setView(e.target.value as ViewMode)}>
-            {VIEW_MODES.map((m) => <option key={m}>{m}</option>)}
-          </select>
-          <select value={spread} onChange={(e) => useUi.getState().setSpread(e.target.value as SpreadPreset)} title="Explosion spread">
-            {(['COMPACT', 'NORMAL', 'ENGINEERING', 'WIDE', 'EXTREME'] as SpreadPreset[]).map((s) => <option key={s}>{s}</option>)}
-          </select>
           <span>EXPLODE</span>
           <input type="range" min={0} max={1} step={0.01} value={explosion} onChange={(e) => {
             const n = Number(e.target.value);
             useUi.getState().setExplosion(n);
             if (n > 0 && view === 'ASSEMBLED') useUi.getState().setView('EXPLODED');
           }} />
+          <select value={spread} onChange={(e) => useUi.getState().setSpread(e.target.value as SpreadPreset)} title="Explosion spread">
+            {(['COMPACT', 'NORMAL', 'ENGINEERING', 'WIDE', 'EXTREME'] as SpreadPreset[]).map((s) => <option key={s}>{s}</option>)}
+          </select>
           <button type="button" className={overlay === 'EXPLODE_LINES' ? 'active' : ''} onClick={() => useUi.getState().setOverlay(overlay === 'EXPLODE_LINES' ? 'NONE' : 'EXPLODE_LINES')}>LINES</button>
-          <label className="top-btn">
-            IMPORT CAD
-            <input type="file" hidden accept=".stl,.step,.stp,.glb,.gltf,.obj" onChange={(e) => {
-              const f = e.target.files?.[0];
-              e.target.value = '';
-              if (f) void importCad(f);
-            }} />
-          </label>
-          <button type="button" className="top-btn" disabled={busy} onClick={() => void postJson('/api/cad/regenerate', {}).then(() => refresh())}>REGEN CAD</button>
-          <button type="button" className="top-btn top-btn--reset" disabled={resetting} onClick={() => void hardReset()}>
-            {resetting ? 'RESET…' : 'HARD RESET'}
+          <button type="button" className="top-btn" onClick={() => useUi.getState().setPaletteOpen(true)}>FIND âŒ˜K</button>
+          <button
+            type="button"
+            className={`health-chip ${healthy ? 'ok' : 'warn'}`}
+            onClick={() => useUi.getState().openHud('health')}
+          >
+            {healthy ? 'âœ“ HEALTHY' : '! CHECK'}
           </button>
         </div>
       </header>
 
-      {doc && (
-        <Navigator
-          parts={doc.parts}
-          assemblies={doc.assemblies}
-          features={doc.features}
-          interfaces={doc.interfaces}
-          requirements={doc.requirements}
-        />
-      )}
+      <EngineeringRail />
 
       <section className="viewport">
         <div className="hud">
-          <div className="tag">SPATIAL PROJECTION · NOT MANUFACTURING CAD</div>
-          <h1>{selected?.name ?? 'NO SELECTION'}</h1>
-          <div>{selectedId ?? 'click empty space or Esc to deselect'} · {view} · {spread}</div>
-          {selected?.spatial.cad && (
-            <div className="cad-flag">{selected.spatial.cad.format.toUpperCase()} · {selected.spatial.cad.truth} · {selected.spatial.cad.note}</div>
-          )}
+          {doc && <Breadcrumbs projectName={doc.project.name} parts={doc.parts} assemblies={doc.assemblies} />}
+          <div className="tag">SPATIAL PROJECTION Â· NOT MANUFACTURING CAD</div>
+          <h1>{contextName ?? 'ARCHEON ARM'}</h1>
+          <div>{selectedId ? selectedId : 'click the machine Â· Esc deselects Â· Space radial'}</div>
         </div>
         {doc && (
           <ArmScene
@@ -468,9 +477,101 @@ export default function App() {
             variantSets={variants.map((v) => ({ id: v.id, parts: v.preview_parts ?? [] }))}
           />
         )}
-        <div className="legend">v{displayVersion} · hash {meta?.hash?.slice(0, 10) ?? '—'}</div>
+        <div className="legend">v{displayVersion} Â· hash {meta?.hash?.slice(0, 10) ?? 'â€”'}</div>
         <ViewNav />
+        <div className="tracker-anchor">
+          <ItemTracker
+            parts={doc?.parts ?? []}
+            assemblies={doc?.assemblies ?? []}
+            requirements={doc?.requirements ?? []}
+            proposalIds={proposalIds}
+          />
+        </div>
         <ObjectHud kind={contextKind === 'proposal' ? (selected ? 'part' : 'assembly') : contextKind} name={contextName} onAction={onContextAction} />
+        <RadialMenu onAction={onContextAction} />
+        <ContextMenu kind={contextKind} onAction={onContextAction} />
+        {doc && (
+          <FloatingHud id="project" title="PROJECT BROWSER">
+            <ProjectBrowser parts={doc.parts} assemblies={doc.assemblies} features={doc.features} interfaces={doc.interfaces} requirements={doc.requirements} />
+          </FloatingHud>
+        )}
+        <FloatingHud id="inspector" title="INSPECTOR">
+          <Inspector
+            selectedId={selectedId}
+            part={selected}
+            assemblies={doc?.assemblies ?? []}
+            features={doc?.features ?? []}
+            interfaces={doc?.interfaces ?? []}
+            ports={doc?.ports ?? []}
+            requirements={doc?.requirements ?? []}
+            materials={doc?.materials ?? []}
+            revision={doc?.project.revision_id ?? 'rev.0001'}
+          />
+        </FloatingHud>
+        <FloatingHud id="health" title="SYSTEM HEALTH">
+          <HealthHud
+            version={displayVersion}
+            revision={doc?.project.revision_id}
+            branch={doc?.project.branch}
+            kernel={cad?.kernel ?? doc?.project.kernel}
+            build123d={cad?.build123d}
+            connected={connected}
+            reachMm={reachMm}
+            errorCount={val?.error_count}
+            provider={meta?.provider ? `${meta.provider.id} / ${meta.provider.model}` : undefined}
+            cadNote={cad?.note}
+          />
+          <div className="insp-actions">
+            <label className="top-btn">IMPORT CAD
+              <input type="file" hidden accept=".stl,.step,.stp,.glb,.gltf,.obj" onChange={(e) => {
+                const f = e.target.files?.[0];
+                e.target.value = '';
+                if (f) void importCad(f);
+              }} />
+            </label>
+            <button type="button" disabled={busy} onClick={() => void postJson('/api/cad/regenerate', {}).then(() => refresh())}>REGEN CAD</button>
+            <button type="button" className="top-btn--reset" disabled={resetting} onClick={() => void hardReset()}>{resetting ? 'RESETâ€¦' : 'HARD RESET'}</button>
+          </div>
+        </FloatingHud>
+        <FloatingHud id="analysis" title="ANALYSIS">
+          <div className="notes">Reach {reachMm} mm DERIVED from link lengths. Payload UNVERIFIED. No FEA. Section plane is visualization only.</div>
+          <button type="button" onClick={() => useUi.getState().setSectionOn(!useUi.getState().sectionOn)}>SECTION {useUi.getState().sectionOn ? 'ON' : 'OFF'}</button>
+        </FloatingHud>
+        <FloatingHud id="measure" title="MEASURE">
+          <div className="notes">
+            {selected ? `${selected.name}: envelope ${selected.spatial.primitive.kind === 'box' ? `${selected.spatial.primitive.sx.toFixed(3)} Ã— ${selected.spatial.primitive.sy.toFixed(3)} Ã— ${selected.spatial.primitive.sz.toFixed(3)} m` : 'cylinder'} Â· DERIVED from DesignIR primitive. Not a CMM. Not BREP mass properties.` : 'Select a part to measure its DesignIR envelope.'}
+          </div>
+        </FloatingHud>
+        <FloatingHud id="section" title="SECTION">
+          <div className="notes">Visualization clip plane. Does not modify CAD.</div>
+          <button type="button" onClick={() => useUi.getState().setSectionOn(!useUi.getState().sectionOn)}>PLANE {useUi.getState().sectionOn ? 'ON' : 'OFF'}</button>
+        </FloatingHud>
+        <FloatingHud id="history" title="HISTORY">
+          <div className="notes">Revision {doc?.project.revision_id}. Hash {meta?.hash}. {meta?.provider?.note}</div>
+        </FloatingHud>
+        <FloatingHud id="bom" title="BOM" wide>
+          <table>
+            <thead><tr><th>NAME</th><th>ID</th><th>QTY</th></tr></thead>
+            <tbody>
+              {doc?.parts.map((p) => (
+                <tr key={p.id} onClick={() => useUi.getState().setSelected(p.id)}><td>{p.name}</td><td>{p.id}</td><td>{p.qty}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </FloatingHud>
+        <FloatingHud id="interfaces" title="INTERFACES">
+          <table>
+            <thead><tr><th>NAME</th><th>KIND</th></tr></thead>
+            <tbody>
+              {doc?.interfaces.map((i) => (
+                <tr key={i.id} onClick={() => useUi.getState().setSelected(i.id)}><td>{i.name}</td><td>{i.kind}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </FloatingHud>
+        <FloatingHud id="compare" title="COMPARE">
+          <div className="notes">{variants.length ? 'Proposal / variant overlay is orange PREVIEW geometry. Not exact CAD.' : 'No active proposal or variants.'}</div>
+        </FloatingHud>
         <AgentHud
           chat={chat}
           msg={msg}
@@ -498,112 +599,14 @@ export default function App() {
       </section>
       <CommandPalette catalog={paletteCatalog} onCommand={onPalette} />
 
-      <aside className="inspector-rail">
-        <ContextRibbon kind={contextKind} name={contextName} onAction={onContextAction} />
-        <ItemTracker
-          parts={doc?.parts ?? []}
-          assemblies={doc?.assemblies ?? []}
-          requirements={doc?.requirements ?? []}
-          proposalIds={proposalIds}
-        />
-        <Inspector
-          selectedId={selectedId}
-          part={selected}
-          assemblies={doc?.assemblies ?? []}
-          features={doc?.features ?? []}
-          interfaces={doc?.interfaces ?? []}
-          ports={doc?.ports ?? []}
-          requirements={doc?.requirements ?? []}
-          materials={doc?.materials ?? []}
-          revision={doc?.project.revision_id ?? 'rev.0001'}
-        />
-      </aside>
-
-      <footer className="dock">
-        <div className="tabs">
-          {DOCK_TABS.map((t) => (
-            <button key={t} className={dockTab === t ? 'active' : ''} onClick={() => useUi.getState().setDockTab(t)}>{t}</button>
-          ))}
-        </div>
-        <div className="dock-body">
-          {dockTab === 'BOM' && (
-            <table>
-              <thead><tr><th>PN / ID</th><th>NAME</th><th>QTY</th><th>MATERIAL</th><th>ROLE</th><th>COST</th></tr></thead>
-              <tbody>
-                {doc?.parts.map((p) => (
-                  <tr key={p.id} onClick={() => useUi.getState().setSelected(p.id)}>
-                    <td>{p.id}</td><td>{p.name}</td><td>{p.qty}</td><td>{p.material ?? '—'}</td><td>{p.semantic_role}</td>
-                    <td className="warn">UNVERIFIED · catalog not connected</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-          {dockTab === 'MATES' && (
-            <table>
-              <thead><tr><th>INTERFACE</th><th>KIND</th><th>ROLE</th><th>A</th><th>B</th></tr></thead>
-              <tbody>
-                {doc?.interfaces.map((i) => (
-                  <tr key={i.id} onClick={() => useUi.getState().setSelected(i.id)}>
-                    <td>{i.name}</td><td>{i.kind}</td><td>{i.semantic_role}</td><td>{i.a}</td><td>{i.b}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-          {dockTab === 'ANALYSIS' && (
-            <div className="notes">
-              Reach DERIVED from link lengths: {reachMm} mm. Payload 3 kg is a requirement (UNVERIFIED). No FEA, no motion envelope, no interference Boolean in this build.
-              <div>
-                <button type="button" onClick={() => useUi.getState().setSectionOn(!useUi.getState().sectionOn)}>
-                  SECTION PLANE {useUi.getState().sectionOn ? 'ON' : 'OFF'}
-                </button>
-                <span> visualization only — does not modify CAD</span>
-              </div>
-            </div>
-          )}
-          {dockTab === 'FEATURE TREE' && (
-            <table>
-              <thead><tr><th>FEATURE</th><th>PART</th><th>KIND</th><th>ROLE</th></tr></thead>
-              <tbody>
-                {doc?.features.map((f) => (
-                  <tr key={f.id}><td>{f.id}</td><td>{f.part}</td><td>{f.kind}</td><td>{f.semantic_role}</td></tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-          {dockTab === 'TRANSACTIONS' && (
-            <table>
-              <thead><tr><th>ID</th><th>STATUS</th><th>AGENT</th><th>INTENT</th></tr></thead>
-              <tbody>
-                {ledger.items.map((t) => (
-                  <tr key={t.transaction_id}><td>{t.transaction_id}</td><td>{t.status}</td><td>{t.agent_id}</td><td>{t.intent}</td></tr>
-                ))}
-                {ledger.items.length === 0 && <tr><td colSpan={4} className="notes">No transactions this session.</td></tr>}
-              </tbody>
-            </table>
-          )}
-          {dockTab === 'VALIDATION' && (
-            <table>
-              <thead><tr><th>SEV</th><th>CODE</th><th>ENTITY</th><th>MESSAGE</th></tr></thead>
-              <tbody>
-                {(val?.findings ?? []).map((f, i) => (
-                  <tr key={i}><td className={f.severity === 'ERROR' ? 'err' : 'warn'}>{f.severity}</td><td>{f.code}</td><td>{f.entity}</td><td>{f.message}</td></tr>
-                ))}
-                {(val?.findings?.length ?? 0) === 0 && <tr><td colSpan={4} className="ok">Graph validators: no findings. Not FEA. Not collision.</td></tr>}
-              </tbody>
-            </table>
-          )}
-          {dockTab === 'TIMELINE' && (
-            <div className="notes">
-              Revision {doc?.project.revision_id}. Design hash {meta?.hash}. Provider {meta?.provider.id} / {meta?.provider.model}. {meta?.provider.note}
-            </div>
-          )}
-          {dockTab === 'CONSOLE' && (
-            <pre className="notes">{(meta?.logs ?? []).slice(-20).join('\n') || 'no structured logs yet'}</pre>
-          )}
-        </div>
-      </footer>
+      <Workbench
+        doc={doc}
+        reachMm={reachMm}
+        val={val}
+        ledger={ledger}
+        hash={meta?.hash}
+        provider={meta?.provider ? `${meta.provider.id} / ${meta.provider.model}` : undefined}
+      />
     </div>
   );
 }

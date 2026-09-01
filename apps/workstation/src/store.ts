@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { ViewMode, TreeTab, DockTab, SpatialView, RenderStyle, Overlay, WorkstationMode, AgentTab } from '@archeon/spatial-grammar';
 import { composeFromLegacy } from '@archeon/spatial-grammar';
 import { applySceneCommand, nudgeSpread, type ExplosionStrategy, type SceneCommand, type SceneSnapshot, type SpreadPreset } from '@archeon/scene-engine';
+import { applyClose, applyOpen, applyPin, emptyHuds, saveHuds, type HudGeom, type HudId, type HudMap } from './services/hudManager';
 
 export type DisplayState = 'VISIBLE' | 'HIDDEN' | 'GHOSTED' | 'ISOLATED';
 
@@ -42,8 +43,15 @@ interface Ui {
   cadStatus: string | null;
   paletteOpen: boolean;
   inspectSection: 'SUMMARY' | 'ENGINEERING' | 'PROVENANCE' | 'GRAPH';
+  inspectOpen: Record<string, boolean>;
   cameraHistory: { center: [number, number, number]; radius: number }[];
   spatialHistory: SceneSnapshot[];
+  huds: HudMap;
+  browserFilter: string;
+  workbenchOpen: boolean;
+  trackerExpanded: boolean;
+  contextMenu: { x: number; y: number; id: string } | null;
+  radialOpen: boolean;
   setSelected: (id: string | null) => void;
   toggleSelected: (id: string) => void;
   setHovered: (id: string | null) => void;
@@ -79,10 +87,20 @@ interface Ui {
   spatialUndo: () => void;
   setPaletteOpen: (v: boolean) => void;
   setInspectSection: (s: 'SUMMARY' | 'ENGINEERING' | 'PROVENANCE' | 'GRAPH') => void;
+  toggleInspect: (section: string) => void;
   setGeomRev: (n: number) => void;
   setAgentWorking: (v: boolean) => void;
   setCadStatus: (s: string | null) => void;
   setActiveVariant: (id: string | null) => void;
+  openHud: (id: HudId) => void;
+  closeHud: (id: HudId) => void;
+  pinHud: (id: HudId, pinned: boolean) => void;
+  patchHud: (id: HudId, patch: Partial<HudGeom>) => void;
+  setBrowserFilter: (f: string) => void;
+  setWorkbenchOpen: (v: boolean) => void;
+  setTrackerExpanded: (v: boolean) => void;
+  setContextMenu: (m: { x: number; y: number; id: string } | null) => void;
+  setRadialOpen: (v: boolean) => void;
 }
 
 function pushRecent(recent: string[], id: string): string[] {
@@ -126,25 +144,41 @@ export const useUi = create<Ui>((set) => ({
   cadStatus: null,
   paletteOpen: false,
   inspectSection: 'SUMMARY',
+  inspectOpen: {},
   cameraHistory: [],
   spatialHistory: [],
+  huds: emptyHuds(),
+  browserFilter: 'ALL',
+  workbenchOpen: false,
+  trackerExpanded: false,
+  contextMenu: null,
+  radialOpen: false,
   setSelected: (selectedId) =>
-    set((s) => ({
-      selectedId,
-      recentIds: selectedId ? pushRecent(s.recentIds, selectedId) : s.recentIds,
-      isolate: selectedId ? s.isolate : null,
-      neighborhoodIds: selectedId ? s.neighborhoodIds : []
-    })),
+    set((s) => {
+      const next = {
+        selectedId,
+        recentIds: selectedId ? pushRecent(s.recentIds, selectedId) : s.recentIds,
+        isolate: selectedId ? s.isolate : null,
+        neighborhoodIds: selectedId ? s.neighborhoodIds : [],
+        radialOpen: false,
+        contextMenu: null as Ui['contextMenu'],
+        huds: selectedId ? applyOpen(s.huds, 'inspector') : s.huds
+      };
+      if (selectedId) saveHuds(next.huds);
+      return next;
+    }),
   toggleSelected: (id) =>
     set((s) => {
       if (s.selectedId === id) {
-        return { selectedId: null, isolate: null, neighborhoodIds: [] };
+        return { selectedId: null, isolate: null, neighborhoodIds: [], radialOpen: false };
       }
-      return { selectedId: id, recentIds: pushRecent(s.recentIds, id) };
+      const huds = applyOpen(s.huds, 'inspector');
+      saveHuds(huds);
+      return { selectedId: id, recentIds: pushRecent(s.recentIds, id), huds };
     }),
   setHovered: (hoveredId) => set({ hoveredId }),
   clearSelection: () => set({ selectedId: null, isolate: null, neighborhoodIds: [], ghostOthers: false, focusId: null }),
-  track: (id) => set((s) => ({ trackedIds: s.trackedIds.includes(id) ? s.trackedIds : [...s.trackedIds, id] })),
+  track: (id) => set((s) => ({ trackedIds: s.trackedIds.includes(id) ? s.trackedIds : [...s.trackedIds, id], trackerExpanded: true })),
   untrack: (id) => set((s) => ({ trackedIds: s.trackedIds.filter((x) => x !== id) })),
   setNeighborhood: (neighborhoodIds) => set({ neighborhoodIds }),
   setGhostOthers: (ghostOthers) => set({ ghostOthers }),
@@ -192,7 +226,12 @@ export const useUi = create<Ui>((set) => ({
   setSectionOn: (sectionOn) => set((s) => ({ sectionOn, overlay: sectionOn ? 'ANALYSIS' : s.overlay })),
   setSectionAxis: (sectionAxis) => set({ sectionAxis }),
   setSectionPos: (sectionPos) => set({ sectionPos }),
-  setHudOpen: (hudOpen) => set((s) => ({ hudOpen, hudCollapsed: hudOpen ? false : s.hudCollapsed })),
+  setHudOpen: (hudOpen) =>
+    set((s) => {
+      const huds = hudOpen ? applyOpen(s.huds, 'agent') : applyClose(s.huds, 'agent');
+      saveHuds(huds);
+      return { hudOpen, hudCollapsed: hudOpen ? false : s.hudCollapsed, huds };
+    }),
   setHudCollapsed: (hudCollapsed) => set({ hudCollapsed }),
   setAgentTab: (agentTab) => set({ agentTab }),
   requestFit: (fitCenter, fitRadius) =>
@@ -238,6 +277,36 @@ export const useUi = create<Ui>((set) => ({
   setAgentWorking: (agentWorking) => set({ agentWorking }),
   setCadStatus: (cadStatus) => set({ cadStatus }),
   setActiveVariant: (activeVariant) => set({ activeVariant }),
+  toggleInspect: (section) => set((s) => ({ inspectOpen: { ...s.inspectOpen, [section]: !s.inspectOpen[section] } })),
+  openHud: (id) =>
+    set((s) => {
+      const huds = applyOpen(s.huds, id);
+      saveHuds(huds);
+      return { huds, hudOpen: id === 'agent' ? true : s.hudOpen, paletteOpen: id === 'project' && s.browserFilter === 'FIND' ? s.paletteOpen : s.paletteOpen };
+    }),
+  closeHud: (id) =>
+    set((s) => {
+      const huds = applyClose(s.huds, id);
+      saveHuds(huds);
+      return { huds, hudOpen: id === 'agent' ? false : s.hudOpen };
+    }),
+  pinHud: (id, pinned) =>
+    set((s) => {
+      const huds = applyPin(s.huds, id, pinned);
+      saveHuds(huds);
+      return { huds };
+    }),
+  patchHud: (id, patch) =>
+    set((s) => {
+      const huds = { ...s.huds, [id]: { ...s.huds[id], ...patch } };
+      saveHuds(huds);
+      return { huds };
+    }),
+  setBrowserFilter: (browserFilter) => set({ browserFilter }),
+  setWorkbenchOpen: (workbenchOpen) => set({ workbenchOpen }),
+  setTrackerExpanded: (trackerExpanded) => set({ trackerExpanded }),
+  setContextMenu: (contextMenu) => set({ contextMenu, radialOpen: false }),
+  setRadialOpen: (radialOpen) => set({ radialOpen, contextMenu: null }),
   spatialUndo: () =>
     set((s) => {
       const prev = s.spatialHistory[s.spatialHistory.length - 1];

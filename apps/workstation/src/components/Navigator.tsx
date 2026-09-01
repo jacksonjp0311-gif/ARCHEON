@@ -53,7 +53,7 @@ function TreeNode({ node, depth }: { node: Node; depth: number }) {
   );
 }
 
-export function Navigator({ parts, assemblies, features, interfaces, requirements }: Props) {
+export function Navigator({ parts, assemblies, features, interfaces, requirements, embedded }: Props & { embedded?: boolean }) {
   const tab = useUi((s) => s.treeTab);
   const setTab = useUi((s) => s.setTreeTab);
 
@@ -108,13 +108,15 @@ export function Navigator({ parts, assemblies, features, interfaces, requirement
   }, [tab, parts, assemblies, features, interfaces, requirements]);
 
   return (
-    <aside className="tree">
-      <h2>ENGINEERING NAVIGATOR</h2>
-      <div className="tabs">
-        {TREE_TABS.map((t) => (
-          <button key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t as TreeTab)}>{t}</button>
-        ))}
-      </div>
+    <aside className={embedded ? 'tree tree--embed' : 'tree'}>
+      {!embedded && <h2>ENGINEERING NAVIGATOR</h2>}
+      {!embedded && (
+        <div className="tabs">
+          {TREE_TABS.map((t) => (
+            <button key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t as TreeTab)}>{t}</button>
+          ))}
+        </div>
+      )}
       <div className="tree-body">
         {nodes.map((n) => <TreeNode key={n.id} node={n} depth={0} />)}
       </div>

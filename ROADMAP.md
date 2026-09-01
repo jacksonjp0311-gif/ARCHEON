@@ -13,7 +13,19 @@ Status language: **shipped**, **partial**, **not started**. Nothing here is a cl
 
 ## Phase 1 — Semantic assembly + spatial workstation — shipped
 
-## Phase 1.2 / v0.3 — Live Design — this tree
+## Phase 1.3 / v0.4 — Adaptive Human Interface — this tree
+
+- Compact Engineering Rail (PROJECT / FIND / SYSTEM / ANALYZE / HISTORY)
+- Searchable Project Browser (filters, not destinations)
+- Collapsible Workbench drawer
+- Human modes DESIGN / ASSEMBLE / ANALYZE / REVIEW
+- SYSTEM HEALTH HUD behind ✓ HEALTHY
+- HudManager: one primary + two utility + special Agent HUD
+- Right-click context menu + Space radial menu
+- Collapsed Item Tracker when empty
+- Breadcrumbs and progressive inspector
+
+## Phase 1.2 / v0.3 — Live Design — shipped
 
 - Three clocks (render / engineering / agent)
 - Scene command bus (deterministic, no agent frame animation)

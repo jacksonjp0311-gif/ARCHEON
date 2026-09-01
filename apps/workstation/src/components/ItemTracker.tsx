@@ -21,6 +21,8 @@ export function ItemTracker({ parts, assemblies, requirements, proposalIds }: Pr
   const selectedId = useUi((s) => s.selectedId);
   const setSelected = useUi((s) => s.setSelected);
   const untrack = useUi((s) => s.untrack);
+  const expanded = useUi((s) => s.trackerExpanded);
+  const setExpanded = useUi((s) => s.setTrackerExpanded);
 
   function label(id: string): string {
     return parts.find((p) => p.id === id)?.name
@@ -38,9 +40,18 @@ export function ItemTracker({ parts, assemblies, requirements, proposalIds }: Pr
     return 'WATCH';
   }
 
+  if (!expanded && tracked.length === 0) {
+    return (
+      <button type="button" className="tracker-chip" onClick={() => setExpanded(true)}>☆ TRACKED 0</button>
+    );
+  }
+
   return (
     <section className="rail-panel tracker">
-      <h2>ITEM TRACKER</h2>
+      <h2>
+        ☆ TRACKED {tracked.length}
+        <button type="button" onClick={() => setExpanded(false)} title="Collapse">—</button>
+      </h2>
       {tracked.length === 0 && <p className="empty">Nothing tracked.<br />Track important parts, requirements, or interfaces while you work.</p>}
       {tracked.map((id) => (
         <button

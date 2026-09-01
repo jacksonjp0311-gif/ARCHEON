@@ -1,10 +1,11 @@
-# Spatial workstation (v0.2 + v0.3)
+# Spatial workstation (v0.4)
 
-Left: Engineering Navigator  
-Center: Spatial viewport (dominant)  
-Right: Item Tracker + CAD Inspector  
-Bottom: Feature / BOM / Mates / Analysis / TX / Validation / Timeline  
-Float: ARCHEON Agent HUD  
+Left: compact Engineering Rail (PROJECT / FIND / SYSTEM / ANALYZE / HISTORY)  
+Center: Spatial viewport (dominant) — the machine is the primary navigation surface  
+Float: HudManager (Inspector, Project Browser, Health, Measure, …) + Agent HUD  
+Bottom: collapsible WORKBENCH drawer  
+
+Default chrome does not permanently show SYSTEM / ASSEMBLY / PARTS tabs, kernel/memory/API chips, or a full-height inspector.  
 
 Selection is nullable. Tracker is a watch list.
 

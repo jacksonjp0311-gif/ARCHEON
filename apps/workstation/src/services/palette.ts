@@ -1,4 +1,4 @@
-export type PaletteKind = 'PART' | 'ASSEMBLY' | 'REQUIREMENT' | 'INTERFACE' | 'COMMAND' | 'VIEW' | 'AGENT';
+export type PaletteKind = 'PART' | 'ASSEMBLY' | 'FEATURE' | 'JOINT' | 'INTERFACE' | 'REQUIREMENT' | 'ANALYSIS' | 'COMMAND' | 'VIEW' | 'AGENT';
 
 export interface PaletteItem {
   id: string;
@@ -41,10 +41,10 @@ export function contextActions(kind: ContextKind): { id: string; label: string; 
       return [
         { id: 'focus', label: 'FOCUS', title: 'Frame selected object.' },
         { id: 'isolate', label: 'ISOLATE', title: 'Hide unrelated objects temporarily.' },
-        { id: 'track', label: 'TRACK', title: 'Keep this engineering entity monitored.' },
         { id: 'explode', label: 'EXPLODE', title: 'Explode the parent assembly context.' },
-        { id: 'xray', label: 'XRAY', title: 'Transparent bodies. View only.' },
-        { id: 'ask', label: 'ASK', title: 'Ask ARCHEON about this object.' }
+        { id: 'measure', label: 'MEASURE', title: 'Envelope dimensions from DesignIR. Not a CMM.' },
+        { id: 'track', label: 'TRACK', title: 'Keep this engineering entity monitored.' },
+        { id: 'ask', label: 'ASK ARCHEON', title: 'Ask ARCHEON about this object.' }
       ];
     case 'assembly':
       return [
@@ -85,6 +85,17 @@ export function contextActions(kind: ContextKind): { id: string; label: string; 
 
 export function objectHudActions(kind: ContextKind): { id: string; label: string }[] {
   if (kind === 'none') return [];
+  if (kind === 'part') {
+    return [
+      { id: 'focus', label: 'FOCUS' },
+      { id: 'isolate', label: 'ISOLATE' },
+      { id: 'explode', label: 'EXPLODE' },
+      { id: 'measure', label: 'MEASURE' },
+      { id: 'track', label: 'TRACK' },
+      { id: 'ask', label: 'ASK ARCHEON' },
+      { id: 'more', label: 'MORE' }
+    ];
+  }
   const all = contextActions(kind);
-  return all.slice(0, 4).concat(all.length > 4 ? [{ id: 'more', label: '···' }] : []);
+  return all.slice(0, 4).concat(all.length > 4 ? [{ id: 'more', label: 'MORE' }] : []);
 }
