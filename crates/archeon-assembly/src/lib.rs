@@ -13,6 +13,7 @@ pub enum ExplosionStrategy {
     Service,
     Graph,
     Custom,
+    Stack,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -189,6 +190,10 @@ pub fn offset_for_profile(
         }
         ExplosionStrategy::Graph => mag *= 0.7 + profile.radial_spacing * 0.25 + 0.12 * depth,
         ExplosionStrategy::Custom => {}
+        ExplosionStrategy::Stack => {
+            dir = v;
+            mag *= 0.55 + 0.08 * stage as f64;
+        }
         ExplosionStrategy::Radial => {
             mag *= profile.radial_spacing * (0.55 + 0.12 * rank * 0.08 + 0.18 * depth);
         }
@@ -261,6 +266,8 @@ mod tests {
             semantic_role: "link".into(),
             qty: 1,
             catalog_ref: None,
+            component_class: None,
+            detail_tier: "primary".into(),
             spatial: Spatial {
                 origin_m: [0.0, 0.0, 0.0],
                 rpy_rad: [0.0, 0.0, 0.0],

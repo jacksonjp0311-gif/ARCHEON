@@ -1,8 +1,8 @@
 import { create } from 'zustand';
-import type { ViewMode, TreeTab, DockTab, SpatialView, RenderStyle, Overlay, WorkstationMode, AgentTab } from '@archeon/spatial-grammar';
-import { composeFromLegacy } from '@archeon/spatial-grammar';
+import type { ViewMode, TreeTab, DockTab, SpatialView, RenderStyle, Overlay, OverlayFlag, OverlayState, WorkstationMode, AgentTab } from '@archeon/spatial-grammar';
+import { composeFromLegacy, emptyOverlays, enableOverlay, primaryOverlayName, toggleOverlayFlag } from '@archeon/spatial-grammar';
 import { applySceneCommand, nudgeSpread, type ExplosionStrategy, type SceneCommand, type SceneSnapshot, type SpreadPreset } from '@archeon/scene-engine';
-import { applyClose, applyOpen, applyPin, emptyHuds, saveHuds, type HudGeom, type HudId, type HudMap } from './services/hudManager';
+import { applyClose, applyOpen, applyPin, emptyHuds, inspectorAfterSelection, saveHuds, type HudGeom, type HudId, type HudMap } from './services/hudManager';
 
 export type DisplayState = 'VISIBLE' | 'HIDDEN' | 'GHOSTED' | 'ISOLATED';
 
@@ -18,6 +18,7 @@ interface Ui {
   spatial: SpatialView;
   renderStyle: RenderStyle;
   overlay: Overlay;
+  overlays: OverlayState;
   mode: WorkstationMode;
   explosion: number;
   strategy: ExplosionStrategy;
@@ -30,6 +31,7 @@ interface Ui {
   sectionOn: boolean;
   sectionAxis: 'x' | 'y' | 'z';
   sectionPos: number;
+  ghostRoles: string[];
   hudOpen: boolean;
   hudCollapsed: boolean;
   agentTab: AgentTab;
@@ -37,6 +39,7 @@ interface Ui {
   fitEpoch: number;
   fitCenter: [number, number, number];
   fitRadius: number;
+  fitSize: [number, number, number];
   variantMode: SceneSnapshot['variantMode'];
   activeVariant: string | null;
   geomRev: number;
@@ -66,6 +69,7 @@ interface Ui {
   setSpatial: (spatial: SpatialView) => void;
   setRenderStyle: (style: RenderStyle) => void;
   setOverlay: (overlay: Overlay) => void;
+  toggleOverlay: (flag: OverlayFlag) => void;
   setMode: (mode: WorkstationMode) => void;
   setExplosion: (n: number) => void;
   setStrategy: (s: ExplosionStrategy) => void;
@@ -78,10 +82,11 @@ interface Ui {
   setSectionOn: (v: boolean) => void;
   setSectionAxis: (a: 'x' | 'y' | 'z') => void;
   setSectionPos: (n: number) => void;
+  setGhostRoles: (roles: string[]) => void;
   setHudOpen: (v: boolean) => void;
   setHudCollapsed: (v: boolean) => void;
   setAgentTab: (t: AgentTab) => void;
-  requestFit: (center: [number, number, number], radius: number) => void;
+  requestFit: (center: [number, number, number], radius: number, size?: [number, number, number]) => void;
   bumpFit: () => void;
   resetView: () => void;
   clearProjectSelection: () => void;
@@ -121,6 +126,7 @@ export const useUi = create<Ui>((set) => ({
   spatial: 'ASSEMBLED',
   renderStyle: 'SHADED_WITH_EDGES',
   overlay: 'NONE',
+  overlays: emptyOverlays(),
   mode: 'ASSEMBLY',
   explosion: 0,
   strategy: 'SEQUENCE',
@@ -133,6 +139,7 @@ export const useUi = create<Ui>((set) => ({
   sectionOn: false,
   sectionAxis: 'y',
   sectionPos: 0,
+  ghostRoles: [],
   hudOpen: false,
   hudCollapsed: false,
   agentTab: 'CHAT',
@@ -140,6 +147,7 @@ export const useUi = create<Ui>((set) => ({
   fitEpoch: 0,
   fitCenter: [0.4, 0.15, 0],
   fitRadius: 1.4,
+  fitSize: [1.2, 0.6, 0.8],
   variantMode: 'NONE',
   activeVariant: null,
   geomRev: 0,
@@ -158,29 +166,36 @@ export const useUi = create<Ui>((set) => ({
   radialOpen: false,
   setSelected: (selectedId) =>
     set((s) => {
-      const next = {
+      const huds = inspectorAfterSelection(s.huds, selectedId);
+      saveHuds(huds);
+      return {
         selectedId,
         recentIds: selectedId ? pushRecent(s.recentIds, selectedId) : s.recentIds,
         isolate: selectedId ? s.isolate : null,
         neighborhoodIds: selectedId ? s.neighborhoodIds : [],
         radialOpen: false,
         contextMenu: null as Ui['contextMenu'],
-        huds: selectedId ? applyOpen(s.huds, 'inspector') : s.huds
+        huds
       };
-      if (selectedId) saveHuds(next.huds);
-      return next;
     }),
   toggleSelected: (id) =>
     set((s) => {
       if (s.selectedId === id) {
-        return { selectedId: null, isolate: null, neighborhoodIds: [], radialOpen: false };
+        const huds = inspectorAfterSelection(s.huds, null);
+        saveHuds(huds);
+        return { selectedId: null, isolate: null, neighborhoodIds: [], radialOpen: false, huds };
       }
-      const huds = applyOpen(s.huds, 'inspector');
+      const huds = inspectorAfterSelection(s.huds, id);
       saveHuds(huds);
       return { selectedId: id, recentIds: pushRecent(s.recentIds, id), huds };
     }),
   setHovered: (hoveredId) => set({ hoveredId }),
-  clearSelection: () => set({ selectedId: null, neighborhoodIds: [], ghostOthers: false, focusId: null }),
+  clearSelection: () =>
+    set((s) => {
+      const huds = inspectorAfterSelection(s.huds, null);
+      saveHuds(huds);
+      return { selectedId: null, neighborhoodIds: [], ghostOthers: false, focusId: null, huds };
+    }),
   track: (id) => set((s) => ({ trackedIds: s.trackedIds.includes(id) ? s.trackedIds : [...s.trackedIds, id], trackerExpanded: true })),
   untrack: (id) => set((s) => ({ trackedIds: s.trackedIds.filter((x) => x !== id) })),
   setNeighborhood: (neighborhoodIds) => set({ neighborhoodIds }),
@@ -203,6 +218,7 @@ export const useUi = create<Ui>((set) => ({
         spatial: composed.spatial,
         renderStyle: composed.style,
         overlay: composed.overlay,
+        overlays: composed.overlay === 'NONE' ? s.overlays : enableOverlay(emptyOverlays(), composed.overlay),
         explosion:
           composed.spatial === 'ASSEMBLED' || composed.spatial === 'FOCUS' || composed.spatial === 'ISOLATE'
             ? composed.spatial === 'ASSEMBLED'
@@ -225,7 +241,16 @@ export const useUi = create<Ui>((set) => ({
       isolate: spatial === 'ISOLATE' ? s.selectedId : spatial === 'ASSEMBLED' ? null : s.isolate
     })),
   setRenderStyle: (renderStyle) => set({ renderStyle }),
-  setOverlay: (overlay) => set({ overlay }),
+  setOverlay: (overlay) =>
+    set((s) => {
+      const overlays = overlay === 'NONE' ? emptyOverlays() : enableOverlay(s.overlays, overlay);
+      return { overlay: primaryOverlayName(overlays), overlays };
+    }),
+  toggleOverlay: (flag) =>
+    set((s) => {
+      const overlays = toggleOverlayFlag(s.overlays, flag);
+      return { overlays, overlay: primaryOverlayName(overlays) };
+    }),
   setMode: (mode) => set((s) => ({ mode, hudOpen: mode === 'AGENT' ? true : s.hudOpen })),
   setExplosion: (explosion) => set({ explosion }),
   setStrategy: (strategy) => set({ strategy }),
@@ -235,7 +260,12 @@ export const useUi = create<Ui>((set) => ({
   setDockTab: (dockTab) => set({ dockTab }),
   setIsolate: (isolate) => set({ isolate, spatial: isolate ? 'ISOLATE' : 'ASSEMBLED', view: isolate ? 'ISOLATE' : 'ASSEMBLED' }),
   setConnected: (connected) => set({ connected }),
-  setSectionOn: (sectionOn) => set((s) => ({ sectionOn, overlay: sectionOn ? 'ANALYSIS' : s.overlay })),
+  setSectionOn: (sectionOn) =>
+    set((s) => {
+      const overlays = { ...s.overlays, analysis: sectionOn };
+      return { sectionOn, overlays, overlay: primaryOverlayName(overlays) };
+    }),
+  setGhostRoles: (ghostRoles) => set({ ghostRoles }),
   setSectionAxis: (sectionAxis) => set({ sectionAxis }),
   setSectionPos: (sectionPos) => set({ sectionPos }),
   setHudOpen: (hudOpen) =>
@@ -246,11 +276,12 @@ export const useUi = create<Ui>((set) => ({
     }),
   setHudCollapsed: (hudCollapsed) => set({ hudCollapsed }),
   setAgentTab: (agentTab) => set({ agentTab }),
-  requestFit: (fitCenter, fitRadius) =>
+  requestFit: (fitCenter, fitRadius, fitSize) =>
     set((s) => ({
       cameraHistory: [...s.cameraHistory, { center: s.fitCenter, radius: s.fitRadius }].slice(-12),
       fitCenter,
       fitRadius,
+      fitSize: fitSize ?? s.fitSize,
       fitNonce: s.fitNonce + 1
     })),
   bumpFit: () => set((s) => ({ fitEpoch: s.fitEpoch + 1 })),
@@ -260,6 +291,7 @@ export const useUi = create<Ui>((set) => ({
       spatial: 'ASSEMBLED',
       renderStyle: 'SHADED_WITH_EDGES',
       overlay: 'NONE',
+      overlays: emptyOverlays(),
       explosion: 0,
       isolate: null,
       ghostOthers: false,
@@ -348,8 +380,19 @@ export const useUi = create<Ui>((set) => ({
       const snap = toSnap(s);
       const next = applySceneCommand(snap, nextCmd);
       const record = ['restore_display', 'explode_entity', 'explode_system', 'isolate_entity', 'focus_entity', 'ghost_others'].includes(cmd.op);
+      let overlays = s.overlays;
+      if (cmd.op === 'show_overlay') overlays = enableOverlay(s.overlays, (cmd as { overlay: string }).overlay);
+      else if (cmd.op === 'hide_overlay' || cmd.op === 'restore_display' || cmd.op === 'home_view') overlays = emptyOverlays();
+      let huds = s.huds;
+      if (cmd.op === 'clear_selection' || cmd.op === 'select_entity') {
+        huds = inspectorAfterSelection(s.huds, next.selectedId);
+        saveHuds(huds);
+      }
       return {
         ...fromSnap(next),
+        overlays,
+        overlay: primaryOverlayName(overlays),
+        huds,
         spatialHistory: record ? [...s.spatialHistory, snap].slice(-16) : s.spatialHistory,
         fitEpoch: next.fitRequest !== 'none' ? s.fitEpoch + 1 : s.fitEpoch
       };

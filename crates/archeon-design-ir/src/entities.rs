@@ -16,7 +16,19 @@ pub struct Project {
     pub kernel: String,
     #[serde(default)]
     pub domain: String,
+    #[serde(default)]
+    pub fidelity: FidelityLevel,
     pub provenance: Provenance,
+}
+
+/// User-selectable design fidelity. Default ENGINEERING.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum FidelityLevel {
+    Concept,
+    #[default]
+    Engineering,
+    Detailed,
 }
 
 fn default_branch() -> String {
@@ -66,9 +78,19 @@ pub struct Part {
     pub qty: u32,
     #[serde(default)]
     pub catalog_ref: Option<String>,
+    /// GENERIC class such as bearing / bolt / shaft. None = designed part.
+    #[serde(default)]
+    pub component_class: Option<String>,
+    /// primary | instance | hidden — semantic detail budget, not a quality score.
+    #[serde(default = "detail_primary")]
+    pub detail_tier: String,
     #[serde(default)]
     pub spatial: Spatial,
     pub provenance: Provenance,
+}
+
+fn detail_primary() -> String {
+    "primary".into()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -172,20 +194,61 @@ pub struct Feature {
 #[serde(rename_all = "snake_case")]
 pub enum FeatureKind {
     Datum,
+    Sketch,
     SketchRectangle,
     SketchCircle,
     Extrude,
     Revolve,
     Cut,
     Hole,
+    Counterbore,
+    Countersink,
     Fillet,
     Chamfer,
     Pattern,
     Pocket,
+    Slot,
+    Boss,
+    Rib,
+    Shell,
     Thread,
+    ThreadReference,
+    MountPattern,
+    BearingSeat,
+    ShaftStep,
+    Flange,
+    Keyway,
+    CablePassage,
     Box,
     Cylinder,
     Transform,
+}
+
+/// How far the CAD worker currently turns a feature into geometry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum KernelGeometry {
+    /// Primitive STEP/STL and build123d (when installed).
+    ExactPrimitive,
+    /// Applied as a Boolean/feature when build123d is installed; otherwise SEMANTIC or PREVIEW tessellation.
+    OcctOrPreview,
+    /// Stored on DesignIR. CAD worker does not author the solid.
+    SemanticOnly,
+}
+
+impl FeatureKind {
+    pub fn kernel_geometry(self) -> KernelGeometry {
+        use FeatureKind::*;
+        match self {
+            Box | Cylinder | Extrude | Revolve => KernelGeometry::ExactPrimitive,
+            Hole | Cut | Pocket | BearingSeat | ShaftStep | CablePassage | Pattern | Fillet
+            | Chamfer | Counterbore | Countersink | Flange => KernelGeometry::OcctOrPreview,
+            Datum | Sketch | SketchRectangle | SketchCircle | Slot | Boss | Rib | Shell
+            | Thread | ThreadReference | MountPattern | Keyway | Transform => {
+                KernelGeometry::SemanticOnly
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -297,6 +360,10 @@ pub struct Material {
     pub name: String,
     #[serde(default)]
     pub density_kg_m3: Option<f64>,
+    /// Physical appearance class for the viewport (not a workstation chrome color).
+    /// machined_aluminum | anodized_aluminum | steel | stainless_steel | black_oxide_steel | polymer | rubber | composite | unknown
+    #[serde(default)]
+    pub appearance: String,
     #[serde(default)]
     pub notes: String,
     pub provenance: Provenance,
@@ -393,4 +460,110 @@ impl Parameter {
             _ => self.value,
         }
     }
+}
+
+/// Origin of a numeric engineering relationship. Never silently invent a tolerance class.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum FitOrigin {
+    Assumed,
+    StandardReference,
+    UserSpecified,
+    Derived,
+    Validated,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FitRelation {
+    pub id: EntityId,
+    pub name: String,
+    pub a: EntityId,
+    pub b: EntityId,
+    pub quantity: String,
+    pub a_value_m: f64,
+    pub b_value_m: f64,
+    #[serde(default)]
+    pub clearance_m: f64,
+    pub origin: FitOrigin,
+    #[serde(default)]
+    pub note: String,
+    pub provenance: Provenance,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FastenerGroup {
+    pub id: EntityId,
+    pub host: EntityId,
+    pub bolt_type: String,
+    pub diameter_m: f64,
+    pub count: u32,
+    #[serde(default)]
+    pub bolt_circle_m: Option<f64>,
+    #[serde(default)]
+    pub hole_type: String,
+    #[serde(default)]
+    pub washer: bool,
+    #[serde(default)]
+    pub nut: bool,
+    #[serde(default)]
+    pub torque_reference: Option<String>,
+    #[serde(default)]
+    pub instance_ids: Vec<EntityId>,
+    pub provenance: Provenance,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlanNode {
+    pub id: EntityId,
+    pub role: String,
+    #[serde(default)]
+    pub component_class: String,
+    #[serde(default)]
+    pub children: Vec<EntityId>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AssemblyPlan {
+    pub id: EntityId,
+    pub name: String,
+    pub assembly: EntityId,
+    #[serde(default)]
+    pub nodes: Vec<PlanNode>,
+    #[serde(default)]
+    pub interfaces: Vec<EntityId>,
+    #[serde(default)]
+    pub load_path: Vec<EntityId>,
+    #[serde(default)]
+    pub rotating: Vec<EntityId>,
+    #[serde(default)]
+    pub service: Vec<EntityId>,
+    pub provenance: Provenance,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LibraryComponent {
+    pub id: EntityId,
+    pub class: String,
+    pub designation: String,
+    #[serde(default)]
+    pub params: BTreeMap<String, f64>,
+    #[serde(default)]
+    pub units: String,
+    /// PARAMETRIC_REFERENCE until a real catalog is connected. Never a fake manufacturer PN.
+    #[serde(default = "parametric_reference")]
+    pub truth: String,
+    #[serde(default)]
+    pub note: String,
+    pub provenance: Provenance,
+}
+
+fn parametric_reference() -> String {
+    "PARAMETRIC_REFERENCE".into()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DetailBudgetEntry {
+    pub role: String,
+    pub tier: String,
+    pub render: String,
 }

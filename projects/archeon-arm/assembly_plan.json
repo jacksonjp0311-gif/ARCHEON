@@ -1,0 +1,108 @@
+{
+  "assembly_plans": [
+    {
+      "id": "plan.shoulder",
+      "name": "ShoulderAssembly",
+      "assembly": "asm.shoulder",
+      "nodes": [
+        {
+          "id": "part.shoulder.motor",
+          "role": "Motor",
+          "component_class": "motor",
+          "children": []
+        },
+        {
+          "id": "part.shoulder.gearbox",
+          "role": "ReductionGearbox",
+          "component_class": "gearbox",
+          "children": []
+        },
+        {
+          "id": "part.shoulder.shaft",
+          "role": "DriveShaft",
+          "component_class": "shaft",
+          "children": []
+        },
+        {
+          "id": "part.shoulder.bearing.a",
+          "role": "BearingPair",
+          "component_class": "bearing",
+          "children": [
+            "part.shoulder.bearing.b"
+          ]
+        },
+        {
+          "id": "part.shoulder.housing",
+          "role": "ShoulderHousing",
+          "component_class": "housing",
+          "children": []
+        },
+        {
+          "id": "part.shoulder.mount.upper",
+          "role": "UpperArmInterface",
+          "component_class": "flange",
+          "children": []
+        },
+        {
+          "id": "part.shoulder.encoder_mount",
+          "role": "EncoderMount",
+          "component_class": "bracket",
+          "children": []
+        },
+        {
+          "id": "part.shoulder.cover",
+          "role": "ServiceCover",
+          "component_class": "cover",
+          "children": []
+        }
+      ],
+      "interfaces": [
+        "iface.motor.gearbox",
+        "iface.gearbox.shaft",
+        "iface.seat.a",
+        "iface.seat.b",
+        "iface.j2",
+        "iface.service.cover",
+        "iface.upper.mount"
+      ],
+      "load_path": [
+        "part.shoulder.mount.upper",
+        "part.shoulder.shaft",
+        "part.shoulder.bearing.a",
+        "part.shoulder.bearing.b",
+        "part.shoulder.housing",
+        "part.shoulder.base"
+      ],
+      "rotating": [
+        "part.shoulder.motor",
+        "part.shoulder.gearbox",
+        "part.shoulder.shaft",
+        "part.shoulder.bearing.a",
+        "part.shoulder.bearing.b",
+        "part.shoulder.spacer",
+        "part.shoulder.mount.upper"
+      ],
+      "service": [
+        "part.shoulder.cover",
+        "part.shoulder.grommet",
+        "part.shoulder.encoder_mount"
+      ],
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "Plan before geometry: attached / how / load / rotate / service / manufacture.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    }
+  ]
+}

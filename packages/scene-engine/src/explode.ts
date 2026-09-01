@@ -8,7 +8,8 @@ export type ExplosionStrategy =
   | 'BOM_FOCUS'
   | 'SERVICE'
   | 'GRAPH'
-  | 'CUSTOM';
+  | 'CUSTOM'
+  | 'STACK';
 
 export type SpreadPreset = 'COMPACT' | 'NORMAL' | 'ENGINEERING' | 'WIDE' | 'EXTREME';
 
@@ -175,7 +176,19 @@ export function recursiveExplosionOffsets(
   const scopeParts = partsInScope(scopeId, parts, asms);
   const profile = SPREAD[preset];
   const worldC = centroidOf(parts);
-  void strategy;
+  if (strategy === 'STACK') {
+    for (const p of parts) {
+      if (scopeParts && !scopeParts.has(p.id)) {
+        out[p.id] = [0, 0, 0];
+        continue;
+      }
+      const base = p.explosion_distance_m > 0 ? p.explosion_distance_m : 0.08;
+      const stage = Math.max(1, p.assembly_stage);
+      const mag = base * profile.spreadScale * 0.28 * k * (0.35 + 0.06 * stage);
+      out[p.id] = scale3(norm3(p.explosion_vector), mag);
+    }
+    return out;
+  }
 
   const descendants = new Map<string, SpatialPart[]>();
   for (const a of asms) descendants.set(a.id, []);
@@ -324,9 +337,58 @@ export function getScopeBounds(boxes: { min: Vec3; max: Vec3 }[]): { min: Vec3; 
   return { min, max, center, radius };
 }
 
-export function transformHostPoint(point: Vec3, hostCanonical: Vec3, hostFinal: Vec3, rpy: Vec3 = [0, 0, 0]): Vec3 {
-  const local = sub3(point, hostCanonical);
-  return add3(hostFinal, rotateRpy(local, rpy));
+/**
+ * Port coordinates are HOST-LOCAL.
+ * worldPort = hostWorldTransform × portLocal
+ * (`hostCanonical` is ignored — kept so old call sites type-check).
+ */
+export function transformHostPoint(
+  portLocal: Vec3,
+  _hostCanonical: Vec3,
+  hostWorld: Vec3,
+  rpy: Vec3 = [0, 0, 0]
+): Vec3 {
+  return worldPortFromLocal(portLocal, hostWorld, rpy);
+}
+
+/** world = hostWorld + R(hostRpy) * portLocal */
+export function worldPortFromLocal(portLocal: Vec3, hostWorld: Vec3, rpy: Vec3 = [0, 0, 0]): Vec3 {
+  return add3(hostWorld, rotateRpy(portLocal, rpy));
+}
+
+/** Inverse of rotateRpy (X then Y then Z). */
+export function invRotateRpy(v: Vec3, rpy: Vec3): Vec3 {
+  const [r, p, y] = rpy;
+  const cy = Math.cos(y), sy = Math.sin(y);
+  const cp = Math.cos(p), sp = Math.sin(p);
+  const cr = Math.cos(r), sr = Math.sin(r);
+  const x0 = v[0] * cy + v[1] * sy;
+  const y0 = -v[0] * sy + v[1] * cy;
+  const z0 = v[2];
+  const x1 = x0 * cp - z0 * sp;
+  const y1 = y0;
+  const z1 = x0 * sp + z0 * cp;
+  return [x1, y1 * cr + z1 * sr, -y1 * sr + z1 * cr];
+}
+
+export function worldToHostLocal(world: Vec3, hostWorld: Vec3, rpy: Vec3 = [0, 0, 0]): Vec3 {
+  return invRotateRpy(sub3(world, hostWorld), rpy);
+}
+
+/** Aspect-aware distance so the AABB fills ~75–82% of the viewport. */
+export function fitDistanceForAabb(
+  size: Vec3,
+  fovDeg: number,
+  aspect: number,
+  fill = 0.78
+): number {
+  const fillClamped = Math.min(0.82, Math.max(0.75, fill));
+  const vFov = (fovDeg * Math.PI) / 180;
+  const hFov = 2 * Math.atan(Math.tan(vFov / 2) * Math.max(0.35, aspect));
+  const distV = size[1] / 2 / Math.tan(vFov / 2) / fillClamped;
+  const distH = size[0] / 2 / Math.tan(hFov / 2) / fillClamped;
+  const distD = size[2] / 2 / Math.tan(vFov / 2) / fillClamped;
+  return Math.max(0.45, distV, distH, distD);
 }
 
 export type FitIntent = 'assembled' | 'focus' | 'isolate' | 'part_exploded' | 'system_exploded' | 'variant' | 'selection';

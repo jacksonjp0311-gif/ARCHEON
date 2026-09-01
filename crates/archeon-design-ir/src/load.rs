@@ -61,6 +61,11 @@ pub fn load_project_dir(dir: &Path) -> Result<DesignDocument, LoadError> {
         revisions: vec![],
         parameters: Default::default(),
         assembly_sequence: vec![],
+        fastener_groups: vec![],
+        assembly_plans: vec![],
+        fit_relations: vec![],
+        component_library: vec![],
+        detail_budget: vec![],
     };
 
     if dir.join("requirements.json").exists() {
@@ -115,6 +120,23 @@ pub fn load_project_dir(dir: &Path) -> Result<DesignDocument, LoadError> {
         doc.decisions = take_array(&v, "decisions").unwrap_or_default();
         doc.evidence = take_array(&v, "evidence").unwrap_or_default();
         doc.analyses = take_array(&v, "analyses").unwrap_or_default();
+    }
+    if dir.join("fasteners.json").exists() {
+        let v = read_json(&dir.join("fasteners.json"))?;
+        doc.fastener_groups = take_array(&v, "fastener_groups").unwrap_or_default();
+    }
+    if dir.join("assembly_plan.json").exists() {
+        let v = read_json(&dir.join("assembly_plan.json"))?;
+        doc.assembly_plans = take_array(&v, "assembly_plans").unwrap_or_default();
+    }
+    if dir.join("fits.json").exists() {
+        let v = read_json(&dir.join("fits.json"))?;
+        doc.fit_relations = take_array(&v, "fit_relations").unwrap_or_default();
+    }
+    if dir.join("library.json").exists() {
+        let v = read_json(&dir.join("library.json"))?;
+        doc.component_library = take_array(&v, "component_library").unwrap_or_default();
+        doc.detail_budget = take_array(&v, "detail_budget").unwrap_or_default();
     }
 
     Ok(doc)

@@ -5,15 +5,15 @@ import { useUi } from '../store';
 
 const AGENTS = [
   ['architect', 'Architect'],
-  ['cad-designer', 'CAD Designer'],
   ['assembly-designer', 'Assembly Designer'],
-  ['constraint-engineer', 'Constraint Engineer'],
-  ['analysis-engineer', 'Analysis Engineer'],
-  ['dfm', 'DFM Reviewer'],
   ['components', 'Components'],
-  ['bom', 'BOM'],
-  ['spatial-director', 'Spatial Director'],
+  ['cad-designer', 'CAD Designer'],
+  ['constraint-engineer', 'Constraint Engineer'],
+  ['dfm', 'DFM Reviewer'],
   ['critic', 'Critic'],
+  ['spatial-director', 'Visual / Spatial Director'],
+  ['analysis-engineer', 'Analysis Engineer'],
+  ['bom', 'BOM'],
   ['memory-curator', 'Memory Curator']
 ] as const;
 

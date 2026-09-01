@@ -57,6 +57,73 @@ pub struct LiveDesignSession {
 }
 
 impl LiveDesignSession {
+    pub fn start_pipeline(doc: &DesignDocument) -> Self {
+        let now = Utc::now().to_rfc3339();
+        Self {
+            session_id: format!("live.{}", Uuid::new_v4().simple()),
+            transaction_id: None,
+            agent_id: "architect".into(),
+            base_revision: doc.project.revision_id.clone(),
+            canonical_hash: doc.design_hash(),
+            status: LiveStatus::Planning,
+            operations: vec![
+                step(
+                    1,
+                    "ARCHITECT — subsystem decomposition",
+                    "COMPLETE",
+                    Some("asm.shoulder / datum.j2".into()),
+                ),
+                step(
+                    2,
+                    "ASSEMBLY DESIGNER — interfaces + plan",
+                    "COMPLETE",
+                    Some("plan.shoulder".into()),
+                ),
+                step(
+                    3,
+                    "COMPONENTS — GENERIC library",
+                    "COMPLETE",
+                    Some("GENERIC_6204_BEARING PARAMETRIC_REFERENCE".into()),
+                ),
+                step(
+                    4,
+                    "CAD DESIGNER — parametric geometry",
+                    "WAITING",
+                    Some("kernel regenerate is async".into()),
+                ),
+                step(
+                    5,
+                    "CONSTRAINT ENGINEER — fits",
+                    "COMPLETE",
+                    Some("journal/seat DERIVED; class ASSUMED".into()),
+                ),
+                step(
+                    6,
+                    "DFM REVIEWER — manufacturability",
+                    "WAITING",
+                    Some("heuristics only — not CAM".into()),
+                ),
+                step(7, "CRITIC — contradictions", "WORKING", None),
+                step(
+                    8,
+                    "VISUAL DIRECTOR — inspect views",
+                    "WAITING",
+                    Some("open the shoulder / stack explode".into()),
+                ),
+            ],
+            preview: None,
+            validation: serde_json::json!({ "ok": true, "note": "pipeline inspect — no canonical write" }),
+            affected_entities: vec!["asm.shoulder".into()],
+            affected_requirements: vec![
+                "req.bearings".into(),
+                "req.service".into(),
+                "req.dof".into(),
+            ],
+            created_at: now.clone(),
+            updated_at: now,
+        }
+    }
+
     pub fn start(agent_id: &str, doc: &DesignDocument) -> Self {
         let now = Utc::now().to_rfc3339();
         Self {
@@ -480,6 +547,7 @@ mod tests {
                 branch: "main".into(),
                 kernel: "primitive".into(),
                 domain: "robotics".into(),
+                fidelity: Default::default(),
                 provenance: Provenance::generated("t", "t"),
             },
             systems: vec![],
@@ -502,6 +570,11 @@ mod tests {
             revisions: vec![],
             parameters: BTreeMap::new(),
             assembly_sequence: vec![],
+            fastener_groups: vec![],
+            assembly_plans: vec![],
+            fit_relations: vec![],
+            component_library: vec![],
+            detail_budget: vec![],
         }
     }
 

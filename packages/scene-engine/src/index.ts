@@ -8,7 +8,8 @@ export type ExplosionStrategy =
   | 'BOM_FOCUS'
   | 'SERVICE'
   | 'GRAPH'
-  | 'CUSTOM';
+  | 'CUSTOM'
+  | 'STACK';
 
 export type SpreadPreset = 'COMPACT' | 'NORMAL' | 'ENGINEERING' | 'WIDE' | 'EXTREME';
 
@@ -102,6 +103,10 @@ export function explosionOffset(
       dir = [0, 0, part.explosion_vector[2] === 0 ? 1 : Math.sign(part.explosion_vector[2])];
       mag *= 0.7 + p.hierarchySpacing * 0.2 * depth;
       break;
+    case 'STACK':
+      dir = v;
+      mag *= 0.55 + 0.08 * stage;
+      break;
     case 'SYSTEM': {
       const assemblyK = smoothstep(Math.min(1, p.progress / 0.45));
       const childK = p.progress > 0.35 ? smoothstep((p.progress - 0.35) / 0.65) : 0;
@@ -188,6 +193,10 @@ export {
   getEntityWorldBounds,
   getScopeBounds,
   transformHostPoint,
+  worldPortFromLocal,
+  worldToHostLocal,
+  invRotateRpy,
+  fitDistanceForAabb,
   resolveFitIntent,
   focusOffset,
   primitiveSize,

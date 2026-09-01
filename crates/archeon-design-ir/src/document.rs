@@ -49,6 +49,16 @@ pub struct DesignDocument {
     pub parameters: BTreeMap<String, Parameter>,
     #[serde(default)]
     pub assembly_sequence: Vec<EntityId>,
+    #[serde(default)]
+    pub fastener_groups: Vec<FastenerGroup>,
+    #[serde(default)]
+    pub assembly_plans: Vec<AssemblyPlan>,
+    #[serde(default)]
+    pub fit_relations: Vec<FitRelation>,
+    #[serde(default)]
+    pub component_library: Vec<LibraryComponent>,
+    #[serde(default)]
+    pub detail_budget: Vec<DetailBudgetEntry>,
 }
 
 fn schema() -> String {
@@ -76,6 +86,10 @@ impl DesignDocument {
         ids.extend(self.analyses.iter().map(|e| e.id.clone()));
         ids.extend(self.evidence.iter().map(|e| e.id.clone()));
         ids.extend(self.decisions.iter().map(|e| e.id.clone()));
+        ids.extend(self.fastener_groups.iter().map(|e| e.id.clone()));
+        ids.extend(self.assembly_plans.iter().map(|e| e.id.clone()));
+        ids.extend(self.fit_relations.iter().map(|e| e.id.clone()));
+        ids.extend(self.component_library.iter().map(|e| e.id.clone()));
         ids
     }
 

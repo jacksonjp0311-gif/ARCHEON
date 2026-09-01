@@ -1,8 +1,8 @@
 {
   "id": "project.archeon-arm",
   "name": "ARCHEON Arm",
-  "description": "Phase-1 six-axis benchtop arm used to prove DesignIR, DTP, and spatial explosion. Not a production robot.",
-  "revision_id": "rev.0001",
+  "description": "Six-axis benchtop arm. v0.5 ENGINEERING shoulder: interface-first bearing-supported pitch joint. Not a production robot.",
+  "revision_id": "rev.0002",
   "branch": "main",
   "kernel": "primitive",
   "domain": "robotics",
@@ -10,11 +10,18 @@
     "class": "GENERATED",
     "created_by": "archeon.seed",
     "reason": "Canonical example project for Phase 1 architecture proof.",
-    "requirement_ids": ["req.payload", "req.reach", "req.budget"],
+    "requirement_ids": [
+      "req.payload",
+      "req.reach",
+      "req.budget"
+    ],
     "agent_id": "architect",
-    "tools": ["seed"],
+    "tools": [
+      "seed"
+    ],
     "evidence_ids": [],
     "revision_id": "rev.0001",
     "user_approved": true
-  }
+  },
+  "fidelity": "ENGINEERING"
 }

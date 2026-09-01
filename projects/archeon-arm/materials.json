@@ -15,7 +15,8 @@
         "evidence_ids": [],
         "revision_id": "rev.0001",
         "user_approved": true
-      }
+      },
+      "appearance": "machined_aluminum"
     },
     {
       "id": "mat.steel",
@@ -26,11 +27,162 @@
         "class": "SOURCE",
         "created_by": "components",
         "reason": "Handbook density only.",
-        "requirement_ids": ["req.bearings"],
+        "requirement_ids": [
+          "req.bearings"
+        ],
         "agent_id": "components",
         "tools": [],
         "evidence_ids": [],
         "revision_id": "rev.0001",
+        "user_approved": true
+      },
+      "appearance": "steel"
+    },
+    {
+      "id": "mat.al_anodized",
+      "name": "Anodized aluminium (handbook density of 6061)",
+      "density_kg_m3": 2700,
+      "appearance": "anodized_aluminum",
+      "notes": "Density SOURCE (6061 handbook). Anodize is ASSUMED appearance, not a qualified coating spec.",
+      "provenance": {
+        "class": "SOURCE",
+        "created_by": "cad-designer",
+        "reason": "Appearance class for motor/gearbox envelopes.",
+        "requirement_ids": [],
+        "agent_id": "cad-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "mat.bearing_steel",
+      "name": "Bearing steel (handbook density)",
+      "density_kg_m3": 7810,
+      "appearance": "steel",
+      "notes": "Density SOURCE. Grade UNVERIFIED. Not AISI 52100 certified.",
+      "provenance": {
+        "class": "SOURCE",
+        "created_by": "components",
+        "reason": "Handbook density only.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "mat.steel_black_oxide",
+      "name": "Carbon steel with black-oxide appearance",
+      "density_kg_m3": 7850,
+      "appearance": "black_oxide_steel",
+      "notes": "Density SOURCE. Coating is appearance only.",
+      "provenance": {
+        "class": "SOURCE",
+        "created_by": "components",
+        "reason": "Handbook density. Black oxide is visual.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "mat.rubber",
+      "name": "Generic elastomer (handbook density)",
+      "density_kg_m3": 1200,
+      "appearance": "rubber",
+      "notes": "Density ASSUMED. Compound UNVERIFIED.",
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "components",
+        "reason": "Grommet elastomer.",
+        "requirement_ids": [
+          "req.service"
+        ],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "mat.polymer",
+      "name": "Generic engineering polymer",
+      "density_kg_m3": 1400,
+      "appearance": "polymer",
+      "notes": "Unused in the current shoulder. Reserved class.",
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "components",
+        "reason": "Appearance class.",
+        "requirement_ids": [],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "mat.stainless",
+      "name": "Generic stainless steel (handbook density)",
+      "density_kg_m3": 8000,
+      "appearance": "stainless_steel",
+      "notes": "Reserved class. Grade UNVERIFIED.",
+      "provenance": {
+        "class": "SOURCE",
+        "created_by": "components",
+        "reason": "Appearance class.",
+        "requirement_ids": [],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "mat.composite",
+      "name": "Generic composite",
+      "density_kg_m3": null,
+      "appearance": "composite",
+      "notes": "No density claimed.",
+      "provenance": {
+        "class": "UNVERIFIED",
+        "created_by": "components",
+        "reason": "Appearance class only.",
+        "requirement_ids": [],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
         "user_approved": true
       }
     }
@@ -45,8 +197,10 @@
       "provenance": {
         "class": "DERIVED",
         "created_by": "analysis-engineer",
-        "reason": "3 kg * 9.81 m/s² at flange. Requirement, not a verified structural load case.",
-        "requirement_ids": ["req.payload"],
+        "reason": "3 kg * 9.81 m/s\u00b2 at flange. Requirement, not a verified structural load case.",
+        "requirement_ids": [
+          "req.payload"
+        ],
         "agent_id": "analysis-engineer",
         "tools": [],
         "evidence_ids": [],
@@ -59,12 +213,18 @@
     {
       "id": "fn.reach",
       "name": "Position tool flange in workspace",
-      "parts": ["part.upper_arm.tube", "part.forearm.tube", "part.wrist.housing"],
+      "parts": [
+        "part.upper_arm.tube",
+        "part.forearm.tube",
+        "part.wrist.housing"
+      ],
       "provenance": {
         "class": "GENERATED",
         "created_by": "architect",
         "reason": "Primary function.",
-        "requirement_ids": ["req.reach"],
+        "requirement_ids": [
+          "req.reach"
+        ],
         "agent_id": "architect",
         "tools": [],
         "evidence_ids": [],

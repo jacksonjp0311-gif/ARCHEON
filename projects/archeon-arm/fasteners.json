@@ -1,0 +1,72 @@
+{
+  "fastener_groups": [
+    {
+      "id": "fastener.shoulder.cover",
+      "host": "part.shoulder.housing",
+      "bolt_type": "GENERIC_SHCS_M4",
+      "diameter_m": 0.004,
+      "count": 4,
+      "bolt_circle_m": null,
+      "hole_type": "through",
+      "washer": false,
+      "nut": false,
+      "torque_reference": "STANDARD_REFERENCE ISO 4762 analog \u2014 not a torque spec",
+      "instance_ids": [
+        "part.shoulder.bolt.cover.1",
+        "part.shoulder.bolt.cover.2",
+        "part.shoulder.bolt.cover.3",
+        "part.shoulder.bolt.cover.4"
+      ],
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "components",
+        "reason": "Cover fastener group. Threads cosmetic.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "fastener.shoulder.base",
+      "host": "part.shoulder.base",
+      "bolt_type": "GENERIC_SHCS_M5",
+      "diameter_m": 0.005,
+      "count": 4,
+      "bolt_circle_m": null,
+      "hole_type": "through",
+      "washer": false,
+      "nut": false,
+      "torque_reference": "STANDARD_REFERENCE ISO 4762 analog \u2014 not a torque spec",
+      "instance_ids": [
+        "part.shoulder.bolt.base.1",
+        "part.shoulder.bolt.base.2",
+        "part.shoulder.bolt.base.3",
+        "part.shoulder.bolt.base.4"
+      ],
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "components",
+        "reason": "Housing-to-base fastener group.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    }
+  ]
+}

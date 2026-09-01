@@ -15,6 +15,10 @@ projects/<name>/
   parameters.json
   transactions.json
   provenance.json
+  fasteners.json
+  library.json
+  assembly_plan.json
+  fits.json
 ```
 
 Identity is dotted lowercase semantic ids (`part.shoulder.housing`). Provenance classes are SCREAMING_SNAKE. Units: store engineering units plus optional `si`.

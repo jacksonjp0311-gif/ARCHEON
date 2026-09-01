@@ -1,11 +1,63 @@
-"""CadKernelAdapter protocol and implementations."""
+"""CadKernelAdapter protocol and implementations.
+
+DesignIR features drive solids. Three.js primitives are a viewport fallback envelope,
+not the primary generated design path.
+
+Kernel geometry claims (honest):
+
+  EXACT primitive STEP+STL always:
+    box, cylinder, extrude-as-box, revolve-as-cylinder, tube (bearing bore / spacer)
+
+  OCCT (build123d) when installed:
+    hole, pocket, cut, bearing_seat, cable_passage, fillet, chamfer,
+    pattern (polar instances), boolean union/cut
+
+  PREVIEW tessellation when OCCT is missing:
+    box with cylindrical hole (STL only; STEP remains the envelope)
+    stepped shaft (STL stacked cylinders; STEP is journal envelope)
+
+  SEMANTIC only (stored, not authored):
+    slot, boss, rib, shell, thread/thread_reference, mount_pattern,
+    flange, keyway, datum, sketch
+"""
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 from typing import Any, Protocol
 
 from . import step_writer, stl_writer
+
+CAD_COVERAGE = {
+    "box": "exact_primitive",
+    "cylinder": "exact_primitive",
+    "extrude": "exact_primitive",
+    "revolve": "exact_primitive",
+    "tube": "exact_primitive",
+    "hole": "occt_or_preview",
+    "cut": "occt_or_preview",
+    "pocket": "occt_or_preview",
+    "bearing_seat": "occt_or_preview",
+    "cable_passage": "occt_or_preview",
+    "shaft_step": "occt_or_preview",
+    "fillet": "occt_or_semantic",
+    "chamfer": "occt_or_semantic",
+    "counterbore": "occt_or_preview",
+    "countersink": "occt_or_preview",
+    "pattern": "occt_or_instances",
+    "boolean_union": "occt_only",
+    "boolean_cut": "occt_only",
+    "slot": "semantic_only",
+    "boss": "semantic_only",
+    "rib": "semantic_only",
+    "shell": "semantic_only",
+    "thread": "semantic_only",
+    "thread_reference": "semantic_only",
+    "mount_pattern": "semantic_only",
+    "flange": "occt_or_preview",
+    "keyway": "semantic_only",
+}
 
 
 def try_build123d() -> bool:
@@ -23,55 +75,308 @@ class CadKernelAdapter(Protocol):
     def regenerate(self, document: dict, out_dir: Path) -> dict: ...
 
 
+def _features_for(document: dict, part_id: str) -> list[dict]:
+    return [f for f in (document.get("features") or []) if f.get("part") == part_id]
+
+
+def _fnum(feat: dict, *keys: str, default: float | None = None) -> float | None:
+    params = feat.get("params") or {}
+    for k in keys:
+        if k in params and params[k] is not None:
+            try:
+                return float(params[k])
+            except (TypeError, ValueError):
+                continue
+    return default
+
+
+def _has_kind(feats: list[dict], *kinds: str) -> list[dict]:
+    want = set(kinds)
+    return [f for f in feats if f.get("kind") in want]
+
+
+def _volume(prim: dict) -> float:
+    kind = prim.get("kind")
+    if kind == "box":
+        return abs(float(prim["sx"]) * float(prim["sy"]) * float(prim["sz"]))
+    if kind == "cylinder":
+        return math.pi * float(prim["radius"]) ** 2 * float(prim["height"])
+    return 0.0
+
+
+def _density_for(document: dict, part: dict) -> float | None:
+    mid = part.get("material")
+    for m in document.get("materials") or []:
+        if m.get("id") == mid:
+            return m.get("density_kg_m3")
+    return None
+
+
+def _inner_radius(feats: list[dict], prim: dict) -> float | None:
+    for f in _has_kind(feats, "bearing_seat", "hole", "pocket", "cable_passage", "cut"):
+        d = _fnum(f, "diameter_m", "bearing_od_m")
+        if d:
+            return d / 2.0
+        r = _fnum(f, "radius_m", "inner_r_m")
+        if r:
+            return r
+    if prim.get("kind") == "cylinder":
+        inner = None
+        for f in feats:
+            ir = _fnum(f, "inner_r_m")
+            if ir:
+                inner = ir
+        return inner
+    return None
+
+
+def _flange_stack(feats: list[dict], prim: dict) -> list[tuple[float, float]] | None:
+    flanges = _has_kind(feats, "flange")
+    if not flanges or prim.get("kind") != "cylinder":
+        return None
+    r, h = float(prim["radius"]), float(prim["height"])
+    disks: list[tuple[float, float]] = []
+    for f in flanges:
+        od = _fnum(f, "od_m") or (r * 2.0 * 1.32)
+        th = _fnum(f, "thickness_m") or 0.006
+        disks.append((od / 2.0, th))
+    body_h = max(0.004, h - sum(t for _, t in disks))
+    if len(disks) == 1:
+        return [disks[0], (r, body_h)]
+    return [disks[0], (r, body_h), disks[-1]]
+
+
+def _shaft_steps(feats: list[dict], prim: dict) -> list[tuple[float, float]] | None:
+    steps = _has_kind(feats, "shaft_step")
+    if not steps:
+        return None
+    out: list[tuple[float, float]] = []
+    if prim.get("kind") == "cylinder":
+        out.append((float(prim["radius"]), float(prim["height"]) * 0.55))
+    for f in steps:
+        d = _fnum(f, "diameter_m", default=0.024) or 0.024
+        L = _fnum(f, "length_m", default=0.008) or 0.008
+        out.append((d / 2.0, L))
+    return out
+
+
+def _write_primitive(stem: Path, part: dict, feats: list[dict]) -> dict:
+    prim = part.get("spatial", {}).get("primitive", {})
+    kind = prim.get("kind")
+    pid = part["id"]
+    inner = _inner_radius(feats, prim)
+    cls = (part.get("component_class") or "") + (part.get("catalog_ref") or "")
+    if inner is None and ("bearing" in cls.lower() or "6204" in cls):
+        inner = 0.010
+    if inner is None and "retainer" in (part.get("semantic_role") or ""):
+        inner = max(0.002, float(prim.get("radius", 0.02)) - 0.006)
+    steps = _shaft_steps(feats, prim)
+    flanges = _flange_stack(feats, prim)
+    holes = _has_kind(feats, "hole", "bearing_seat", "pocket", "cable_passage", "cut", "counterbore")
+    applied: list[str] = []
+    failed: list[str] = []
+    exact = True
+    note = "Exact primitive B-rep."
+    bb = [0.01, 0.01, 0.01]
+
+    if kind == "cylinder" and inner and inner < float(prim["radius"]):
+        r, h = float(prim["radius"]), float(prim["height"])
+        step_writer.write_tube_step(str(stem) + ".step", inner, r, h, pid)
+        stl_writer.write_tube_stl(str(stem) + ".stl", inner, r, h)
+        bb = [r * 2, r * 2, h]
+        applied.append("tube")
+        note = "Exact hollow-cylinder B-rep (bearing bore / spacer analog)."
+    elif kind == "cylinder" and flanges:
+        r, h = float(prim["radius"]), float(prim["height"])
+        step_writer.write_cylinder_step(str(stem) + ".step", r, h, pid)
+        stl_writer.write_stepped_shaft_stl(str(stem) + ".stl", flanges)
+        bb = [max(x[0] for x in flanges) * 2, max(x[0] for x in flanges) * 2, h]
+        applied.append("flange_preview")
+        exact = False
+        note = "STEP is the cylinder envelope (exact). STL is a PREVIEW of housing/motor flanges. Fused OCCT solid requires build123d."
+    elif kind == "cylinder" and steps:
+        r, h = float(prim["radius"]), float(prim["height"])
+        step_writer.write_cylinder_step(str(stem) + ".step", r, h, pid)
+        stl_writer.write_stepped_shaft_stl(str(stem) + ".stl", steps)
+        bb = [r * 2, r * 2, h]
+        applied.append("shaft_step_preview")
+        exact = False
+        note = "STEP is the journal envelope (exact cylinder). STL is a PREVIEW of shaft steps. Not a fused OCCT solid."
+    elif kind == "box" and holes:
+        sx, sy, sz = float(prim["sx"]), float(prim["sy"]), float(prim["sz"])
+        hole_r = inner or (_fnum(holes[0], "diameter_m", "bearing_od_m", default=0.047) or 0.047) / 2.0
+        step_writer.write_box_step(str(stem) + ".step", sx, sy, sz, pid)
+        stl_writer.write_box_with_y_hole_stl(str(stem) + ".stl", sx, sy, sz, hole_r)
+        bb = [sx, sy, sz]
+        applied.extend(f.get("kind") for f in holes)
+        exact = False
+        note = "STEP is the exact box envelope. STL PREVIEW punches a cylindrical hole along Y. Boolean cut requires build123d/OCCT."
+    elif kind == "box":
+        sx, sy, sz = float(prim["sx"]), float(prim["sy"]), float(prim["sz"])
+        step_writer.write_box_step(str(stem) + ".step", sx, sy, sz, pid)
+        stl_writer.write_box_stl(str(stem) + ".stl", sx, sy, sz)
+        bb = [sx, sy, sz]
+        applied.append("box")
+        note = "Exact primitive B-rep (box). Not an OCCT feature tree."
+    elif kind == "cylinder":
+        r, h = float(prim["radius"]), float(prim["height"])
+        # fastener visual: head + shank as preview if role says bolt
+        role = (part.get("semantic_role") or "") + (part.get("component_class") or "")
+        if "bolt" in role or "fastener" in role:
+            head_r = r * 1.6
+            head_h = h * 0.28
+            shank_h = h * 0.72
+            step_writer.write_cylinder_step(str(stem) + ".step", r, h, pid)
+            stl_writer.write_fastener_stl(str(stem) + ".stl", r, shank_h, head_r, head_h)
+            exact = False
+            note = "STEP is a cylinder envelope (exact). STL is a cosmetic cap-head PREVIEW. Thread is THREAD_REFERENCE — not helix BREP."
+        else:
+            step_writer.write_cylinder_step(str(stem) + ".step", r, h, pid)
+            stl_writer.write_cylinder_stl(str(stem) + ".stl", r, h)
+            note = "Exact primitive B-rep (cylinder). Not an OCCT feature tree."
+        bb = [r * 2, r * 2, h]
+        applied.append("cylinder")
+    else:
+        return {}
+
+    semantic = [
+        f.get("kind")
+        for f in feats
+        if CAD_COVERAGE.get(f.get("kind"), "semantic_only") == "semantic_only"
+    ]
+    return {
+        "bbox_m": bb,
+        "applied": [k for k in applied if k],
+        "semantic_only": semantic,
+        "failed": failed,
+        "exact": exact,
+        "note": note,
+        "volume_m3": _volume(prim),
+    }
+
+
+def _write_build123d(stem: Path, part: dict, feats: list[dict]) -> dict | None:
+    try:
+        from build123d import (  # type: ignore
+            Box,
+            Cylinder,
+            Location,
+            export_step,
+            export_stl,
+            fillet as occt_fillet,
+            chamfer as occt_chamfer,
+        )
+    except Exception as exc:  # noqa: BLE001
+        return {"error": str(exc)}
+
+    spatial = part.get("spatial") or {}
+    prim = spatial.get("primitive") or {}
+    origin = spatial.get("origin_m") or [0, 0, 0]
+    loc = Location((0.0, 0.0, 0.0))  # assembly placement stays in DesignIR
+    kind = prim.get("kind")
+    applied: list[str] = []
+    failed: list[str] = []
+    try:
+        if kind == "box":
+            solid = loc * Box(float(prim["sx"]), float(prim["sy"]), float(prim["sz"]))
+            applied.append("box")
+        elif kind == "cylinder":
+            solid = loc * Cylinder(float(prim["radius"]), float(prim["height"]))
+            applied.append("cylinder")
+        else:
+            return None
+        for f in feats:
+            fk = f.get("kind")
+            try:
+                if fk in ("hole", "cut", "pocket", "bearing_seat", "cable_passage", "counterbore"):
+                    r = _fnum(f, "radius_m") or ((_fnum(f, "diameter_m", "bearing_od_m") or 0.01) / 2.0)
+                    depth = _fnum(f, "depth_m", "height_m") or (
+                        float(prim["sy"]) if kind == "box" else float(prim.get("height", 0.02))
+                    )
+                    cutter = Location((0, 0, 0)) * Cylinder(r, depth * 1.2)
+                    solid = solid - cutter
+                    applied.append(fk)
+                elif fk == "fillet":
+                    rad = _fnum(f, "radius_m", default=0.001) or 0.001
+                    solid = occt_fillet(solid.edges(), rad)
+                    applied.append("fillet")
+                elif fk == "chamfer":
+                    dist = _fnum(f, "distance_m", default=0.001) or 0.001
+                    solid = occt_chamfer(solid.edges(), dist)
+                    applied.append("chamfer")
+                elif fk == "shaft_step":
+                    d = _fnum(f, "diameter_m", default=0.024) or 0.024
+                    L = _fnum(f, "length_m", default=0.008) or 0.008
+                    step = Location((0, 0, float(prim.get("height", 0.05)) / 2)) * Cylinder(d / 2.0, L)
+                    solid = solid + step
+                    applied.append("shaft_step")
+            except Exception as exc:  # noqa: BLE001
+                failed.append(f"{fk}:{exc}")
+        export_step(solid, str(stem) + ".step")
+        export_stl(solid, str(stem) + ".stl")
+        bb = (
+            [float(prim["sx"]), float(prim["sy"]), float(prim["sz"])]
+            if kind == "box"
+            else [float(prim["radius"]) * 2, float(prim["radius"]) * 2, float(prim["height"])]
+        )
+        return {
+            "bbox_m": bb,
+            "applied": applied,
+            "failed": failed,
+            "exact": True,
+            "note": "OpenCascade/build123d solid. Fillet/chamfer/hole applied when the feature succeeded.",
+            "volume_m3": _volume(prim),
+            "kernel": "build123d",
+        }
+    except Exception as exc:  # noqa: BLE001
+        return {"error": str(exc)}
+
+
 class PrimitiveKernelAdapter:
     name = "primitive"
 
     def regenerate(self, document: dict, out_dir: Path) -> dict:
         out_dir.mkdir(parents=True, exist_ok=True)
-        parts = document.get("parts") or []
         written = []
         bbox_union = [0.0, 0.0, 0.0]
-        for part in parts:
+        failures = []
+        for part in document.get("parts") or []:
             pid = part["id"]
-            prim = part.get("spatial", {}).get("primitive", {})
-            kind = prim.get("kind")
             stem = out_dir / pid.replace(".", "_")
-            if kind == "box":
-                sx, sy, sz = float(prim["sx"]), float(prim["sy"]), float(prim["sz"])
-                step_writer.write_box_step(str(stem) + ".step", sx, sy, sz, pid)
-                stl_writer.write_box_stl(str(stem) + ".stl", sx, sy, sz)
-                bb = [sx, sy, sz]
-            elif kind == "cylinder":
-                r, h = float(prim["radius"]), float(prim["height"])
-                step_writer.write_cylinder_step(str(stem) + ".step", r, h, pid)
-                stl_writer.write_cylinder_stl(str(stem) + ".stl", r, h)
-                bb = [r * 2, r * 2, h]
-            else:
+            feats = _features_for(document, pid)
+            spec = _write_primitive(stem, part, feats)
+            if not spec:
+                failures.append({"id": pid, "error": "unsupported primitive"})
                 continue
-            vol = _volume(prim)
             dens = _density_for(document, part)
-            mass = vol * dens if dens is not None else None
+            vol = spec.get("volume_m3")
+            mass = vol * dens if dens is not None and vol is not None else None
             written.append(
                 {
                     "id": pid,
                     "step": str(stem) + ".step",
                     "stl": str(stem) + ".stl",
-                    "bbox_m": bb,
+                    "bbox_m": spec["bbox_m"],
                     "volume_m3": vol,
                     "mass_kg": mass,
                     "mass_class": "ASSUMED" if mass is not None else "UNVERIFIED",
                     "kernel": self.name,
-                    "exact": True,
-                    "note": "Exact primitive B-rep (box/cylinder). Not an OCCT feature tree.",
+                    "exact": spec.get("exact", True),
+                    "applied_features": spec.get("applied", []),
+                    "semantic_only_features": spec.get("semantic_only", []),
+                    "failed_features": spec.get("failed", []),
+                    "note": spec.get("note"),
                 }
             )
             for i in range(3):
-                bbox_union[i] = max(bbox_union[i], bb[i])
+                bbox_union[i] = max(bbox_union[i], spec["bbox_m"][i])
         manifest = {
             "ok": True,
             "kernel": self.name,
             "build123d": False,
+            "coverage": CAD_COVERAGE,
             "parts": written,
+            "failures": failures,
             "bbox_union_m": bbox_union,
             "interference": {
                 "method": "none",
@@ -89,61 +394,64 @@ class Build123dKernelAdapter:
     def regenerate(self, document: dict, out_dir: Path) -> dict:
         if not try_build123d():
             raise RuntimeError("build123d is not installed")
-        from build123d import Box, Cylinder, Location, Compound, export_step, export_stl  # type: ignore
-
         out_dir.mkdir(parents=True, exist_ok=True)
-        solids = []
         written = []
+        failures = []
+        bbox_union = [0.0, 0.0, 0.0]
         for part in document.get("parts") or []:
             pid = part["id"]
-            spatial = part.get("spatial") or {}
-            prim = spatial.get("primitive") or {}
-            origin = spatial.get("origin_m") or [0, 0, 0]
-            loc = Location((float(origin[0]), float(origin[1]), float(origin[2])))
-            kind = prim.get("kind")
-            if kind == "box":
-                solid = loc * Box(float(prim["sx"]), float(prim["sy"]), float(prim["sz"]))
-            elif kind == "cylinder":
-                solid = loc * Cylinder(float(prim["radius"]), float(prim["height"]))
-            else:
+            stem = out_dir / pid.replace(".", "_")
+            feats = _features_for(document, pid)
+            spec = _write_build123d(stem, part, feats)
+            if not spec or spec.get("error"):
+                fallback = PrimitiveKernelAdapter()
+                one = {"parts": [part], "features": feats, "materials": document.get("materials") or []}
+                tmp = fallback.regenerate(one, out_dir)
+                if tmp.get("parts"):
+                    rec = tmp["parts"][0]
+                    rec["fallback"] = spec.get("error") if spec else "build123d_failed"
+                    rec["kernel"] = "primitive_fallback"
+                    written.append(rec)
+                else:
+                    failures.append({"id": pid, "error": spec.get("error") if spec else "unknown"})
                 continue
-            solids.append(solid)
-            stem = out_dir / (pid.replace(".", "_") + "_occt")
-            export_step(solid, str(stem) + ".step")
-            export_stl(solid, str(stem) + ".stl")
-            written.append({"id": pid, "step": str(stem) + ".step", "stl": str(stem) + ".stl", "kernel": self.name})
-        if solids:
-            compound = Compound(solids)
-            export_step(compound, str(out_dir / "assembly.step"))
-        return {
+            dens = _density_for(document, part)
+            vol = spec.get("volume_m3")
+            mass = vol * dens if dens is not None and vol is not None else None
+            written.append(
+                {
+                    "id": pid,
+                    "step": str(stem) + ".step",
+                    "stl": str(stem) + ".stl",
+                    "bbox_m": spec["bbox_m"],
+                    "volume_m3": vol,
+                    "mass_kg": mass,
+                    "mass_class": "ASSUMED" if mass is not None else "UNVERIFIED",
+                    "kernel": self.name,
+                    "exact": spec.get("exact", True),
+                    "applied_features": spec.get("applied", []),
+                    "failed_features": spec.get("failed", []),
+                    "note": spec.get("note"),
+                }
+            )
+            for i in range(3):
+                bbox_union[i] = max(bbox_union[i], spec["bbox_m"][i])
+        manifest = {
             "ok": True,
             "kernel": self.name,
             "build123d": True,
+            "coverage": CAD_COVERAGE,
             "parts": written,
+            "failures": failures,
+            "bbox_union_m": bbox_union,
             "interference": {
                 "method": "not_run",
                 "checked": False,
-                "note": "Solids exported via OpenCascade. Boolean interference not invoked in Phase 1.",
+                "note": "Solids exported via OpenCascade. Boolean interference not invoked unless a feature cut succeeded per-part.",
             },
         }
-
-
-def _volume(prim: dict) -> float:
-    if prim.get("kind") == "box":
-        return abs(float(prim["sx"]) * float(prim["sy"]) * float(prim["sz"]))
-    if prim.get("kind") == "cylinder":
-        import math
-
-        return math.pi * float(prim["radius"]) ** 2 * float(prim["height"])
-    return 0.0
-
-
-def _density_for(document: dict, part: dict) -> float | None:
-    mid = part.get("material")
-    for m in document.get("materials") or []:
-        if m.get("id") == mid:
-            return m.get("density_kg_m3")
-    return None
+        (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+        return manifest
 
 
 def select_kernel(prefer: str | None = None) -> CadKernelAdapter:

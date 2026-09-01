@@ -1,9 +1,10 @@
 import { Suspense, useEffect, useMemo, useRef } from 'react';
 import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber';
-import { ContactShadows, Edges, Html, Line, OrbitControls } from '@react-three/drei';
+import { ContactShadows, Edges, Environment, Grid, Html, Line, OrbitControls } from '@react-three/drei';
 import { STLLoader } from 'three-stdlib';
 import * as THREE from 'three';
 import {
+  fitDistanceForAabb,
   focusOffset,
   getEntityWorldBounds,
   getFinalRenderTransform,
@@ -12,46 +13,113 @@ import {
   partsInScope,
   primitiveSize,
   resolveFitIntent,
-  transformHostPoint
+  worldPortFromLocal
 } from '@archeon/scene-engine';
 import { useUi } from '../store';
-import type { Part } from '@archeon/design-protocol';
+import { localInterfaceGraph, type Part } from '@archeon/design-protocol';
 
-const ORANGE = '#ff981b';
-const ICE = '#9ec9dc';
+const GOLD = '#D6A33A';
+const GOLD_HI = '#F0C45C';
+const GOLD_DIM = '#7E5B1E';
+const LAVENDER = '#A779FF';
+const LAVENDER_HI = '#C7A8FF';
+const EDGE_IDLE = '#6A6E74';
+const DATUM = '#8A8680';
+const VALID = '#5dba7a';
+const WARNING = '#c9a227';
 
-type MatClass = 'ALUMINUM' | 'STEEL' | 'UNKNOWN';
+type MatClass =
+  | 'MACHINED_ALUMINUM'
+  | 'ANODIZED_BLACK_ALUMINUM'
+  | 'STEEL'
+  | 'STAINLESS_STEEL'
+  | 'BLACK_OXIDE_STEEL'
+  | 'POLYMER'
+  | 'RUBBER'
+  | 'COMPOSITE'
+  | 'UNKNOWN';
 
 function matClass(part: Part): MatClass {
-  const id = (part.material ?? '').toLowerCase();
-  if (id.includes('al') || id.includes('6061')) return 'ALUMINUM';
-  if (id.includes('steel')) return 'STEEL';
+  const id = `${part.material ?? ''} ${(part as Part & { appearance?: string }).appearance ?? ''}`.toLowerCase();
+  if (id.includes('anodiz') || id.includes('al_anod')) return 'ANODIZED_BLACK_ALUMINUM';
+  if (id.includes('black') || id.includes('oxide')) return 'BLACK_OXIDE_STEEL';
+  if (id.includes('stainless')) return 'STAINLESS_STEEL';
+  if (id.includes('rubber') || id.includes('elastomer')) return 'RUBBER';
+  if (id.includes('polymer') || id.includes('plastic')) return 'POLYMER';
+  if (id.includes('composite')) return 'COMPOSITE';
+  if (id.includes('al') || id.includes('6061')) return 'MACHINED_ALUMINUM';
+  if (id.includes('steel') || id.includes('bearing')) return 'STEEL';
   return 'UNKNOWN';
 }
 
 function pbr(cls: MatClass, overlayProvenance?: string) {
   if (overlayProvenance) {
-    return { color: overlayProvenance, metalness: 0.35, roughness: 0.45 };
+    return { color: overlayProvenance, metalness: 0.35, roughness: 0.45, env: 0.6 };
   }
   switch (cls) {
-    case 'ALUMINUM':
-      return { color: '#c5d0d8', metalness: 0.82, roughness: 0.28 };
+    case 'MACHINED_ALUMINUM':
+      return { color: '#cfd6db', metalness: 0.88, roughness: 0.18, env: 1.25 };
+    case 'ANODIZED_BLACK_ALUMINUM':
+      return { color: '#2c3138', metalness: 0.48, roughness: 0.28, env: 1.05 };
     case 'STEEL':
-      return { color: '#8d969f', metalness: 0.9, roughness: 0.38 };
+      return { color: '#9aa3ab', metalness: 0.92, roughness: 0.28, env: 1.15 };
+    case 'STAINLESS_STEEL':
+      return { color: '#d0d5d2', metalness: 0.9, roughness: 0.2, env: 1.3 };
+    case 'BLACK_OXIDE_STEEL':
+      return { color: '#3a3d42', metalness: 0.78, roughness: 0.36, env: 0.95 };
+    case 'POLYMER':
+      return { color: '#6e6862', metalness: 0.06, roughness: 0.58, env: 0.35 };
+    case 'RUBBER':
+      return { color: '#2c2a28', metalness: 0.04, roughness: 0.82, env: 0.2 };
+    case 'COMPOSITE':
+      return { color: '#4e463e', metalness: 0.14, roughness: 0.5, env: 0.4 };
     default:
-      return { color: '#7a8792', metalness: 0.42, roughness: 0.55 };
+      return { color: '#8a9096', metalness: 0.4, roughness: 0.5, env: 0.55 };
   }
 }
 
 function provenanceTint(cls: string): string {
   switch (cls) {
-    case 'SOURCE': return '#62f2a4';
-    case 'DERIVED': return '#5ce1ff';
-    case 'GENERATED': return '#9ec9dc';
-    case 'ASSUMED': return '#c9b07a';
-    case 'UNVERIFIED': return '#e6b84c';
-    default: return '#8aa3b3';
+    case 'SOURCE':
+    case 'VALIDATED':
+      return VALID;
+    case 'DERIVED':
+    case 'GENERATED':
+      return '#b8b4ac';
+    case 'ASSUMED':
+      return WARNING;
+    case 'UNVERIFIED':
+      return WARNING;
+    default:
+      return '#8a9096';
   }
+}
+
+function StudioRig({ agentAccent }: { agentAccent: boolean }) {
+  return (
+    <>
+      <color attach="background" args={['#030303']} />
+      <hemisphereLight args={['#e8e4dc', '#17181B', 0.38]} />
+      <directionalLight
+        castShadow
+        position={[2.4, 3.9, 2.6]}
+        intensity={1.7}
+        color="#fff3e4"
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
+        shadow-camera-near={0.2}
+        shadow-camera-far={16}
+        shadow-camera-left={-4}
+        shadow-camera-right={4}
+        shadow-camera-top={4}
+        shadow-camera-bottom={-4}
+      />
+      <directionalLight position={[-2.6, 1.5, -1.4]} intensity={0.48} color="#d8dce2" />
+      <directionalLight position={[-0.4, 1.8, 3.4]} intensity={0.22} color="#F0C45C" />
+      {agentAccent && <directionalLight position={[0.2, 2.4, -2.8]} intensity={0.09} color="#A779FF" />}
+      <Environment preset="warehouse" environmentIntensity={0.32} />
+    </>
+  );
 }
 
 function meshUrl(part: Part): string | null {
@@ -79,7 +147,7 @@ function StlMesh({ url, material, opacity, wire, clip }: { url: string; material
         opacity={opacity}
         wireframe={!!wire}
         clippingPlanes={clip}
-        envMapIntensity={0.7}
+        envMapIntensity={material.env ?? 1}
       />
     </mesh>
   );
@@ -114,14 +182,28 @@ function Solid({
 }) {
   const pos = getFinalRenderTransform(part.spatial.origin_m, { explosion: offset });
   const prim = part.spatial.primitive;
-  const material = proposal
-    ? { color: ORANGE, metalness: 0.25, roughness: 0.42 }
-    : pbr(matClass(part), provenanceOverlay ? provenanceTint(part.provenance.class) : undefined);
-  const opacity = proposal ? 0.38 : ghosted ? 0.12 : xray ? 0.22 : 0.96;
-  const clip = cutaway ? [new THREE.Plane(new THREE.Vector3(0, -1, 0), 0.002)] : [];
+  const physical = pbr(matClass(part), provenanceOverlay ? provenanceTint(part.provenance.class) : undefined);
+  const material = physical;
+  const opacity = proposal ? 0.34 : ghosted ? 0.12 : xray ? 0.22 : 0.98;
+  const sectionAxis = useUi.getState().sectionAxis;
+  const sectionPos = useUi.getState().sectionPos;
+  const n =
+    sectionAxis === 'x' ? new THREE.Vector3(-1, 0, 0) : sectionAxis === 'z' ? new THREE.Vector3(0, 0, -1) : new THREE.Vector3(0, -1, 0);
+  const clip = cutaway ? [new THREE.Plane(n, sectionPos || 0.002)] : [];
   const rot = part.spatial.rpy_rad as [number, number, number];
   const cadUrl = meshUrl(part);
-  const edge = proposal ? ORANGE : selected ? ORANGE : hovered ? ICE : neighbor ? '#38d7ff' : tracked ? '#e6b84c' : '#1c3a4c';
+  const warn = part.provenance.class === 'UNVERIFIED' || part.provenance.class === 'ASSUMED';
+  const edge = proposal
+    ? LAVENDER
+    : selected
+      ? GOLD
+      : hovered
+        ? GOLD_HI
+        : neighbor
+          ? LAVENDER_HI
+          : warn && provenanceOverlay
+            ? WARNING
+            : EDGE_IDLE;
   return (
     <group
       position={pos}
@@ -159,12 +241,12 @@ function Solid({
             opacity={opacity}
             wireframe={wire || proposal}
             clippingPlanes={clip}
-            envMapIntensity={0.7}
+            envMapIntensity={material.env ?? 1}
           />
         </mesh>
       ) : (
         <mesh castShadow receiveShadow>
-          <cylinderGeometry args={[prim.radius, prim.radius, prim.height, 28]} />
+          <cylinderGeometry args={[prim.radius, prim.radius, prim.height, 48]} />
           <meshStandardMaterial
             color={material.color}
             metalness={material.metalness}
@@ -173,11 +255,11 @@ function Solid({
             opacity={opacity}
             wireframe={wire || proposal}
             clippingPlanes={clip}
-            envMapIntensity={0.7}
+            envMapIntensity={material.env ?? 1}
           />
         </mesh>
       )}
-      {!ghosted && <Edges threshold={18} color={edge} />}
+      {!ghosted && <Edges threshold={12} color={edge} />}
       {(selected || hovered) && !proposal && (
         <Html center sprite occlude={false} style={{ pointerEvents: 'none' }}>
           <div className="spatial-label">
@@ -189,7 +271,7 @@ function Solid({
       {tracked && !selected && (
         <mesh position={[0, prim.kind === 'box' ? prim.sz * 0.55 : prim.height * 0.55, 0]}>
           <octahedronGeometry args={[0.012, 0]} />
-          <meshBasicMaterial color="#e6b84c" />
+          <meshBasicMaterial color={GOLD} />
         </mesh>
       )}
     </group>
@@ -197,23 +279,26 @@ function Solid({
 }
 
 function CameraRig() {
-  const { camera } = useThree();
+  const { camera, size } = useThree();
   const nonce = useUi((s) => s.fitNonce);
   const center = useUi((s) => s.fitCenter);
   const radius = useUi((s) => s.fitRadius);
+  const fitSize = useUi((s) => s.fitSize);
   const goal = useRef({ c: new THREE.Vector3(0.4, 0.15, 0), p: new THREE.Vector3(1.35, 0.85, 0.95) });
   const fitting = useRef(0);
   const lastNonce = useRef(-1);
   useEffect(() => {
     const c = new THREE.Vector3(...center);
-    const dist = Math.max(0.9, radius * 2.35);
+    const aspect = size.width / Math.max(1, size.height);
+    const fov = 'fov' in camera ? (camera as THREE.PerspectiveCamera).fov : 42;
+    const dist = fitDistanceForAabb(fitSize ?? [radius * 2, radius * 2, radius * 2], fov, aspect, 0.78);
     const p = c.clone().add(new THREE.Vector3(0.92, 0.58, 0.74).normalize().multiplyScalar(dist));
     goal.current = { c, p };
     if (nonce !== lastNonce.current) {
       lastNonce.current = nonce;
       fitting.current = 1;
     }
-  }, [nonce, center, radius]);
+  }, [nonce, center, radius, fitSize, size.width, size.height]);
   useFrame((state, dt) => {
     if (fitting.current <= 0) return;
     const k = 1 - Math.exp(-dt * 6.5);
@@ -253,19 +338,24 @@ export function ArmScene({
   const spread = useUi((s) => s.spread);
   const spatial = useUi((s) => s.spatial);
   const style = useUi((s) => s.renderStyle);
-  const overlay = useUi((s) => s.overlay);
+  const overlays = useUi((s) => s.overlays);
   const isolate = useUi((s) => s.isolate);
   const ghostOthers = useUi((s) => s.ghostOthers);
   const focusId = useUi((s) => s.focusId);
   const explodeContext = useUi((s) => s.explodeContext);
   const sectionOn = useUi((s) => s.sectionOn);
+  const ghostRoles = useUi((s) => s.ghostRoles);
   const activeVariant = useUi((s) => s.activeVariant);
   const requestFit = useUi((s) => s.requestFit);
   const xray = style === 'XRAY';
   const wire = style === 'WIREFRAME' || style === 'HIDDEN_LINE';
-  const cutaway = overlay === 'ANALYSIS' && sectionOn;
-  const showIfaces = overlay === 'INTERFACES' || overlay === 'CONSTRAINTS';
-  const explodeLines = overlay === 'EXPLODE_LINES' || spatial === 'EXPLODED' || spatial === 'SYSTEM_EXPLODED' || spatial === 'PART_EXPLODED';
+  const cutaway = sectionOn;
+  const showIfaces = overlays.interfaces || overlays.mates || overlays.constraints;
+  const explodeLines = overlays.explodeTrails;
+  const localGraph = useMemo(
+    () => localInterfaceGraph(selected, parts, ports, interfaces),
+    [selected, parts, ports, interfaces]
+  );
 
   const visible = useMemo(() => {
     if (spatial === 'ISOLATE' && isolate) {
@@ -331,13 +421,18 @@ export function ArmScene({
     }
     const boxes = (subset.length ? subset : w).map((x) => x.box);
     const fit = getScopeBounds(boxes);
-    requestFit(fit.center, fit.radius * 1.15);
+    const sz: [number, number, number] = [
+      Math.max(0.08, fit.max[0] - fit.min[0]),
+      Math.max(0.08, fit.max[1] - fit.min[1]),
+      Math.max(0.08, fit.max[2] - fit.min[2])
+    ];
+    requestFit(fit.center, fit.radius, sz);
   }, [fitSig]);
 
   return (
     <Canvas
       shadows
-      gl={{ antialias: true, localClippingEnabled: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
+      gl={{ antialias: true, localClippingEnabled: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.18 }}
       camera={{ position: [1.35, 0.85, 0.95], fov: 42, near: 0.01, far: 40 }}
       onCreated={({ gl }) => {
         gl.localClippingEnabled = true;
@@ -351,34 +446,35 @@ export function ArmScene({
       }}
       onContextMenu={(e) => e.nativeEvent.preventDefault()}
     >
-      <color attach="background" args={['#071018']} />
-      <hemisphereLight args={['#d7eef8', '#121c24', 0.55]} />
-      <directionalLight
-        castShadow
-        position={[2.6, 4.4, 2.2]}
-        intensity={1.45}
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
-        shadow-camera-near={0.2}
-        shadow-camera-far={16}
-        shadow-camera-left={-4}
-        shadow-camera-right={4}
-        shadow-camera-top={4}
-        shadow-camera-bottom={-4}
-      />
-      <directionalLight position={[-2.2, 1.4, -1.6]} intensity={0.28} color="#7ec8e6" />
-      <mesh rotation-x={-Math.PI / 2} position={[0.4, -0.025, 0]} receiveShadow>
-        <planeGeometry args={[14, 14]} />
-        <meshStandardMaterial color="#0a141c" roughness={0.92} metalness={0.08} />
+      <Suspense fallback={null}>
+        <StudioRig agentAccent={overlays.agentDiff || !!proposalParts} />
+      </Suspense>
+      <mesh rotation-x={-Math.PI / 2} position={[0.4, -0.018, 0]} receiveShadow>
+        <planeGeometry args={[16, 16]} />
+        <meshStandardMaterial color="#080808" roughness={0.88} metalness={0.12} envMapIntensity={0.35} />
       </mesh>
-      <gridHelper args={[8, 40, '#1f4c64', '#0c1c2a']} position={[0.4, 0.002, 0]} />
-      <ContactShadows position={[0.4, 0, 0]} opacity={0.42} scale={9} blur={2.4} far={5} />
-      <axesHelper args={[0.22]} />
+      <Grid
+        position={[0.4, 0.001, 0]}
+        args={[12, 12]}
+        cellSize={0.05}
+        cellThickness={0.35}
+        cellColor="#2a2c30"
+        sectionSize={0.25}
+        sectionThickness={0.9}
+        sectionColor="#7E5B1E"
+        fadeDistance={3.6}
+        fadeStrength={1.85}
+        infiniteGrid
+      />
+      <ContactShadows position={[0.4, 0, 0]} opacity={0.52} scale={10} blur={2.8} far={6} />
+      <axesHelper args={[0.16]} />
       <CameraRig />
       <Suspense fallback={null}>
         {world.map(({ part: p, pos }) => {
+          const roleGhost = ghostRoles.includes(p.semantic_role) || (ghostRoles.length > 0 && ghostRoles.some((r) => p.semantic_role.includes(r) || p.id.includes(r)));
           const ghosted =
-            ghostOthers && selected != null && p.id !== selected && p.parent !== selected && !neighborhood.includes(p.id);
+            roleGhost ||
+            (ghostOthers && selected != null && p.id !== selected && p.parent !== selected && !neighborhood.includes(p.id));
           const delta: [number, number, number] = [
             pos[0] - p.spatial.origin_m[0],
             pos[1] - p.spatial.origin_m[1],
@@ -396,7 +492,7 @@ export function ArmScene({
               xray={xray}
               cutaway={cutaway}
               wire={wire}
-              provenanceOverlay={overlay === 'PROVENANCE'}
+              provenanceOverlay={overlays.provenance}
               proposal={false}
               offset={delta}
             />
@@ -459,48 +555,70 @@ export function ArmScene({
           })
           .map(({ part: p, pos }) => (
             <Line
-              key={`line-${p.id}`}
+              key={`trail-${p.id}`}
               points={[p.spatial.origin_m, pos]}
-              color={selected === p.id ? ORANGE : ICE}
-              lineWidth={selected === p.id ? 1.4 : 0.7}
+              color={selected === p.id ? GOLD : GOLD_DIM}
+              lineWidth={selected === p.id ? 1.3 : 0.7}
               transparent
-              opacity={selected === p.id ? 0.85 : 0.28}
+              opacity={selected === p.id ? 0.8 : 0.32}
             />
           ))}
       {showIfaces &&
-        ports.map((port) => {
-          const host = world.find((w) => w.part.id === port.host);
-          const pos = host
-            ? transformHostPoint(port.origin_m, host.part.spatial.origin_m, host.pos, host.part.spatial.rpy_rad)
-            : port.origin_m;
-          return (
-            <mesh key={port.id} position={pos}>
-              <octahedronGeometry args={[0.012, 0]} />
-              <meshBasicMaterial color="#38d7ff" />
-            </mesh>
-          );
-        })}
+        ports
+          .filter((port) => selected != null && (localGraph.portIds.has(port.id) || localGraph.hostIds.has(port.host)))
+          .map((port) => {
+            const host = world.find((w) => w.part.id === port.host);
+            const pos = host
+              ? worldPortFromLocal(port.origin_m, host.pos, host.part.spatial.rpy_rad)
+              : port.origin_m;
+            return (
+              <mesh key={port.id} position={pos}>
+                <octahedronGeometry args={[0.009, 0]} />
+                <meshBasicMaterial color={overlays.agentDiff ? LAVENDER : GOLD} />
+              </mesh>
+            );
+          })}
       {showIfaces &&
-        interfaces.map((iface) => {
-          const a = ports.find((p) => p.id === iface.a);
-          const b = ports.find((p) => p.id === iface.b);
-          if (!a || !b) return null;
-          const ha = world.find((w) => w.part.id === a.host);
-          const hb = world.find((w) => w.part.id === b.host);
-          const pa = ha ? transformHostPoint(a.origin_m, ha.part.spatial.origin_m, ha.pos, ha.part.spatial.rpy_rad) : a.origin_m;
-          const pb = hb ? transformHostPoint(b.origin_m, hb.part.spatial.origin_m, hb.pos, hb.part.spatial.rpy_rad) : b.origin_m;
-          const hot = neighborhood.includes(iface.id) || neighborhood.includes(a.host) || neighborhood.includes(b.host);
-          return (
-            <Line
-              key={`iface-${iface.id}`}
-              points={[pa, pb]}
-              color={hot ? ORANGE : '#38d7ff'}
-              lineWidth={hot ? 1.6 : 1}
-              transparent
-              opacity={hot ? 0.9 : 0.4}
-            />
-          );
-        })}
+        interfaces
+          .filter((iface) => selected != null && localGraph.ifaceIds.has(iface.id))
+          .map((iface) => {
+            const a = ports.find((p) => p.id === iface.a);
+            const b = ports.find((p) => p.id === iface.b);
+            if (!a || !b) return null;
+            const ha = world.find((w) => w.part.id === a.host);
+            const hb = world.find((w) => w.part.id === b.host);
+            const pa = ha ? worldPortFromLocal(a.origin_m, ha.pos, ha.part.spatial.rpy_rad) : a.origin_m;
+            const pb = hb ? worldPortFromLocal(b.origin_m, hb.pos, hb.part.spatial.rpy_rad) : b.origin_m;
+            const hot = selected === a.host || selected === b.host || selected === iface.id;
+            const color = overlays.agentDiff
+              ? LAVENDER
+              : hot
+                ? GOLD
+                : GOLD_DIM;
+            return (
+              <Line
+                key={`iface-${iface.id}`}
+                points={[pa, pb]}
+                color={color}
+                lineWidth={hot ? 1.5 : 0.9}
+                transparent
+                opacity={hot ? 0.9 : 0.45}
+              />
+            );
+          })}
+      {overlays.datums && selected &&
+        ports
+          .filter((port) => localGraph.portIds.has(port.id))
+          .map((port) => {
+            const host = world.find((w) => w.part.id === port.host);
+            const pos = host ? worldPortFromLocal(port.origin_m, host.pos, host.part.spatial.rpy_rad) : port.origin_m;
+            return (
+              <mesh key={`datum-${port.id}`} position={pos}>
+                <sphereGeometry args={[0.004, 8, 8]} />
+                <meshBasicMaterial color={DATUM} />
+              </mesh>
+            );
+          })}
       <OrbitControls makeDefault target={[0.4, 0.15, 0]} enableDamping={false} />
     </Canvas>
   );

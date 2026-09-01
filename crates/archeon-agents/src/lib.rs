@@ -53,6 +53,7 @@ pub fn roster() -> Vec<AgentCard> {
                 "create_sketch",
                 "extrude",
                 "create_datum",
+                "create_part",
             ],
             &[Authority::Read, Authority::Propose],
             &["read_part", "create_transaction", "regenerate_geometry"],
@@ -112,8 +113,8 @@ pub fn roster() -> Vec<AgentCard> {
         ),
         card(
             "spatial-director",
-            "Spatial Director",
-            "Views, explosion, isolate. Does not mutate DesignIR.",
+            "Spatial / Visual Director",
+            "Views, explosion, cutaway, stack inspect. Does not mutate DesignIR.",
             &[],
             &[Authority::Read],
             &["create_exploded_view", "focus_part"],
@@ -301,6 +302,16 @@ pub enum ViewCommand {
         factor: f64,
     },
     OpenHud,
+    OpenShoulder,
+    ExplodeStack {
+        id: Option<String>,
+    },
+    Cutaway {
+        enabled: bool,
+    },
+    GhostHousing,
+    IsolateInternals,
+    ShowLoadPaths,
     RestoreDisplay,
     PreviousView,
     HomeView,
@@ -585,8 +596,238 @@ pub fn parse_command_ctx(text: &str, doc: &DesignDocument, ctx: &OperatorContext
         views.push(ViewCommand::SetMode {
             mode: "CUTAWAY".into(),
         });
+        views.push(ViewCommand::Cutaway { enabled: true });
     }
-    if lower.contains("service") {
+    if lower.contains("open the shoulder")
+        || lower.contains("open shoulder")
+        || lower.contains("show internals")
+        || lower.contains("show me the internal")
+        || lower.contains("internal stack")
+    {
+        views.push(ViewCommand::OpenShoulder);
+        views.push(ViewCommand::Select {
+            id: "asm.shoulder".into(),
+        });
+        views.push(ViewCommand::GhostHousing);
+        views.push(ViewCommand::Cutaway { enabled: true });
+        views.push(ViewCommand::ExplodeStack {
+            id: Some("asm.shoulder".into()),
+        });
+        views.push(ViewCommand::OpenHud);
+        notes.push("Spatial Director: housing ghosted, section on, stack exploded along JointAxis (datum.j2). View only.".into());
+        card = Some(ReplyCard {
+            kind: "spatial".into(),
+            title: "Shoulder internals".into(),
+            happened: "Cover/housing ghosted. Bearing/shaft stack framed along the joint axis."
+                .into(),
+            why: "Operator asked to inspect the coaxial stack.".into(),
+            changed: "View only. DesignIR unchanged.".into(),
+            attention: "Cutaway is a clipping plane, not a sectioned BREP.".into(),
+            actions: vec![
+                ReplyAction {
+                    id: "restore".into(),
+                    label: "ASSEMBLE".into(),
+                },
+                ReplyAction {
+                    id: "interfaces".into(),
+                    label: "LOAD PATH".into(),
+                },
+            ],
+        });
+    }
+    if lower.contains("explode the gearbox") || lower.contains("explode gearbox") {
+        views.push(ViewCommand::Select {
+            id: "part.shoulder.gearbox".into(),
+        });
+        views.push(ViewCommand::ExplodeStack {
+            id: Some("asm.shoulder".into()),
+        });
+        notes.push("Spatial Director: gearbox is an ENVELOPE. Stack explode shows motor→gearbox→shaft along JointAxis. Internal gears are not modeled.".into());
+    }
+    if lower.contains("load-carrying")
+        || lower.contains("load carrying")
+        || lower.contains("show the load")
+    {
+        views.push(ViewCommand::ShowLoadPaths);
+        views.push(ViewCommand::Show {
+            layer: "interfaces".into(),
+        });
+        views.push(ViewCommand::Select {
+            id: "asm.shoulder".into(),
+        });
+        notes.push("Assembly Designer: load path is the plan graph (mount→shaft→bearings→housing→base). Not FEA.".into());
+    }
+    if lower.contains("add service") || lower.contains("service access") {
+        views.push(ViewCommand::Select {
+            id: "part.shoulder.cover".into(),
+        });
+        views.push(ViewCommand::Focus {
+            id: "part.shoulder.cover".into(),
+        });
+        notes.push("Service cover already exists at ENGINEERING fidelity. Remove/add cover is a DTP change.".into());
+    }
+    if lower.contains("remove cover") {
+        views.push(ViewCommand::Select {
+            id: "part.shoulder.cover".into(),
+        });
+        views.push(ViewCommand::GhostHousing);
+        notes.push("CAD Designer cannot DeletePart. Cover is selected and ghosted. An operator-authorized transaction is required to remove it from DesignIR.".into());
+    }
+    if lower.contains("add mounting bolts") || lower.contains("add the bolts") {
+        views.push(ViewCommand::Select {
+            id: "fastener.shoulder.base".into(),
+        });
+        notes.push("FastenerGroup fastener.shoulder.base already instances four GENERIC_SHCS_M5. DETAILED would add washers/nuts.".into());
+    }
+    if lower.contains("add the actual bearing")
+        || lower.contains("bearing arrangement")
+        || lower.contains("design the housing around")
+    {
+        views.push(ViewCommand::Select {
+            id: "asm.shoulder".into(),
+        });
+        views.push(ViewCommand::ExplodeStack {
+            id: Some("asm.shoulder".into()),
+        });
+        views.push(ViewCommand::OpenHud);
+        notes.push("Components: GENERIC_6204 pair is already the ENGINEERING bearing arrangement. Housing seats DERIVED from OD. Not a catalog PN.".into());
+        action = Some("generative_inspect".into());
+    }
+    if lower.contains("redesign the shoulder")
+        || lower.contains("detailed manufacturable")
+        || lower.contains("design a shoulder")
+        || lower.contains("design a motor-driven shoulder")
+        || (lower.contains("make it detailed") && lower.contains("shoulder"))
+        || lower.contains("make this manufacturable")
+        || lower.contains("make it detailed")
+    {
+        views.push(ViewCommand::Select {
+            id: "asm.shoulder".into(),
+        });
+        views.push(ViewCommand::OpenHud);
+        views.push(ViewCommand::SetMode {
+            mode: "AGENT_PROPOSAL".into(),
+        });
+        action = Some("generative_inspect".into());
+        notes.push("ARCHITECT: subsystem is asm.shoulder (pitch joint on datum.j2).".into());
+        notes.push("ASSEMBLY DESIGNER: plan.shoulder — motor, gearbox, shaft, bearing pair, housing, mount, cover, fasteners.".into());
+        notes.push("COMPONENTS: GENERIC_6204_BEARING PARAMETRIC_REFERENCE 20/47/14 mm.".into());
+        notes.push(
+            "CAD DESIGNER: housing/shaft/seats already authored. Exact CAD via kernel regenerate."
+                .into(),
+        );
+        notes.push("CONSTRAINT ENGINEER: journal=ID and seat=OD are DERIVED. Fit class ASSUMED — not ISO 286.".into());
+        notes.push("DFM REVIEWER: through-holes STANDARD_REFERENCE analog. No CAM.".into());
+        notes.push(
+            "CRITIC: gearbox internals absent; motor is an envelope; catalog not connected.".into(),
+        );
+        notes.push(
+            "VISUAL DIRECTOR: waiting for operator to OPEN THE SHOULDER / EXPLODE STACK.".into(),
+        );
+        notes.push(
+            "No agent mutated canonical DesignIR. COMMIT still required for any proposal.".into(),
+        );
+        card = Some(ReplyCard {
+            kind: "proposal".into(),
+            title: "SHOULDER DESIGN".into(),
+            happened: "Inspected requirements, assembly plan, GENERIC bearing pair, and housing/shaft interfaces.".into(),
+            why: "Generative engineering pipeline. Geometry follows interfaces.".into(),
+            changed: "Canonical already holds the ENGINEERING assembly. A DETAILED fidelity bump is proposed only if you APPROVE.".into(),
+            attention: "No FEA. No manufacturer PN. No silent tolerances.".into(),
+            actions: vec![
+                ReplyAction {
+                    id: "explode".into(),
+                    label: "OPEN STACK".into(),
+                },
+                ReplyAction {
+                    id: "validate".into(),
+                    label: "VALIDATE".into(),
+                },
+                ReplyAction {
+                    id: "reject".into(),
+                    label: "KEEP ENGINEERING".into(),
+                },
+            ],
+        });
+        if lower.contains("detailed") || lower.contains("manufacturable") {
+            let mut proposed = DesignTransaction::propose(
+                "cad-designer",
+                "Raise shoulder fidelity ENGINEERING → DETAILED (parameter only)",
+                "DETAILED would add washers/nuts and encoder body. This transaction only records the fidelity parameter. Part spawn is a follow-up COMMIT. Canonical geometry unchanged until then.",
+                vec![Operation::ChangeParameter {
+                    name: "design.fidelity".into(),
+                    value: 3.0,
+                    unit: Some("enum".into()),
+                }],
+            );
+            proposed.requirements = vec!["req.service".into(), "req.bearings".into()];
+            proposed.confidence = 0.5;
+            tx = Some(proposed);
+        }
+    }
+    if lower.contains("change bearing")
+        || lower.contains("larger bearing")
+        || lower.contains("bigger bearing")
+    {
+        // handled below for journal; also select the real bearing
+        views.push(ViewCommand::Select {
+            id: "part.shoulder.bearing.a".into(),
+        });
+    }
+    if lower.contains("simplify") || lower.contains("reduce part count") {
+        notes.push("CONCEPT fidelity would hide fasteners/cover/retainers. Request is view+parameter; DTP required to delete parts.".into());
+        views.push(ViewCommand::SetMode {
+            mode: "AGENT_PROPOSAL".into(),
+        });
+        if tx.is_none() {
+            let mut proposed = DesignTransaction::propose(
+                "cad-designer",
+                "Lower fidelity ENGINEERING → CONCEPT",
+                "CONCEPT keeps housing+shaft+motor envelopes. Does not delete parts until a follow-up tx. Parameter only.",
+                vec![Operation::ChangeParameter {
+                    name: "design.fidelity".into(),
+                    value: 1.0,
+                    unit: Some("enum".into()),
+                }],
+            );
+            proposed.confidence = 0.45;
+            tx = Some(proposed);
+        }
+    }
+    if lower.contains("increase serviceability") {
+        views.push(ViewCommand::Select {
+            id: "part.shoulder.cover".into(),
+        });
+        views.push(ViewCommand::SetMode {
+            mode: "SERVICE".into(),
+        });
+        notes.push("Service cover and cable passage already exist. Increasing serviceability further is a DFM proposal, not an automatic remodel.".into());
+    }
+    if lower.contains("try three housing") {
+        action = Some("variants".into());
+        notes.push("Three PREVIEW housing envelopes (wall ± variation via upper_arm unused). Housing wall is ASSUMED; variants are parameter previews, not independent CAD kernels.".into());
+    }
+    if lower.contains("design a bearing-supported") || lower.contains("rotating shaft") {
+        views.push(ViewCommand::ExplodeStack {
+            id: Some("asm.shoulder".into()),
+        });
+        action = Some("generative_inspect".into());
+        notes.push("Benchmark A: the shoulder shaft+bearing pair is the rotating-shaft example. GENERIC_6204, DERIVED journal/seat.".into());
+    }
+    if lower.contains("electronics enclosure") || lower.contains("removable lid") {
+        notes.push("Benchmark C: ServiceCoverGenerator + box envelope. Not a full electronics project in this tree. Use the generator; do not invent a second product.".into());
+    }
+    if lower.contains("structural bracket") && lower.contains("bolt") {
+        notes.push("Benchmark D: BracketGenerator four-bolt pattern. Shoulder encoder mount is the in-tree instance.".into());
+        views.push(ViewCommand::Select {
+            id: "part.shoulder.encoder_mount".into(),
+        });
+    }
+    if lower.contains("service pose")
+        || lower.contains("service view")
+        || lower.trim() == "service"
+        || lower.contains("extraction path")
+    {
         views.push(ViewCommand::SetMode {
             mode: "SERVICE".into(),
         });
@@ -884,7 +1125,12 @@ const ENTITY_ALIASES: &[(&str, &str)] = &[
     ("upper arm", "asm.upper_arm"),
     ("end effector", "part.ee.adapter"),
     ("forearm", "asm.forearm"),
-    ("bearing", "part.shoulder.shaft"),
+    ("bearing", "part.shoulder.bearing.a"),
+    ("shaft", "part.shoulder.shaft"),
+    ("gearbox", "part.shoulder.gearbox"),
+    ("housing", "part.shoulder.housing"),
+    ("cover", "part.shoulder.cover"),
+    ("motor", "part.shoulder.motor"),
     ("shoulder", "asm.shoulder"),
     ("elbow", "asm.elbow"),
     ("wrist", "asm.wrist"),
@@ -993,6 +1239,7 @@ mod tests {
                 branch: "main".into(),
                 kernel: "primitive".into(),
                 domain: "robotics".into(),
+                fidelity: Default::default(),
                 provenance: Provenance::generated("t", "t"),
             },
             systems: vec![],
@@ -1015,6 +1262,11 @@ mod tests {
             revisions: vec![],
             parameters: Default::default(),
             assembly_sequence: vec![],
+            fastener_groups: vec![],
+            assembly_plans: vec![],
+            fit_relations: vec![],
+            component_library: vec![],
+            detail_budget: vec![],
         }
     }
 
@@ -1035,6 +1287,19 @@ mod tests {
             }],
         );
         assert!(authorize_tx("cad-designer", &tx).is_err());
+    }
+
+    #[test]
+    fn local_parser_opens_shoulder_stack() {
+        let p = parse_command("open the shoulder", &doc());
+        assert!(p.views.iter().any(|v| matches!(
+            v,
+            ViewCommand::OpenShoulder | ViewCommand::ExplodeStack { .. }
+        )));
+        assert!(p
+            .views
+            .iter()
+            .any(|v| matches!(v, ViewCommand::Cutaway { enabled: true })));
     }
 
     #[test]
@@ -1077,7 +1342,7 @@ mod tests {
                 _ => None,
             })
             .collect();
-        assert!(tracks.contains(&"part.shoulder.shaft"));
+        assert!(tracks.contains(&"part.shoulder.bearing.a"));
         assert!(tracks.contains(&"asm.upper_arm"));
     }
 

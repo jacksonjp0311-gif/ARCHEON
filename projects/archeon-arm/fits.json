@@ -1,0 +1,144 @@
+{
+  "fit_relations": [
+    {
+      "id": "fit.journal.6204",
+      "name": "shaft journal to GENERIC_6204 ID",
+      "a": "part.shoulder.shaft",
+      "b": "part.shoulder.bearing.a",
+      "quantity": "journal_diameter",
+      "a_value_m": 0.02,
+      "b_value_m": 0.02,
+      "clearance_m": 0.0,
+      "origin": "DERIVED",
+      "note": "Journal equals bearing ID. Transition/press class ASSUMED \u2014 not ISO 286.",
+      "provenance": {
+        "class": "DERIVED",
+        "created_by": "constraint-engineer",
+        "reason": "Derived from library ID.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "constraint-engineer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "fit.seat.6204",
+      "name": "housing seat to GENERIC_6204 OD",
+      "a": "part.shoulder.housing",
+      "b": "part.shoulder.bearing.a",
+      "quantity": "seat_diameter",
+      "a_value_m": 0.047,
+      "b_value_m": 0.047,
+      "clearance_m": 0.0,
+      "origin": "DERIVED",
+      "note": "Seat equals bearing OD. Housing fit class ASSUMED \u2014 not H7.",
+      "provenance": {
+        "class": "DERIVED",
+        "created_by": "constraint-engineer",
+        "reason": "Derived from library OD.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "constraint-engineer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "fit.wall",
+      "name": "housing wall around bearing OD",
+      "a": "part.shoulder.housing",
+      "b": "part.shoulder.bearing.a",
+      "quantity": "wall_thickness",
+      "a_value_m": 0.008,
+      "b_value_m": 0.0,
+      "clearance_m": 0.008,
+      "origin": "ASSUMED",
+      "note": "8 mm wall ASSUMED. Not a stress-sized wall.",
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "cad-designer",
+        "reason": "Assumed wall.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "fit.cover.gap",
+      "name": "service cover gap",
+      "a": "part.shoulder.cover",
+      "b": "part.shoulder.housing",
+      "quantity": "assembly_gap",
+      "a_value_m": 0.001,
+      "b_value_m": 0.0,
+      "clearance_m": 0.001,
+      "origin": "ASSUMED",
+      "note": "1 mm cover clearance ASSUMED.",
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "assembly-designer",
+        "reason": "Cover gap.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "fit.fastener.clearance",
+      "name": "M5 through-hole clearance",
+      "a": "part.shoulder.base",
+      "b": "part.shoulder.bolt.base.1",
+      "quantity": "fastener_clearance",
+      "a_value_m": 0.0055,
+      "b_value_m": 0.005,
+      "clearance_m": 0.0005,
+      "origin": "STANDARD_REFERENCE",
+      "note": "Clearance hole analog of ISO 273 medium. Not a qualified hole table.",
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "dfm",
+        "reason": "Standard-reference clearance.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "dfm",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    }
+  ]
+}

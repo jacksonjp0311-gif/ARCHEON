@@ -11,8 +11,12 @@ import {
   resolveExplodeContext,
   resolveFitIntent,
   transformHostPoint,
+  worldPortFromLocal,
+  worldToHostLocal,
+  fitDistanceForAabb,
   type SpatialPart
 } from '@archeon/scene-engine';
+import { composeFromLegacy, emptyOverlays, enableOverlay, primaryOverlayName } from '@archeon/spatial-grammar';
 
 const part: SpatialPart = {
   id: 'part.a',
@@ -205,10 +209,33 @@ describe('final transform and bounds', () => {
     expect(b.max[1] - b.min[1]).toBeGreaterThan(1);
   });
 
-  it('ports follow host final transform', () => {
-    const p = transformHostPoint([0.1, 0, 0.2], [0, 0, 0.2], [0.5, 0, 0.2]);
+  it('ports are host-local, not canonical-world mixed', () => {
+    const local: [number, number, number] = [0.1, 0, 0];
+    const hostWorld: [number, number, number] = [0.5, 0, 0.2];
+    const p = worldPortFromLocal(local, hostWorld);
     expect(p[0]).toBeCloseTo(0.6);
     expect(p[2]).toBeCloseTo(0.2);
+    const back = worldToHostLocal(p, hostWorld);
+    expect(back[0]).toBeCloseTo(0.1);
+    expect(back[2]).toBeCloseTo(0);
+    const viaLegacy = transformHostPoint(local, [9, 9, 9], hostWorld);
+    expect(viaLegacy[0]).toBeCloseTo(0.6);
+  });
+
+  it('aspect-aware fit is longer for a long thin AABB than a cube of same radius', () => {
+    const long = fitDistanceForAabb([1.6, 0.2, 0.2], 42, 16 / 9, 0.78);
+    const cube = fitDistanceForAabb([0.4, 0.4, 0.4], 42, 16 / 9, 0.78);
+    expect(long).toBeGreaterThan(cube);
+  });
+
+  it('exploded spatial mode does not imply explode trails', () => {
+    expect(composeFromLegacy('EXPLODED').overlay).toBe('NONE');
+    expect(composeFromLegacy('SYSTEM_EXPLODED').overlay).toBe('NONE');
+    expect(emptyOverlays().explodeTrails).toBe(false);
+    const on = enableOverlay(emptyOverlays(), 'EXPLODE_LINES');
+    expect(on.explodeTrails).toBe(true);
+    expect(on.interfaces).toBe(false);
+    expect(primaryOverlayName(on)).toBe('EXPLODE_LINES');
   });
 
   it('system explode fit intent is not selection', () => {

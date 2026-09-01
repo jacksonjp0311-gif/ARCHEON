@@ -6,8 +6,8 @@ Exact geometry adapter. The workstation renderer is **not** this kernel.
 
 | Adapter | Status |
 |---|---|
-| `PrimitiveKernelAdapter` | Always available. Writes ISO-10303 STEP B-rep for boxes and cylinders, plus STL tessellation. |
-| `Build123dKernelAdapter` | Used only if `build123d` imports. Optional extra: `pip install build123d`. |
+| `PrimitiveKernelAdapter` | Always available. Exact STEP for box, cylinder, tube. PREVIEW STL for box-holes, shaft steps, fastener heads. |
+| `Build123dKernelAdapter` | Used only if `build123d` imports. Boolean cut/union, fillet, chamfer. Optional: `pip install build123d`. |
 
 Zoo / FreeCAD / Fusion / Onshape adapters are stubs.
 

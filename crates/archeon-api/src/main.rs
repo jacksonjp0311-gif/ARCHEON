@@ -404,6 +404,26 @@ async fn handle_chat(st: AppState, body: ChatIn) -> Json<Value> {
             }
         }
     }
+    if parsed.action.as_deref() == Some("generative_inspect") && parsed.tx.is_none() {
+        let session = LiveDesignSession::start_pipeline(&doc);
+        let report = validate(&doc);
+        *app.live.session.lock().unwrap() = Some(session.clone());
+        live::emit_kind(
+            &app,
+            "AGENT_STARTED",
+            json!({ "session_id": session.session_id, "kind": "generative_pipeline" }),
+        );
+        return Json(json!({
+            "reply": parsed.notes.first().cloned().unwrap_or_else(|| "Shoulder generative inspect. Canonical DesignIR unchanged.".into()),
+            "views": parsed.views,
+            "notes": parsed.notes,
+            "card": parsed.card,
+            "steps": session.operations,
+            "session": session,
+            "findings": report.findings,
+            "provider": "local-dtp"
+        }));
+    }
     if parsed.action.as_deref() == Some("best") {
         let vars = app.live.variants.lock().unwrap().clone();
         let id = pick_heuristic_best(&vars, 0.8);

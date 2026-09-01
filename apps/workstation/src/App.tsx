@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { type ViewMode } from '@archeon/spatial-grammar';
 import { neighborhoodOf, type Part, type Requirement } from '@archeon/design-protocol';
 import { resolveExplodeContext, type SpreadPreset } from '@archeon/scene-engine';
@@ -74,6 +74,14 @@ interface ChatOut {
   preview_parts?: Part[];
 }
 
+function spatialLabel(spatial: string): string {
+  if (spatial.includes('EXPLOD')) return 'EXPLODED';
+  if (spatial === 'ISOLATE') return 'ISOLATE';
+  if (spatial === 'FOCUS') return 'FOCUS';
+  if (spatial === 'SERVICE') return 'SERVICE';
+  return 'ASSEMBLED';
+}
+
 export default function App() {
   const [doc, setDoc] = useState<DesignDoc | null>(null);
   const [meta, setMeta] = useState<ProjectMeta | null>(null);
@@ -97,11 +105,12 @@ export default function App() {
   const [cadStatus, setCadStatus] = useState<string | null>(null);
 
   const selectedId = useUi((s) => s.selectedId);
+  const spatial = useUi((s) => s.spatial);
   const view = useUi((s) => s.view);
   const explosion = useUi((s) => s.explosion);
   const spread = useUi((s) => s.spread);
   const mode = useUi((s) => s.mode);
-  const overlay = useUi((s) => s.overlay);
+  const overlays = useUi((s) => s.overlays);
   const connected = useUi((s) => s.connected);
   const workbenchOpen = useUi((s) => s.workbenchOpen);
   const huds = useUi((s) => s.huds);
@@ -177,7 +186,11 @@ export default function App() {
       }
       if (v.kind === 'isolate' && v.id) ui.dispatch({ op: 'isolate_entity', entity_id: v.id });
       if (v.kind === 'select' && v.id) ui.dispatch({ op: 'select_entity', entity_id: v.id });
-      if (v.kind === 'reset_view' || v.kind === 'home_view') ui.dispatch({ op: 'home_view' });
+      if (v.kind === 'reset_view' || v.kind === 'home_view') {
+        ui.dispatch({ op: 'home_view' });
+        ui.setGhostRoles([]);
+        ui.setSectionOn(false);
+      }
       if (v.kind === 'set_mode' && v.mode) ui.setView(v.mode as ViewMode);
       if (v.kind === 'show' && v.layer === 'interfaces') ui.dispatch({ op: 'show_overlay', overlay: 'INTERFACES' });
       if (v.kind === 'focus' && v.id) {
@@ -218,6 +231,41 @@ export default function App() {
         ui.setSelected(v.id);
         ui.setOverlay('PROVENANCE');
         ui.setHudOpen(true);
+      }
+      if (v.kind === 'open_shoulder' || v.kind === 'ghost_housing') {
+        ui.setGhostRoles(['shoulder_housing', 'service_cover']);
+        ui.setSectionOn(true);
+        ui.setSectionAxis('y');
+        ui.setSelected('asm.shoulder');
+        ui.setHudOpen(true);
+      }
+      if (v.kind === 'explode_stack') {
+        const scope = v.id || 'asm.shoulder';
+        ui.setStrategy('STACK');
+        ui.dispatch({ op: 'explode_entity', entity_id: scope, factor: v.factor ?? 0.9 });
+      }
+      if (v.kind === 'cutaway') {
+        ui.setSectionOn(v.enabled !== false);
+        ui.setView('CUTAWAY');
+      }
+      if (v.kind === 'isolate_internals') {
+        ui.setGhostRoles(['shoulder_housing', 'service_cover']);
+        ui.setIsolate('asm.shoulder');
+      }
+      if (v.kind === 'show_load_paths') {
+        ui.setOverlay('INTERFACES');
+        ui.setNeighborhood(
+          (design?.parts ?? [])
+            .filter((p) =>
+              ['drive_shaft', 'bearing', 'shoulder_housing', 'shoulder_base', 'upper_arm_mount'].includes(p.semantic_role)
+            )
+            .map((p) => p.id)
+        );
+        ui.setGhostOthers(true);
+      }
+      if (v.kind === 'restore_display') {
+        ui.setGhostRoles([]);
+        ui.setSectionOn(false);
       }
     }
   }
@@ -284,7 +332,7 @@ export default function App() {
       url.searchParams.set('force', '1');
       window.location.replace(url.toString());
     } catch (err) {
-      setChat((c) => [...c, { who: 'ERROR', text: `HARD RESET failed Â· ${err instanceof Error ? err.message : 'compiler unavailable'}` }]);
+      setChat((c) => [...c, { who: 'ERROR', text: `HARD RESET failed · ${err instanceof Error ? err.message : 'compiler unavailable'}` }]);
       setResetting(false);
     }
   }
@@ -345,7 +393,7 @@ export default function App() {
             ? 'interface'
             : 'none';
   const contextName = selected?.name ?? selectedAsm?.name ?? selectedReq?.id ?? selectedIface?.name;
-  const reachMm = meta?.reach_m != null ? Math.round(meta.reach_m * 1000) : 'â€”';
+  const reachMm = meta?.reach_m != null ? Math.round(meta.reach_m * 1000) : '—';
   const propReach = meta?.proposal?.reach_m != null ? Math.round(meta.proposal.reach_m * 1000) : null;
   const proposalIds = [
     ...(meta?.proposal?.transaction.requirements ?? []),
@@ -361,7 +409,7 @@ export default function App() {
     ...(doc?.interfaces.map((i) => ({ id: i.id, label: i.name, kind: 'INTERFACE' as const })) ?? []),
     ...(doc?.features.map((f) => ({ id: f.id, label: f.id, kind: 'FEATURE' as const, hint: f.kind })) ?? []),
     ...(doc?.interfaces.filter((i) => i.kind === 'mechanical').map((i) => ({ id: i.id, label: i.name, kind: 'JOINT' as const })) ?? []),
-    { id: 'an.reach', label: 'Reach (link-sum)', kind: 'ANALYSIS' as const, hint: 'DERIVED Â· not FEA' },
+    { id: 'an.reach', label: 'Reach (link-sum)', kind: 'ANALYSIS' as const, hint: 'DERIVED · not FEA' },
     { id: 'cmd.explode', label: 'explode', kind: 'COMMAND', hint: 'explode selected' },
     { id: 'cmd.restore', label: 'restore display', kind: 'COMMAND' },
     { id: 'cmd.home', label: 'home view', kind: 'COMMAND' },
@@ -457,14 +505,14 @@ export default function App() {
           <select value={spread} onChange={(e) => useUi.getState().setSpread(e.target.value as SpreadPreset)} title="Explosion spread">
             {(['COMPACT', 'NORMAL', 'ENGINEERING', 'WIDE', 'EXTREME'] as SpreadPreset[]).map((s) => <option key={s}>{s}</option>)}
           </select>
-          <button type="button" className={overlay === 'EXPLODE_LINES' ? 'active' : ''} onClick={() => useUi.getState().setOverlay(overlay === 'EXPLODE_LINES' ? 'NONE' : 'EXPLODE_LINES')}>LINES</button>
-          <button type="button" className="top-btn" onClick={() => useUi.getState().setPaletteOpen(true)}>FIND âŒ˜K</button>
+          <button type="button" className={overlays.explodeTrails ? 'active' : ''} onClick={() => useUi.getState().toggleOverlay('explodeTrails')}>LINES</button>
+          <button type="button" className="top-btn" onClick={() => useUi.getState().setPaletteOpen(true)}>FIND Ctrl+K</button>
           <button
             type="button"
             className={`health-chip ${healthy ? 'ok' : 'warn'}`}
             onClick={() => useUi.getState().openHud('health')}
           >
-            {healthy ? 'âœ“ HEALTHY' : '! CHECK'}
+            {healthy ? '✓ HEALTHY' : '! CHECK'}
           </button>
         </div>
       </header>
@@ -474,9 +522,8 @@ export default function App() {
       <section className="viewport">
         <div className="hud">
           {doc && <Breadcrumbs projectName={doc.project.name} parts={doc.parts} assemblies={doc.assemblies} />}
-          <div className="tag">SPATIAL PROJECTION Â· NOT MANUFACTURING CAD</div>
-          <h1>{contextName ?? 'ARCHEON ARM'}</h1>
-          <div>{selectedId ? selectedId : 'click the machine Â· Esc deselects Â· Space radial'}</div>
+          <div>{spatialLabel(spatial)} · ENGINEERING</div>
+          {!selectedId && <div className="hint">Click geometry to inspect</div>}
         </div>
         {doc && (
           <ArmScene
@@ -488,7 +535,7 @@ export default function App() {
             variantSets={variants.map((v) => ({ id: v.id, parts: v.preview_parts ?? [] }))}
           />
         )}
-        <div className="legend">v{displayVersion} Â· hash {meta?.hash?.slice(0, 10) ?? 'â€”'}</div>
+        <div className="legend">v{displayVersion} · {meta?.hash?.slice(0, 10) ?? '—'}</div>
         <ViewNav />
         <div className="tracker-anchor">
           <ItemTracker
@@ -541,7 +588,7 @@ export default function App() {
               }} />
             </label>
             <button type="button" disabled={busy} onClick={() => void postJson('/api/cad/regenerate', {}).then(() => refresh())}>REGEN CAD</button>
-            <button type="button" className="top-btn--reset" disabled={resetting} onClick={() => void hardReset()}>{resetting ? 'RESETâ€¦' : 'HARD RESET'}</button>
+            <button type="button" className="top-btn--reset" disabled={resetting} onClick={() => void hardReset()}>{resetting ? 'RESET…' : 'HARD RESET'}</button>
           </div>
         </FloatingHud>
         <FloatingHud id="analysis" title="ANALYSIS">
@@ -550,7 +597,7 @@ export default function App() {
         </FloatingHud>
         <FloatingHud id="measure" title="MEASURE">
           <div className="notes">
-            {selected ? `${selected.name}: envelope ${selected.spatial.primitive.kind === 'box' ? `${selected.spatial.primitive.sx.toFixed(3)} Ã— ${selected.spatial.primitive.sy.toFixed(3)} Ã— ${selected.spatial.primitive.sz.toFixed(3)} m` : 'cylinder'} Â· DERIVED from DesignIR primitive. Not a CMM. Not BREP mass properties.` : 'Select a part to measure its DesignIR envelope.'}
+            {selected ? `${selected.name}: envelope ${selected.spatial.primitive.kind === 'box' ? `${selected.spatial.primitive.sx.toFixed(3)} × ${selected.spatial.primitive.sy.toFixed(3)} × ${selected.spatial.primitive.sz.toFixed(3)} m` : 'cylinder'} · DERIVED from DesignIR primitive. Not a CMM. Not BREP mass properties.` : 'Select a part to measure its DesignIR envelope.'}
           </div>
         </FloatingHud>
         <FloatingHud id="section" title="SECTION">

@@ -3,47 +3,48 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#050b12" />
+  <meta name="theme-color" content="#030303" />
   <meta http-equiv="Cache-Control" content="no-store" />
   <title>ARCHEON compiler</title>
   <link rel="icon" href="/archeon.png" />
   <style>
     :root {
-      --bg0: #050b12; --ice: #d7f3ff; --ice-2: #8ec8de; --muted: #6f8a9a;
-      --line: #1f4c64; --orange: #ff981b; --cyan: #38d7ff; --green: #6ce391; --fault: #e85b6a;
+      --surface-0: #030303; --text-primary: #E8E4DC; --text-muted: #827D75;
+      --action-primary: #D6A33A; --agent: #A779FF; --valid: #5dba7a; --fault: #c45b5b;
+      --border: #222328;
       font-family: Rajdhani, Bahnschrift, "Segoe UI", sans-serif;
     }
     * { box-sizing: border-box; }
     html, body {
-      margin: 0; min-height: 100%; color: var(--ice); background:
-        radial-gradient(ellipse at 50% 18%, rgba(255,152,27,.16), transparent 42%),
-        radial-gradient(ellipse at 80% 90%, rgba(56,215,255,.08), transparent 40%),
-        var(--bg0);
+      margin: 0; min-height: 100%; color: var(--text-primary); background:
+        radial-gradient(ellipse at 50% 18%, rgba(214,163,58,.12), transparent 42%),
+        radial-gradient(ellipse at 80% 90%, rgba(167,121,255,.06), transparent 40%),
+        var(--surface-0);
     }
     .wrap { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; }
     .card {
-      width: min(560px, 100%); padding: 28px 24px 22px; border: 1px solid var(--line);
-      background: linear-gradient(180deg, rgba(12,28,42,.96), rgba(5,11,18,.98));
+      width: min(560px, 100%); padding: 28px 24px 22px; border: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(12,12,14,.96), rgba(3,3,3,.98));
       position: relative;
     }
     .card:before, .card:after { content: ""; position: absolute; width: 12px; height: 12px; }
-    .card:before { left: -1px; top: -1px; border-left: 2px solid var(--ice-2); border-top: 2px solid var(--ice-2); }
-    .card:after { right: -1px; bottom: -1px; border-right: 2px solid var(--ice-2); border-bottom: 2px solid var(--ice-2); }
-    .mark { width: 96px; height: 96px; margin: 0 auto 12px; border: 1px solid var(--line); background: #040b14; display: block; }
-    .eyebrow { margin: 0; color: var(--orange); letter-spacing: .16em; font-size: 12px; font-weight: 700; text-align: center; }
-    h1 { margin: 6px 0 10px; font-size: 28px; letter-spacing: .12em; text-align: center; color: var(--ice); }
+    .card:before { left: -1px; top: -1px; border-left: 2px solid var(--agent); border-top: 2px solid var(--agent); }
+    .card:after { right: -1px; bottom: -1px; border-right: 2px solid var(--action-primary); border-bottom: 2px solid var(--action-primary); }
+    .mark { width: 96px; height: 96px; margin: 0 auto 12px; border: 1px solid var(--border); background: #030303; display: block; }
+    .eyebrow { margin: 0; color: var(--action-primary); letter-spacing: .16em; font-size: 12px; font-weight: 700; text-align: center; }
+    h1 { margin: 6px 0 10px; font-size: 28px; letter-spacing: .12em; text-align: center; color: var(--text-primary); }
     .chip {
       display: block; width: max-content; margin: 0 auto 14px; padding: 4px 12px;
-      border: 1px solid var(--cyan); color: var(--orange); letter-spacing: .12em; font-size: 14px;
+      border: 1px solid var(--agent); color: var(--action-primary); letter-spacing: .12em; font-size: 14px;
     }
-    .lede { margin: 0 0 14px; color: var(--ice-2); text-align: center; font-size: 14px; }
+    .lede { margin: 0 0 14px; color: var(--text-muted); text-align: center; font-size: 14px; }
     .stream { display: grid; gap: 4px; min-height: 132px; text-align: left; font-family: "IBM Plex Mono", Consolas, monospace; font-size: 12px; }
-    .line { display: grid; grid-template-columns: 22px 1fr 72px; gap: 8px; padding: 6px 8px; border-left: 3px solid transparent; color: var(--ice-2); }
-    .line.is-active { border-left-color: var(--cyan); color: var(--ice); background: rgba(56,215,255,.08); }
-    .line.is-pass { border-left-color: var(--green); color: var(--green); }
+    .line { display: grid; grid-template-columns: 22px 1fr 72px; gap: 8px; padding: 6px 8px; border-left: 3px solid transparent; color: var(--text-muted); }
+    .line.is-active { border-left-color: var(--agent); color: var(--text-primary); background: rgba(167,121,255,.08); }
+    .line.is-pass { border-left-color: var(--valid); color: var(--valid); }
     .line.is-fail { border-left-color: var(--fault); color: var(--fault); }
-    .glyph { color: var(--orange); }
-    .status { margin: 14px 0 0; text-align: center; color: var(--cyan); letter-spacing: .08em; font-size: 13px; font-weight: 700; }
+    .glyph { color: var(--action-primary); }
+    .status { margin: 14px 0 0; text-align: center; color: var(--agent); letter-spacing: .08em; font-size: 13px; font-weight: 700; }
     .boundary { margin: 12px 0 0; color: var(--muted); font-size: 11px; letter-spacing: .06em; text-align: center; }
   </style>
 </head>

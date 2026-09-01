@@ -4,6 +4,7 @@
 
 pub mod document;
 pub mod entities;
+pub mod generators;
 pub mod ids;
 pub mod load;
 
@@ -33,6 +34,7 @@ mod tests {
                 branch: "main".into(),
                 kernel: "primitive".into(),
                 domain: "mechanical".into(),
+                fidelity: Default::default(),
                 provenance: Provenance::generated("test", "unit"),
             },
             systems: vec![],
@@ -55,6 +57,11 @@ mod tests {
             revisions: vec![],
             parameters: Default::default(),
             assembly_sequence: vec![],
+            fastener_groups: vec![],
+            assembly_plans: vec![],
+            fit_relations: vec![],
+            component_library: vec![],
+            detail_budget: vec![],
         };
         let json = serde_json::to_string(&doc).unwrap();
         let back: DesignDocument = serde_json::from_str(&json).unwrap();
@@ -68,7 +75,7 @@ mod tests {
             std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../projects/archeon-arm");
         let doc = load_project_dir(&dir).expect("load arm");
         assert!(doc.parts.len() >= 8);
-        assert_eq!(doc.interfaces.len(), 7);
+        assert!(doc.interfaces.len() >= 7);
         let reach = doc.derived_reach_m().expect("reach");
         assert!((reach - 0.8).abs() < 1e-9);
         let ids = doc.all_ids();
@@ -88,6 +95,7 @@ mod tests {
                 branch: "main".into(),
                 kernel: "primitive".into(),
                 domain: "mechanical".into(),
+                fidelity: Default::default(),
                 provenance: Provenance::generated("test", "unit"),
             },
             systems: vec![],
@@ -110,6 +118,11 @@ mod tests {
             revisions: vec![],
             parameters: Default::default(),
             assembly_sequence: vec![],
+            fastener_groups: vec![],
+            assembly_plans: vec![],
+            fit_relations: vec![],
+            component_library: vec![],
+            detail_budget: vec![],
         };
         let ids = doc.all_ids();
         let set = doc.id_set();

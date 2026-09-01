@@ -24,6 +24,77 @@ export const OVERLAYS = [
 ] as const;
 export type Overlay = (typeof OVERLAYS)[number];
 
+/** Independent overlay layers. Explode trails are not implied by exploded spatial mode. */
+export const OVERLAY_FLAGS = [
+  'explodeTrails',
+  'interfaces',
+  'mates',
+  'constraints',
+  'datums',
+  'provenance',
+  'agentDiff',
+  'analysis'
+] as const;
+export type OverlayFlag = (typeof OVERLAY_FLAGS)[number];
+export type OverlayState = Record<OverlayFlag, boolean>;
+
+export function emptyOverlays(): OverlayState {
+  return {
+    explodeTrails: false,
+    interfaces: false,
+    mates: false,
+    constraints: false,
+    datums: false,
+    provenance: false,
+    agentDiff: false,
+    analysis: false
+  };
+}
+
+export function overlayFlagFromName(name: string): OverlayFlag | null {
+  switch (name) {
+    case 'EXPLODE_LINES':
+      return 'explodeTrails';
+    case 'INTERFACES':
+      return 'interfaces';
+    case 'MATES':
+      return 'mates';
+    case 'CONSTRAINTS':
+      return 'constraints';
+    case 'DATUMS':
+      return 'datums';
+    case 'PROVENANCE':
+      return 'provenance';
+    case 'AGENT_DIFF':
+      return 'agentDiff';
+    case 'ANALYSIS':
+      return 'analysis';
+    default:
+      return null;
+  }
+}
+
+export function enableOverlay(state: OverlayState, name: string): OverlayState {
+  if (name === 'NONE') return emptyOverlays();
+  const flag = overlayFlagFromName(name);
+  if (!flag) return state;
+  return { ...state, [flag]: true };
+}
+
+export function toggleOverlayFlag(state: OverlayState, flag: OverlayFlag): OverlayState {
+  return { ...state, [flag]: !state[flag] };
+}
+
+export function primaryOverlayName(state: OverlayState): Overlay {
+  if (state.explodeTrails) return 'EXPLODE_LINES';
+  if (state.interfaces) return 'INTERFACES';
+  if (state.constraints) return 'CONSTRAINTS';
+  if (state.provenance) return 'PROVENANCE';
+  if (state.agentDiff) return 'AGENT_DIFF';
+  if (state.analysis) return 'ANALYSIS';
+  return 'NONE';
+}
+
 export const WORKSTATION_MODES = [
   'DESIGN',
   'ASSEMBLY',
@@ -85,11 +156,11 @@ export type AgentTab = (typeof AGENT_TABS)[number];
 export function composeFromLegacy(view: ViewMode): { spatial: SpatialView; style: RenderStyle; overlay: Overlay } {
   switch (view) {
     case 'EXPLODED':
-      return { spatial: 'EXPLODED', style: 'SHADED_WITH_EDGES', overlay: 'EXPLODE_LINES' };
+      return { spatial: 'EXPLODED', style: 'SHADED_WITH_EDGES', overlay: 'NONE' };
     case 'SYSTEM_EXPLODED':
-      return { spatial: 'SYSTEM_EXPLODED', style: 'SHADED_WITH_EDGES', overlay: 'EXPLODE_LINES' };
+      return { spatial: 'SYSTEM_EXPLODED', style: 'SHADED_WITH_EDGES', overlay: 'NONE' };
     case 'PART_EXPLODED':
-      return { spatial: 'PART_EXPLODED', style: 'SHADED_WITH_EDGES', overlay: 'EXPLODE_LINES' };
+      return { spatial: 'PART_EXPLODED', style: 'SHADED_WITH_EDGES', overlay: 'NONE' };
     case 'SERVICE':
       return { spatial: 'SERVICE', style: 'SHADED_WITH_EDGES', overlay: 'NONE' };
     case 'ISOLATE':

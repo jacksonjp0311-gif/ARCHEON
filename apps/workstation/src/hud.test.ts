@@ -5,6 +5,7 @@ import {
   applyPin,
   breadcrumbs,
   emptyHuds,
+  inspectorAfterSelection,
   primaryOpen,
   utilityOpen
 } from './services/hudManager';
@@ -53,6 +54,19 @@ describe('HudManager clutter limits', () => {
     h = applyClose(h, 'health');
     expect(h.health.open).toBe(false);
     expect(h.health.pinned).toBe(false);
+  });
+
+  it('inspector closes on deselect unless pinned', () => {
+    let h = emptyHuds();
+    h = inspectorAfterSelection(h, 'part.a');
+    expect(h.inspector.open).toBe(true);
+    h = inspectorAfterSelection(h, null);
+    expect(h.inspector.open).toBe(false);
+    h = inspectorAfterSelection(h, 'part.a');
+    h = applyPin(h, 'inspector', true);
+    h = inspectorAfterSelection(h, null);
+    expect(h.inspector.open).toBe(true);
+    expect(h.inspector.pinned).toBe(true);
   });
 });
 

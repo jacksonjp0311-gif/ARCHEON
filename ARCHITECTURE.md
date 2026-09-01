@@ -1,6 +1,6 @@
 # ARCHEON architecture
 
-Version 0.4.0 — Adaptive Human Interface.
+Version 0.5.0 — Generative Engineering Fidelity.
 
 > Geometry is only one projection of an engineered system.
 
@@ -53,7 +53,9 @@ Live Design sessions, CAD jobs, and variants live on the engineering clock. They
 
 ### 8. Replaceable CAD kernel
 
-All exact geometry goes through `CadKernelAdapter`. Phase 1 implements a primitive STEP/STL kernel and an optional build123d adapter.
+All exact geometry goes through `CadKernelAdapter`. v0.5 implements a feature-aware primitive STEP/STL kernel (box, cylinder, tube, preview holes/steps) and an optional build123d/OCCT adapter for Boolean cut, fillet, and chamfer. Three.js primitives are not the generated design path.
+
+See `docs/GENERATIVE_ENGINEERING.md`, `docs/COMPONENT_GENERATORS.md`, `docs/DESIGN_FIDELITY.md`.
 
 ### 9. Replaceable model provider
 

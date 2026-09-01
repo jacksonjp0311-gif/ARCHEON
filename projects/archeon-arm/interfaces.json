@@ -1,64 +1,1298 @@
 {
   "ports": [
-    {"id": "port.base.j1", "host": "part.base.column", "role": "revolute_output", "datum": "datum.j1", "origin_m": [0, 0, 0.10],
-      "provenance": {"class": "GENERATED", "created_by": "assembly-designer", "reason": "J1 yaw.", "requirement_ids": ["req.dof"], "agent_id": "assembly-designer", "tools": [], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
-    {"id": "port.shoulder.j1", "host": "part.shoulder.housing", "role": "revolute_input", "datum": "datum.j1", "origin_m": [0, 0, 0.10],
-      "provenance": {"class": "GENERATED", "created_by": "assembly-designer", "reason": "J1 mate.", "requirement_ids": ["req.dof"], "agent_id": "assembly-designer", "tools": [], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
-    {"id": "port.shoulder.bearing", "host": "part.shoulder.housing", "role": "radial_bearing_mount", "datum": "datum.j2", "origin_m": [0, 0, 0.20],
-      "provenance": {"class": "GENERATED", "created_by": "assembly-designer", "reason": "ShoulderBearingSeat.", "requirement_ids": ["req.bearings"], "agent_id": "assembly-designer", "tools": [], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
-    {"id": "port.shaft.bearing", "host": "part.shoulder.shaft", "role": "radial_bearing_journal", "datum": "datum.j2", "origin_m": [0, 0, 0.20],
-      "provenance": {"class": "GENERATED", "created_by": "assembly-designer", "reason": "Journal.", "requirement_ids": ["req.bearings"], "agent_id": "assembly-designer", "tools": [], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
-    {"id": "port.shoulder.j2", "host": "part.shoulder.shaft", "role": "revolute_output", "datum": "datum.j2", "origin_m": [0, 0, 0.20],
-      "provenance": {"class": "GENERATED", "created_by": "assembly-designer", "reason": "J2 pitch.", "requirement_ids": ["req.dof"], "agent_id": "assembly-designer", "tools": [], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
-    {"id": "port.upper.j2", "host": "part.upper_arm.tube", "role": "revolute_input", "datum": "datum.j2", "origin_m": [0, 0, 0.20],
-      "provenance": {"class": "GENERATED", "created_by": "assembly-designer", "reason": "Upper arm root.", "requirement_ids": ["req.reach"], "agent_id": "assembly-designer", "tools": [], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
-    {"id": "port.upper.j3", "host": "part.upper_arm.tube", "role": "revolute_output", "datum": "datum.j3", "origin_m": [0.40, 0, 0.20],
-      "provenance": {"class": "GENERATED", "created_by": "assembly-designer", "reason": "Elbow drive.", "requirement_ids": ["req.dof"], "agent_id": "assembly-designer", "tools": [], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
-    {"id": "port.elbow.j3", "host": "part.elbow.housing", "role": "revolute_input", "datum": "datum.j3", "origin_m": [0.40, 0, 0.20],
-      "provenance": {"class": "GENERATED", "created_by": "assembly-designer", "reason": "Elbow in.", "requirement_ids": ["req.dof"], "agent_id": "assembly-designer", "tools": [], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
-    {"id": "port.elbow.j3out", "host": "part.elbow.housing", "role": "revolute_output", "datum": "datum.j3", "origin_m": [0.44, 0, 0.20],
-      "provenance": {"class": "GENERATED", "created_by": "assembly-designer", "reason": "Elbow out.", "requirement_ids": ["req.dof"], "agent_id": "assembly-designer", "tools": [], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
-    {"id": "port.forearm.j3", "host": "part.forearm.tube", "role": "revolute_input", "datum": "datum.j3", "origin_m": [0.44, 0, 0.20],
-      "provenance": {"class": "GENERATED", "created_by": "assembly-designer", "reason": "Forearm root.", "requirement_ids": ["req.reach"], "agent_id": "assembly-designer", "tools": [], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
-    {"id": "port.forearm.j4", "host": "part.forearm.tube", "role": "revolute_output", "datum": "datum.j4", "origin_m": [0.77, 0, 0.20],
-      "provenance": {"class": "GENERATED", "created_by": "assembly-designer", "reason": "Wrist roll in.", "requirement_ids": ["req.dof"], "agent_id": "assembly-designer", "tools": [], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
-    {"id": "port.wrist.j4", "host": "part.wrist.housing", "role": "revolute_input", "datum": "datum.j4", "origin_m": [0.77, 0, 0.20],
-      "provenance": {"class": "GENERATED", "created_by": "assembly-designer", "reason": "Wrist in.", "requirement_ids": ["req.dof"], "agent_id": "assembly-designer", "tools": [], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
-    {"id": "port.wrist.j6", "host": "part.wrist.housing", "role": "revolute_output", "datum": "datum.j6", "origin_m": [0.84, 0, 0.20],
-      "provenance": {"class": "GENERATED", "created_by": "assembly-designer", "reason": "Flange drive.", "requirement_ids": ["req.dof"], "agent_id": "assembly-designer", "tools": [], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
-    {"id": "port.ee.j6", "host": "part.ee.adapter", "role": "tool_flange", "datum": "datum.j6", "origin_m": [0.84, 0, 0.20],
-      "provenance": {"class": "GENERATED", "created_by": "assembly-designer", "reason": "EE interface.", "requirement_ids": ["req.payload"], "agent_id": "assembly-designer", "tools": [], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}}
+    {
+      "id": "port.base.j1",
+      "host": "part.base.column",
+      "role": "revolute_output",
+      "datum": "datum.j1",
+      "origin_m": [
+        0.0,
+        0.0,
+        0.04
+      ],
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "J1 yaw.",
+        "requirement_ids": [
+          "req.dof"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      },
+      "frame": "HOST_LOCAL"
+    },
+    {
+      "id": "port.shoulder.j1",
+      "host": "part.shoulder.housing",
+      "role": "revolute_input",
+      "datum": "datum.j1",
+      "origin_m": [
+        0.0,
+        0.0,
+        -0.1
+      ],
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "J1 mate.",
+        "requirement_ids": [
+          "req.dof"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      },
+      "frame": "HOST_LOCAL"
+    },
+    {
+      "id": "port.shoulder.bearing",
+      "host": "part.shoulder.housing",
+      "role": "radial_bearing_mount",
+      "datum": "datum.j2",
+      "origin_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "ShoulderBearingSeat.",
+        "requirement_ids": [
+          "req.bearings"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      },
+      "frame": "HOST_LOCAL"
+    },
+    {
+      "id": "port.shaft.bearing",
+      "host": "part.shoulder.shaft",
+      "role": "radial_bearing_journal",
+      "datum": "datum.j2",
+      "origin_m": [
+        0.0,
+        -2.9e-08,
+        -0.008
+      ],
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "Journal.",
+        "requirement_ids": [
+          "req.bearings"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      },
+      "frame": "HOST_LOCAL"
+    },
+    {
+      "id": "port.shoulder.j2",
+      "host": "part.shoulder.shaft",
+      "role": "revolute_output",
+      "datum": "datum.j2",
+      "origin_m": [
+        0.0,
+        -2.9e-08,
+        -0.008
+      ],
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "J2 pitch.",
+        "requirement_ids": [
+          "req.dof"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      },
+      "frame": "HOST_LOCAL"
+    },
+    {
+      "id": "port.upper.j2",
+      "host": "part.upper_arm.tube",
+      "role": "revolute_input",
+      "datum": "datum.j2",
+      "origin_m": [
+        -0.2,
+        0.0,
+        0.0
+      ],
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "Upper arm root.",
+        "requirement_ids": [
+          "req.reach"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      },
+      "frame": "HOST_LOCAL"
+    },
+    {
+      "id": "port.upper.j3",
+      "host": "part.upper_arm.tube",
+      "role": "revolute_output",
+      "datum": "datum.j3",
+      "origin_m": [
+        0.2,
+        0.0,
+        0.0
+      ],
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "Elbow drive.",
+        "requirement_ids": [
+          "req.dof"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      },
+      "frame": "HOST_LOCAL"
+    },
+    {
+      "id": "port.elbow.j3",
+      "host": "part.elbow.housing",
+      "role": "revolute_input",
+      "datum": "datum.j3",
+      "origin_m": [
+        -0.02,
+        0.0,
+        0.0
+      ],
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "Elbow in.",
+        "requirement_ids": [
+          "req.dof"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      },
+      "frame": "HOST_LOCAL"
+    },
+    {
+      "id": "port.elbow.j3out",
+      "host": "part.elbow.housing",
+      "role": "revolute_output",
+      "datum": "datum.j3",
+      "origin_m": [
+        0.02,
+        0.0,
+        0.0
+      ],
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "Elbow out.",
+        "requirement_ids": [
+          "req.dof"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      },
+      "frame": "HOST_LOCAL"
+    },
+    {
+      "id": "port.forearm.j3",
+      "host": "part.forearm.tube",
+      "role": "revolute_input",
+      "datum": "datum.j3",
+      "origin_m": [
+        -0.165,
+        0.0,
+        0.0
+      ],
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "Forearm root.",
+        "requirement_ids": [
+          "req.reach"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      },
+      "frame": "HOST_LOCAL"
+    },
+    {
+      "id": "port.forearm.j4",
+      "host": "part.forearm.tube",
+      "role": "revolute_output",
+      "datum": "datum.j4",
+      "origin_m": [
+        0.165,
+        0.0,
+        0.0
+      ],
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "Wrist roll in.",
+        "requirement_ids": [
+          "req.dof"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      },
+      "frame": "HOST_LOCAL"
+    },
+    {
+      "id": "port.wrist.j4",
+      "host": "part.wrist.housing",
+      "role": "revolute_input",
+      "datum": "datum.j4",
+      "origin_m": [
+        1.29e-07,
+        0.0,
+        -0.035
+      ],
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "Wrist in.",
+        "requirement_ids": [
+          "req.dof"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      },
+      "frame": "HOST_LOCAL"
+    },
+    {
+      "id": "port.wrist.j6",
+      "host": "part.wrist.housing",
+      "role": "revolute_output",
+      "datum": "datum.j6",
+      "origin_m": [
+        -1.29e-07,
+        0.0,
+        0.035
+      ],
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "Flange drive.",
+        "requirement_ids": [
+          "req.dof"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      },
+      "frame": "HOST_LOCAL"
+    },
+    {
+      "id": "port.ee.j6",
+      "host": "part.ee.adapter",
+      "role": "tool_flange",
+      "datum": "datum.j6",
+      "origin_m": [
+        -0.02,
+        0.0,
+        0.0
+      ],
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "EE interface.",
+        "requirement_ids": [
+          "req.payload"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      },
+      "frame": "HOST_LOCAL"
+    },
+    {
+      "id": "port.motor.output",
+      "host": "part.shoulder.motor",
+      "role": "motor_output",
+      "datum": "datum.j2",
+      "origin_m": [
+        0.0,
+        -1.36e-07,
+        -0.037
+      ],
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "MotorOutputPort \u2014 interface first.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      },
+      "frame": "HOST_LOCAL"
+    },
+    {
+      "id": "port.gearbox.input",
+      "host": "part.shoulder.gearbox",
+      "role": "gearbox_input",
+      "datum": "datum.j2",
+      "origin_m": [
+        0.0,
+        8.8e-08,
+        0.024
+      ],
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "GearboxInputPort.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      },
+      "frame": "HOST_LOCAL"
+    },
+    {
+      "id": "port.gearbox.output",
+      "host": "part.shoulder.gearbox",
+      "role": "gearbox_output",
+      "datum": "datum.j2",
+      "origin_m": [
+        0.0,
+        -8.8e-08,
+        -0.024
+      ],
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "Gearbox output to shaft.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      },
+      "frame": "HOST_LOCAL"
+    },
+    {
+      "id": "port.seat.a",
+      "host": "part.shoulder.housing",
+      "role": "bearing_seat",
+      "datum": "datum.j2",
+      "origin_m": [
+        0.0,
+        -0.022,
+        0.0
+      ],
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "BearingSeatA.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      },
+      "frame": "HOST_LOCAL"
+    },
+    {
+      "id": "port.seat.b",
+      "host": "part.shoulder.housing",
+      "role": "bearing_seat",
+      "datum": "datum.j2",
+      "origin_m": [
+        0.0,
+        0.022,
+        0.0
+      ],
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "BearingSeatB.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      },
+      "frame": "HOST_LOCAL"
+    },
+    {
+      "id": "port.bearing.a.od",
+      "host": "part.shoulder.bearing.a",
+      "role": "bearing_od",
+      "datum": "datum.j2",
+      "origin_m": [
+        0.0,
+        0.0,
+        -0.0
+      ],
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "Bearing A OD.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      },
+      "frame": "HOST_LOCAL"
+    },
+    {
+      "id": "port.bearing.b.od",
+      "host": "part.shoulder.bearing.b",
+      "role": "bearing_od",
+      "datum": "datum.j2",
+      "origin_m": [
+        0.0,
+        0.0,
+        -0.0
+      ],
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "Bearing B OD.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      },
+      "frame": "HOST_LOCAL"
+    },
+    {
+      "id": "port.shaft.journal.a",
+      "host": "part.shoulder.shaft",
+      "role": "radial_bearing_journal",
+      "datum": "datum.j2",
+      "origin_m": [
+        0.0,
+        5.1e-08,
+        0.014
+      ],
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "Journal A.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      },
+      "frame": "HOST_LOCAL"
+    },
+    {
+      "id": "port.shaft.journal.b",
+      "host": "part.shoulder.shaft",
+      "role": "radial_bearing_journal",
+      "datum": "datum.j2",
+      "origin_m": [
+        0.0,
+        -1.1e-07,
+        -0.03
+      ],
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "Journal B.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      },
+      "frame": "HOST_LOCAL"
+    },
+    {
+      "id": "port.mount.upper",
+      "host": "part.shoulder.mount.upper",
+      "role": "upper_arm_mount",
+      "datum": "datum.j2",
+      "origin_m": [
+        0.007,
+        0.0,
+        0.0
+      ],
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "UpperArmMount.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      },
+      "frame": "HOST_LOCAL"
+    },
+    {
+      "id": "port.cover.access",
+      "host": "part.shoulder.cover",
+      "role": "service_access",
+      "datum": "datum.j2",
+      "origin_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "ServiceAccess.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      },
+      "frame": "HOST_LOCAL"
+    },
+    {
+      "id": "port.housing.cover",
+      "host": "part.shoulder.housing",
+      "role": "service_access",
+      "datum": "datum.j2",
+      "origin_m": [
+        0.0,
+        0.0,
+        0.055
+      ],
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "Housing service face.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      },
+      "frame": "HOST_LOCAL"
+    }
   ],
   "interfaces": [
-    {"id": "iface.j1", "name": "Base yaw joint", "kind": "mechanical", "a": "port.base.j1", "b": "port.shoulder.j1", "semantic_role": "revolute_j1",
-      "provenance": {"class": "GENERATED", "created_by": "assembly-designer", "reason": "J1.", "requirement_ids": ["req.dof"], "agent_id": "assembly-designer", "tools": [], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
-    {"id": "iface.shoulder.bearing", "name": "ShoulderBearingSeat", "kind": "mechanical", "a": "port.shoulder.bearing", "b": "port.shaft.bearing", "semantic_role": "radial_bearing_mount",
-      "provenance": {"class": "ASSUMED", "created_by": "assembly-designer", "reason": "Bearing seat semantic interface. No catalog PN.", "requirement_ids": ["req.bearings"], "agent_id": "assembly-designer", "tools": [], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
-    {"id": "iface.j2", "name": "Shoulder pitch joint", "kind": "mechanical", "a": "port.shoulder.j2", "b": "port.upper.j2", "semantic_role": "revolute_j2",
-      "provenance": {"class": "GENERATED", "created_by": "assembly-designer", "reason": "J2.", "requirement_ids": ["req.dof"], "agent_id": "assembly-designer", "tools": [], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
-    {"id": "iface.j3a", "name": "Upper-to-elbow", "kind": "mechanical", "a": "port.upper.j3", "b": "port.elbow.j3", "semantic_role": "revolute_j3",
-      "provenance": {"class": "GENERATED", "created_by": "assembly-designer", "reason": "J3 in.", "requirement_ids": ["req.dof"], "agent_id": "assembly-designer", "tools": [], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
-    {"id": "iface.j3b", "name": "Elbow-to-forearm", "kind": "mechanical", "a": "port.elbow.j3out", "b": "port.forearm.j3", "semantic_role": "revolute_j3_out",
-      "provenance": {"class": "GENERATED", "created_by": "assembly-designer", "reason": "J3 out.", "requirement_ids": ["req.dof"], "agent_id": "assembly-designer", "tools": [], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
-    {"id": "iface.j4", "name": "Forearm-to-wrist", "kind": "mechanical", "a": "port.forearm.j4", "b": "port.wrist.j4", "semantic_role": "revolute_j4",
-      "provenance": {"class": "GENERATED", "created_by": "assembly-designer", "reason": "J4.", "requirement_ids": ["req.dof"], "agent_id": "assembly-designer", "tools": [], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
-    {"id": "iface.j6", "name": "Wrist-to-flange", "kind": "mechanical", "a": "port.wrist.j6", "b": "port.ee.j6", "semantic_role": "tool_flange",
-      "provenance": {"class": "GENERATED", "created_by": "assembly-designer", "reason": "J6 / flange.", "requirement_ids": ["req.payload"], "agent_id": "assembly-designer", "tools": [], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}}
+    {
+      "id": "iface.j1",
+      "name": "Base yaw joint",
+      "kind": "mechanical",
+      "a": "port.base.j1",
+      "b": "port.shoulder.j1",
+      "semantic_role": "revolute_j1",
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "J1.",
+        "requirement_ids": [
+          "req.dof"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "iface.shoulder.bearing",
+      "name": "ShoulderBearingSeat",
+      "kind": "mechanical",
+      "a": "port.shoulder.bearing",
+      "b": "port.shaft.bearing",
+      "semantic_role": "radial_bearing_mount",
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "assembly-designer",
+        "reason": "Bearing seat semantic interface. No catalog PN.",
+        "requirement_ids": [
+          "req.bearings"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "iface.j2",
+      "name": "Shoulder pitch joint",
+      "kind": "mechanical",
+      "a": "port.shoulder.j2",
+      "b": "port.upper.j2",
+      "semantic_role": "revolute_j2",
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "J2.",
+        "requirement_ids": [
+          "req.dof"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "iface.j3a",
+      "name": "Upper-to-elbow",
+      "kind": "mechanical",
+      "a": "port.upper.j3",
+      "b": "port.elbow.j3",
+      "semantic_role": "revolute_j3",
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "J3 in.",
+        "requirement_ids": [
+          "req.dof"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "iface.j3b",
+      "name": "Elbow-to-forearm",
+      "kind": "mechanical",
+      "a": "port.elbow.j3out",
+      "b": "port.forearm.j3",
+      "semantic_role": "revolute_j3_out",
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "J3 out.",
+        "requirement_ids": [
+          "req.dof"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "iface.j4",
+      "name": "Forearm-to-wrist",
+      "kind": "mechanical",
+      "a": "port.forearm.j4",
+      "b": "port.wrist.j4",
+      "semantic_role": "revolute_j4",
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "J4.",
+        "requirement_ids": [
+          "req.dof"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "iface.j6",
+      "name": "Wrist-to-flange",
+      "kind": "mechanical",
+      "a": "port.wrist.j6",
+      "b": "port.ee.j6",
+      "semantic_role": "tool_flange",
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "J6 / flange.",
+        "requirement_ids": [
+          "req.payload"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "iface.motor.gearbox",
+      "name": "MotorOutputPort\u2013GearboxInputPort",
+      "kind": "mechanical",
+      "a": "port.motor.output",
+      "b": "port.gearbox.input",
+      "semantic_role": "drive_coupling",
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "Interface-first drive.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "iface.gearbox.shaft",
+      "name": "Gearbox output to shaft",
+      "kind": "mechanical",
+      "a": "port.gearbox.output",
+      "b": "port.shaft.journal.a",
+      "semantic_role": "shaft_drive",
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "Gearbox to shaft.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "iface.seat.a",
+      "name": "BearingSeatA",
+      "kind": "mechanical",
+      "a": "port.seat.a",
+      "b": "port.bearing.a.od",
+      "semantic_role": "bearing_seat",
+      "provenance": {
+        "class": "DERIVED",
+        "created_by": "assembly-designer",
+        "reason": "Seat A to bearing A OD.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "iface.seat.b",
+      "name": "BearingSeatB",
+      "kind": "mechanical",
+      "a": "port.seat.b",
+      "b": "port.bearing.b.od",
+      "semantic_role": "bearing_seat",
+      "provenance": {
+        "class": "DERIVED",
+        "created_by": "assembly-designer",
+        "reason": "Seat B to bearing B OD.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "iface.journal.a",
+      "name": "Journal A",
+      "kind": "mechanical",
+      "a": "port.shaft.journal.a",
+      "b": "port.bearing.a.od",
+      "semantic_role": "journal",
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "Shaft journal A. Semantic \u2014 OD port is the bearing host.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "iface.service.cover",
+      "name": "ServiceAccess",
+      "kind": "mechanical",
+      "a": "port.cover.access",
+      "b": "port.housing.cover",
+      "semantic_role": "service_access",
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "Cover to housing service face.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "iface.upper.mount",
+      "name": "UpperArmMount",
+      "kind": "mechanical",
+      "a": "port.mount.upper",
+      "b": "port.upper.j2",
+      "semantic_role": "upper_arm_mount",
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "Mount plate to upper-arm root.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "iface.journal.b",
+      "name": "Journal B",
+      "kind": "mechanical",
+      "a": "port.shaft.journal.b",
+      "b": "port.bearing.b.od",
+      "semantic_role": "journal",
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "reason": "Shaft journal B.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "assembly-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    }
   ],
   "mates": [
-    {"id": "mate.j1", "interface": "iface.j1", "kind": "revolute", "offset_m": 0,
-      "provenance": {"class": "ASSUMED", "created_by": "constraint-engineer", "reason": "No geometric solver in Phase 1.", "requirement_ids": ["req.dof"], "agent_id": "constraint-engineer", "tools": [], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
-    {"id": "mate.bearing", "interface": "iface.shoulder.bearing", "kind": "concentric", "offset_m": 0,
-      "provenance": {"class": "ASSUMED", "created_by": "constraint-engineer", "reason": "Semantic concentric mate.", "requirement_ids": ["req.bearings"], "agent_id": "constraint-engineer", "tools": [], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
-    {"id": "mate.j2", "interface": "iface.j2", "kind": "revolute", "offset_m": 0,
-      "provenance": {"class": "ASSUMED", "created_by": "constraint-engineer", "reason": "Semantic revolute.", "requirement_ids": ["req.dof"], "agent_id": "constraint-engineer", "tools": [], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
-    {"id": "mate.j3a", "interface": "iface.j3a", "kind": "revolute", "offset_m": 0,
-      "provenance": {"class": "ASSUMED", "created_by": "constraint-engineer", "reason": "Semantic revolute.", "requirement_ids": ["req.dof"], "agent_id": "constraint-engineer", "tools": [], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
-    {"id": "mate.j3b", "interface": "iface.j3b", "kind": "revolute", "offset_m": 0,
-      "provenance": {"class": "ASSUMED", "created_by": "constraint-engineer", "reason": "Semantic revolute.", "requirement_ids": ["req.dof"], "agent_id": "constraint-engineer", "tools": [], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
-    {"id": "mate.j4", "interface": "iface.j4", "kind": "revolute", "offset_m": 0,
-      "provenance": {"class": "ASSUMED", "created_by": "constraint-engineer", "reason": "Semantic revolute.", "requirement_ids": ["req.dof"], "agent_id": "constraint-engineer", "tools": [], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
-    {"id": "mate.j6", "interface": "iface.j6", "kind": "fixed", "offset_m": 0,
-      "provenance": {"class": "ASSUMED", "created_by": "constraint-engineer", "reason": "Flange bolt pattern not modeled.", "requirement_ids": ["req.payload"], "agent_id": "constraint-engineer", "tools": [], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}}
+    {
+      "id": "mate.j1",
+      "interface": "iface.j1",
+      "kind": "revolute",
+      "offset_m": 0,
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "constraint-engineer",
+        "reason": "No geometric solver in Phase 1.",
+        "requirement_ids": [
+          "req.dof"
+        ],
+        "agent_id": "constraint-engineer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "mate.bearing",
+      "interface": "iface.shoulder.bearing",
+      "kind": "concentric",
+      "offset_m": 0,
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "constraint-engineer",
+        "reason": "Semantic concentric mate.",
+        "requirement_ids": [
+          "req.bearings"
+        ],
+        "agent_id": "constraint-engineer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "mate.j2",
+      "interface": "iface.j2",
+      "kind": "revolute",
+      "offset_m": 0,
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "constraint-engineer",
+        "reason": "Semantic revolute.",
+        "requirement_ids": [
+          "req.dof"
+        ],
+        "agent_id": "constraint-engineer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "mate.j3a",
+      "interface": "iface.j3a",
+      "kind": "revolute",
+      "offset_m": 0,
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "constraint-engineer",
+        "reason": "Semantic revolute.",
+        "requirement_ids": [
+          "req.dof"
+        ],
+        "agent_id": "constraint-engineer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "mate.j3b",
+      "interface": "iface.j3b",
+      "kind": "revolute",
+      "offset_m": 0,
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "constraint-engineer",
+        "reason": "Semantic revolute.",
+        "requirement_ids": [
+          "req.dof"
+        ],
+        "agent_id": "constraint-engineer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "mate.j4",
+      "interface": "iface.j4",
+      "kind": "revolute",
+      "offset_m": 0,
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "constraint-engineer",
+        "reason": "Semantic revolute.",
+        "requirement_ids": [
+          "req.dof"
+        ],
+        "agent_id": "constraint-engineer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "mate.j6",
+      "interface": "iface.j6",
+      "kind": "fixed",
+      "offset_m": 0,
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "constraint-engineer",
+        "reason": "Flange bolt pattern not modeled.",
+        "requirement_ids": [
+          "req.payload"
+        ],
+        "agent_id": "constraint-engineer",
+        "tools": [],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "mate.motor.gearbox",
+      "interface": "iface.motor.gearbox",
+      "kind": "concentric",
+      "offset_m": 0,
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "constraint-engineer",
+        "reason": "Semantic concentric. No solver.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "constraint-engineer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "mate.seat.a",
+      "interface": "iface.seat.a",
+      "kind": "concentric",
+      "offset_m": 0,
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "constraint-engineer",
+        "reason": "Semantic concentric.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "constraint-engineer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "mate.seat.b",
+      "interface": "iface.seat.b",
+      "kind": "concentric",
+      "offset_m": 0,
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "constraint-engineer",
+        "reason": "Semantic concentric.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "constraint-engineer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "mate.service.cover",
+      "interface": "iface.service.cover",
+      "kind": "coincident",
+      "offset_m": 0.001,
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "constraint-engineer",
+        "reason": "Cover gap 1 mm ASSUMED.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "constraint-engineer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "mate.upper.mount",
+      "interface": "iface.upper.mount",
+      "kind": "fixed",
+      "offset_m": 0,
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "constraint-engineer",
+        "reason": "Mount to upper arm. Semantic.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "constraint-engineer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "mate.journal.b",
+      "interface": "iface.journal.b",
+      "kind": "concentric",
+      "offset_m": 0,
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "constraint-engineer",
+        "reason": "Semantic concentric.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "constraint-engineer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    }
   ]
 }

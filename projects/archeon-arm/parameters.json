@@ -9,10 +9,14 @@
         "class": "ASSUMED",
         "created_by": "cad-designer",
         "reason": "Seed link length so derived reach equals 800 mm with forearm+wrist.",
-        "requirement_ids": ["req.reach"],
+        "requirement_ids": [
+          "req.reach"
+        ],
         "agent_id": "cad-designer",
         "tools": [],
-        "evidence_ids": ["ev.reach-derived"],
+        "evidence_ids": [
+          "ev.reach-derived"
+        ],
         "revision_id": "rev.0001",
         "user_approved": true
       }
@@ -26,10 +30,14 @@
         "class": "ASSUMED",
         "created_by": "cad-designer",
         "reason": "Seed link length.",
-        "requirement_ids": ["req.reach"],
+        "requirement_ids": [
+          "req.reach"
+        ],
         "agent_id": "cad-designer",
         "tools": [],
-        "evidence_ids": ["ev.reach-derived"],
+        "evidence_ids": [
+          "ev.reach-derived"
+        ],
         "revision_id": "rev.0001",
         "user_approved": true
       }
@@ -43,11 +51,100 @@
         "class": "ASSUMED",
         "created_by": "cad-designer",
         "reason": "Seed wrist stack height.",
-        "requirement_ids": ["req.reach"],
+        "requirement_ids": [
+          "req.reach"
+        ],
         "agent_id": "cad-designer",
         "tools": [],
-        "evidence_ids": ["ev.reach-derived"],
+        "evidence_ids": [
+          "ev.reach-derived"
+        ],
         "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    "design.fidelity": {
+      "name": "design.fidelity",
+      "value": 2,
+      "unit": "enum",
+      "si": 2,
+      "provenance": {
+        "class": "USER_LOCKED",
+        "created_by": "architect",
+        "reason": "1=CONCEPT 2=ENGINEERING 3=DETAILED. Default ENGINEERING.",
+        "requirement_ids": [],
+        "agent_id": "architect",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    "shoulder.bearing.od": {
+      "name": "shoulder.bearing.od",
+      "value": 47,
+      "unit": "mm",
+      "si": 0.047,
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "components",
+        "reason": "GENERIC_6204 OD. PARAMETRIC_REFERENCE.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    "shoulder.bearing.id": {
+      "name": "shoulder.bearing.id",
+      "value": 20,
+      "unit": "mm",
+      "si": 0.02,
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "components",
+        "reason": "GENERIC_6204 ID. PARAMETRIC_REFERENCE.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    "shoulder.wall": {
+      "name": "shoulder.wall",
+      "value": 8,
+      "unit": "mm",
+      "si": 0.008,
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "cad-designer",
+        "reason": "Housing wall ASSUMED.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
         "user_approved": true
       }
     }

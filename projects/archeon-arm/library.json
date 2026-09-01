@@ -1,0 +1,377 @@
+{
+  "component_library": [
+    {
+      "id": "lib.bearing.6204",
+      "class": "bearing",
+      "designation": "GENERIC_6204_BEARING",
+      "params": {
+        "inner_diameter_m": 0.02,
+        "outer_diameter_m": 0.047,
+        "width_m": 0.014
+      },
+      "units": "m",
+      "truth": "PARAMETRIC_REFERENCE",
+      "note": "ISO 15 6204 envelope analog. Not a purchased manufacturer PN.",
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "components",
+        "reason": "ISO 15 6204 envelope analog. Not a purchased manufacturer PN.",
+        "requirement_ids": [
+          "req.bearings"
+        ],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "lib.bearing.6205",
+      "class": "bearing",
+      "designation": "GENERIC_6205_BEARING",
+      "params": {
+        "inner_diameter_m": 0.025,
+        "outer_diameter_m": 0.052,
+        "width_m": 0.015
+      },
+      "units": "m",
+      "truth": "PARAMETRIC_REFERENCE",
+      "note": "ISO 15 6205 envelope analog. Not a purchased PN.",
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "components",
+        "reason": "ISO 15 6205 envelope analog. Not a purchased PN.",
+        "requirement_ids": [
+          "req.bearings"
+        ],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "lib.bolt.m4_shcs",
+      "class": "bolt",
+      "designation": "GENERIC_SHCS_M4",
+      "params": {
+        "diameter_m": 0.004,
+        "head_d_m": 0.007,
+        "length_m": 0.012
+      },
+      "units": "m",
+      "truth": "PARAMETRIC_REFERENCE",
+      "note": "ISO 4762 analog. Thread is THREAD_REFERENCE.",
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "components",
+        "reason": "ISO 4762 analog. Thread is THREAD_REFERENCE.",
+        "requirement_ids": [
+          "req.bearings"
+        ],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "lib.bolt.m5_shcs",
+      "class": "bolt",
+      "designation": "GENERIC_SHCS_M5",
+      "params": {
+        "diameter_m": 0.005,
+        "head_d_m": 0.0085,
+        "length_m": 0.016
+      },
+      "units": "m",
+      "truth": "PARAMETRIC_REFERENCE",
+      "note": "ISO 4762 analog. Not a torque spec.",
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "components",
+        "reason": "ISO 4762 analog. Not a torque spec.",
+        "requirement_ids": [
+          "req.bearings"
+        ],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "lib.nut.m5",
+      "class": "nut",
+      "designation": "GENERIC_NUT_M5",
+      "params": {
+        "diameter_m": 0.005,
+        "across_flats_m": 0.008
+      },
+      "units": "m",
+      "truth": "PARAMETRIC_REFERENCE",
+      "note": "ISO 4032 analog.",
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "components",
+        "reason": "ISO 4032 analog.",
+        "requirement_ids": [
+          "req.bearings"
+        ],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "lib.washer.m5",
+      "class": "washer",
+      "designation": "GENERIC_WASHER_M5",
+      "params": {
+        "inner_diameter_m": 0.0053,
+        "outer_diameter_m": 0.01,
+        "thickness_m": 0.001
+      },
+      "units": "m",
+      "truth": "PARAMETRIC_REFERENCE",
+      "note": "ISO 7089 analog.",
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "components",
+        "reason": "ISO 7089 analog.",
+        "requirement_ids": [
+          "req.bearings"
+        ],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "lib.shaft.d20",
+      "class": "shaft",
+      "designation": "GENERIC_SHAFT_D20",
+      "params": {
+        "diameter_m": 0.02
+      },
+      "units": "m",
+      "truth": "PARAMETRIC_REFERENCE",
+      "note": "Journal class for GENERIC_6204 inner diameter.",
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "components",
+        "reason": "Journal class for GENERIC_6204 inner diameter.",
+        "requirement_ids": [
+          "req.bearings"
+        ],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "lib.motor.servo60",
+      "class": "motor",
+      "designation": "GENERIC_SERVO_ENVELOPE_60",
+      "params": {
+        "diameter_m": 0.06,
+        "length_m": 0.075
+      },
+      "units": "m",
+      "truth": "PARAMETRIC_REFERENCE",
+      "note": "Servo envelope only. No winding, no catalog torque.",
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "components",
+        "reason": "Servo envelope only. No winding, no catalog torque.",
+        "requirement_ids": [
+          "req.bearings"
+        ],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "lib.gearbox.planetary80",
+      "class": "gearbox",
+      "designation": "GENERIC_PLANETARY_ENVELOPE_80",
+      "params": {
+        "diameter_m": 0.08,
+        "length_m": 0.048
+      },
+      "units": "m",
+      "truth": "PARAMETRIC_REFERENCE",
+      "note": "Reduction envelope. Internal gears are not modeled.",
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "components",
+        "reason": "Reduction envelope. Internal gears are not modeled.",
+        "requirement_ids": [
+          "req.bearings"
+        ],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "lib.coupling.d20",
+      "class": "coupling",
+      "designation": "GENERIC_COUPLING_D20",
+      "params": {
+        "bore_m": 0.02,
+        "od_m": 0.04,
+        "length_m": 0.03
+      },
+      "units": "m",
+      "truth": "PARAMETRIC_REFERENCE",
+      "note": "Oldham/jaw envelope analog. Not a purchased PN.",
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "components",
+        "reason": "Oldham/jaw envelope analog. Not a purchased PN.",
+        "requirement_ids": [
+          "req.bearings"
+        ],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "lib.linear_bearing.lm12",
+      "class": "linear_bearing",
+      "designation": "GENERIC_LINEAR_BEARING_12",
+      "params": {
+        "inner_diameter_m": 0.012,
+        "outer_diameter_m": 0.021,
+        "length_m": 0.03
+      },
+      "units": "m",
+      "truth": "PARAMETRIC_REFERENCE",
+      "note": "LM analog envelope. Not a purchased PN.",
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "components",
+        "reason": "LM analog envelope. Not a purchased PN.",
+        "requirement_ids": [
+          "req.bearings"
+        ],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "lib.bushing.d20",
+      "class": "bushing",
+      "designation": "GENERIC_BUSHING_D20",
+      "params": {
+        "inner_diameter_m": 0.02,
+        "outer_diameter_m": 0.026,
+        "length_m": 0.02
+      },
+      "units": "m",
+      "truth": "PARAMETRIC_REFERENCE",
+      "note": "Plain bushing envelope.",
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "components",
+        "reason": "Plain bushing envelope.",
+        "requirement_ids": [
+          "req.bearings"
+        ],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    }
+  ],
+  "detail_budget": [
+    {
+      "role": "housing",
+      "tier": "primary",
+      "render": "high"
+    },
+    {
+      "role": "shaft",
+      "tier": "primary",
+      "render": "high"
+    },
+    {
+      "role": "bearing",
+      "tier": "primary",
+      "render": "high"
+    },
+    {
+      "role": "motor_envelope",
+      "tier": "primary",
+      "render": "high"
+    },
+    {
+      "role": "gearbox_envelope",
+      "tier": "primary",
+      "render": "high"
+    },
+    {
+      "role": "fastener",
+      "tier": "instance",
+      "render": "instance"
+    },
+    {
+      "role": "cable_passage",
+      "tier": "primary",
+      "render": "high"
+    },
+    {
+      "role": "grommet",
+      "tier": "hidden",
+      "render": "low"
+    }
+  ]
+}

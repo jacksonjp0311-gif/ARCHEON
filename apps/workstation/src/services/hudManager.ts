@@ -84,6 +84,13 @@ export function applyClose(huds: HudMap, id: HudId): HudMap {
   return { ...huds, [id]: { ...huds[id], open: false, pinned: false } };
 }
 
+/** Inspector follows selection. Deselect closes it unless pinned. */
+export function inspectorAfterSelection(huds: HudMap, selectedId: string | null): HudMap {
+  if (selectedId) return applyOpen(huds, 'inspector');
+  if (huds.inspector.pinned) return huds;
+  return applyClose(huds, 'inspector');
+}
+
 export function applyPin(huds: HudMap, id: HudId, pinned: boolean): HudMap {
   return { ...huds, [id]: { ...huds[id], pinned, open: pinned ? true : huds[id].open } };
 }
@@ -171,9 +178,9 @@ export function fromWorkstationMode(m: string): HumanMode {
 }
 
 export const RAIL_ITEMS = [
-  { id: 'project', label: 'PROJECT', hud: 'project' as HudId },
-  { id: 'find', label: 'FIND', hud: null },
-  { id: 'system', label: 'SYSTEM', hud: 'project' as HudId },
-  { id: 'analyze', label: 'ANALYZE', hud: 'analysis' as HudId },
-  { id: 'history', label: 'HISTORY', hud: 'history' as HudId }
+  { id: 'project', label: 'PROJECT', glyph: '▣', hud: 'project' as HudId },
+  { id: 'find', label: 'FIND', glyph: '⌕', hud: null },
+  { id: 'system', label: 'SYSTEM', glyph: '☰', hud: 'project' as HudId },
+  { id: 'analyze', label: 'ANALYZE', glyph: '△', hud: 'analysis' as HudId },
+  { id: 'history', label: 'HISTORY', glyph: '↻', hud: 'history' as HudId }
 ] as const;

@@ -1,29 +1,750 @@
 {
   "datums": [
-    {"id": "datum.j1", "host": "part.base.column", "kind": "axis", "origin_m": [0, 0, 0], "axis": [0, 0, 1], "semantic_role": "joint_axis_yaw",
-      "provenance": {"class": "GENERATED", "created_by": "cad-designer", "reason": "J1 axis.", "requirement_ids": ["req.dof"], "agent_id": "cad-designer", "tools": ["datum_axis"], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
-    {"id": "datum.j2", "host": "part.shoulder.housing", "kind": "axis", "origin_m": [0, 0, 0.20], "axis": [0, 1, 0], "semantic_role": "joint_axis",
-      "provenance": {"class": "GENERATED", "created_by": "cad-designer", "reason": "Shoulder pitch JointAxis.", "requirement_ids": ["req.dof"], "agent_id": "cad-designer", "tools": ["datum_axis"], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
-    {"id": "datum.j3", "host": "part.elbow.housing", "kind": "axis", "origin_m": [0.42, 0, 0.20], "axis": [0, 1, 0], "semantic_role": "joint_axis",
-      "provenance": {"class": "GENERATED", "created_by": "cad-designer", "reason": "Elbow axis.", "requirement_ids": ["req.dof"], "agent_id": "cad-designer", "tools": ["datum_axis"], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
-    {"id": "datum.j4", "host": "part.wrist.housing", "kind": "axis", "origin_m": [0.77, 0, 0.20], "axis": [1, 0, 0], "semantic_role": "joint_axis",
-      "provenance": {"class": "GENERATED", "created_by": "cad-designer", "reason": "Wrist roll.", "requirement_ids": ["req.dof"], "agent_id": "cad-designer", "tools": ["datum_axis"], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
-    {"id": "datum.j6", "host": "part.ee.adapter", "kind": "axis", "origin_m": [0.84, 0, 0.20], "axis": [1, 0, 0], "semantic_role": "tool_axis",
-      "provenance": {"class": "GENERATED", "created_by": "cad-designer", "reason": "Flange axis.", "requirement_ids": ["req.payload"], "agent_id": "cad-designer", "tools": ["datum_axis"], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}}
+    {
+      "id": "datum.j1",
+      "host": "part.base.column",
+      "kind": "axis",
+      "origin_m": [
+        0,
+        0,
+        0
+      ],
+      "axis": [
+        0,
+        0,
+        1
+      ],
+      "semantic_role": "joint_axis_yaw",
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "cad-designer",
+        "reason": "J1 axis.",
+        "requirement_ids": [
+          "req.dof"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "datum_axis"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "datum.j2",
+      "host": "part.shoulder.housing",
+      "kind": "axis",
+      "origin_m": [
+        0,
+        0,
+        0.2
+      ],
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "semantic_role": "joint_axis",
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "cad-designer",
+        "reason": "Shoulder pitch JointAxis.",
+        "requirement_ids": [
+          "req.dof"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "datum_axis"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "datum.j3",
+      "host": "part.elbow.housing",
+      "kind": "axis",
+      "origin_m": [
+        0.42,
+        0,
+        0.2
+      ],
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "semantic_role": "joint_axis",
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "cad-designer",
+        "reason": "Elbow axis.",
+        "requirement_ids": [
+          "req.dof"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "datum_axis"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "datum.j4",
+      "host": "part.wrist.housing",
+      "kind": "axis",
+      "origin_m": [
+        0.77,
+        0,
+        0.2
+      ],
+      "axis": [
+        1,
+        0,
+        0
+      ],
+      "semantic_role": "joint_axis",
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "cad-designer",
+        "reason": "Wrist roll.",
+        "requirement_ids": [
+          "req.dof"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "datum_axis"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "datum.j6",
+      "host": "part.ee.adapter",
+      "kind": "axis",
+      "origin_m": [
+        0.84,
+        0,
+        0.2
+      ],
+      "axis": [
+        1,
+        0,
+        0
+      ],
+      "semantic_role": "tool_axis",
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "cad-designer",
+        "reason": "Flange axis.",
+        "requirement_ids": [
+          "req.payload"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "datum_axis"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    }
   ],
   "features": [
-    {"id": "feat.base.plate.box", "part": "part.base.plate", "kind": "box", "semantic_role": "body",
-      "params": {"sx": 0.22, "sy": 0.22, "sz": 0.02},
-      "provenance": {"class": "GENERATED", "created_by": "cad-designer", "reason": "Plate extrusion analog.", "requirement_ids": [], "agent_id": "cad-designer", "tools": ["box"], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
-    {"id": "feat.shoulder.pocket", "part": "part.shoulder.housing", "kind": "hole", "semantic_role": "bearing_pocket",
-      "params": {"diameter_m": 0.036, "depth_m": 0.018, "note": "BearingPocket — semantic. Primitive kernel cuts a cylinder."},
-      "provenance": {"class": "ASSUMED", "created_by": "cad-designer", "reason": "Bearing pocket intent. Not a qualified bore.", "requirement_ids": ["req.bearings"], "agent_id": "cad-designer", "tools": ["hole"], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}},
-    {"id": "feat.upper.extrude", "part": "part.upper_arm.tube", "kind": "extrude", "semantic_role": "link_body",
-      "params": {"depth_m": 0.05, "driven_by": "upper_arm.length"},
-      "provenance": {"class": "GENERATED", "created_by": "cad-designer", "reason": "Link solid driven by parameter.", "requirement_ids": ["req.reach"], "agent_id": "cad-designer", "tools": ["extrude"], "evidence_ids": [], "revision_id": "rev.0001", "user_approved": true}}
+    {
+      "id": "feat.base.plate.box",
+      "part": "part.base.plate",
+      "kind": "box",
+      "semantic_role": "body",
+      "params": {
+        "sx": 0.22,
+        "sy": 0.22,
+        "sz": 0.02
+      },
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "cad-designer",
+        "reason": "Plate extrusion analog.",
+        "requirement_ids": [],
+        "agent_id": "cad-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "feat.shoulder.housing.body",
+      "part": "part.shoulder.housing",
+      "kind": "box",
+      "semantic_role": "housing_body",
+      "params": {
+        "sx": 0.155,
+        "sy": 0.096,
+        "sz": 0.11
+      },
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "cad-designer",
+        "reason": "Housing envelope.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "feat.shoulder.housing.seat_a",
+      "part": "part.shoulder.housing",
+      "kind": "bearing_seat",
+      "semantic_role": "bearing_seat",
+      "params": {
+        "diameter_m": 0.047,
+        "depth_m": 0.014,
+        "origin": "DERIVED",
+        "note": "Seat DERIVED from GENERIC_6204 OD. Fit class ASSUMED \u2014 not H7."
+      },
+      "provenance": {
+        "class": "DERIVED",
+        "created_by": "cad-designer",
+        "reason": "Inboard bearing seat.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "feat.shoulder.housing.seat_b",
+      "part": "part.shoulder.housing",
+      "kind": "bearing_seat",
+      "semantic_role": "bearing_seat",
+      "params": {
+        "diameter_m": 0.047,
+        "depth_m": 0.014,
+        "origin": "DERIVED"
+      },
+      "provenance": {
+        "class": "DERIVED",
+        "created_by": "cad-designer",
+        "reason": "Outboard bearing seat.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "feat.shoulder.housing.cable",
+      "part": "part.shoulder.housing",
+      "kind": "cable_passage",
+      "semantic_role": "cable_passage",
+      "params": {
+        "diameter_m": 0.016,
+        "depth_m": 0.02,
+        "origin": "ASSUMED"
+      },
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "cad-designer",
+        "reason": "Cable passage through -X wall.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "feat.shoulder.housing.cover_holes",
+      "part": "part.shoulder.housing",
+      "kind": "mount_pattern",
+      "semantic_role": "cover_fasteners",
+      "params": {
+        "count": 4,
+        "diameter_m": 0.0044,
+        "hole_type": "through"
+      },
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "cad-designer",
+        "reason": "Host holes for cover FastenerGroup.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "feat.shoulder.housing.base_holes",
+      "part": "part.shoulder.base",
+      "kind": "mount_pattern",
+      "semantic_role": "base_fasteners",
+      "params": {
+        "count": 4,
+        "diameter_m": 0.0055,
+        "hole_type": "through"
+      },
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "cad-designer",
+        "reason": "Host holes for housing-to-base FastenerGroup.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "feat.shoulder.motor.flange",
+      "part": "part.shoulder.motor",
+      "kind": "flange",
+      "semantic_role": "motor_flange",
+      "params": {
+        "od_m": 0.072,
+        "thickness_m": 0.007,
+        "origin": "ASSUMED"
+      },
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "cad-designer",
+        "reason": "Motor front flange analog. Not a manufacturer face.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "feat.shoulder.gearbox.flange",
+      "part": "part.shoulder.gearbox",
+      "kind": "flange",
+      "semantic_role": "gearbox_flange",
+      "params": {
+        "od_m": 0.088,
+        "thickness_m": 0.006,
+        "origin": "ASSUMED"
+      },
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "cad-designer",
+        "reason": "Gearbox output flange analog.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "feat.shoulder.bearing.a.bore",
+      "part": "part.shoulder.bearing.a",
+      "kind": "hole",
+      "semantic_role": "bearing_bore",
+      "params": {
+        "inner_r_m": 0.01,
+        "diameter_m": 0.02,
+        "origin": "DERIVED"
+      },
+      "provenance": {
+        "class": "DERIVED",
+        "created_by": "cad-designer",
+        "reason": "Bearing ID DERIVED from GENERIC_6204.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "feat.shoulder.bearing.b.bore",
+      "part": "part.shoulder.bearing.b",
+      "kind": "hole",
+      "semantic_role": "bearing_bore",
+      "params": {
+        "inner_r_m": 0.01,
+        "diameter_m": 0.02,
+        "origin": "DERIVED"
+      },
+      "provenance": {
+        "class": "DERIVED",
+        "created_by": "cad-designer",
+        "reason": "Bearing ID DERIVED from GENERIC_6204.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "feat.shoulder.retainer.a.bore",
+      "part": "part.shoulder.retainer.a",
+      "kind": "hole",
+      "semantic_role": "retainer_bore",
+      "params": {
+        "inner_r_m": 0.021,
+        "diameter_m": 0.042,
+        "origin": "ASSUMED"
+      },
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "cad-designer",
+        "reason": "Retainer lip over bearing outer race.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "feat.shoulder.retainer.b.bore",
+      "part": "part.shoulder.retainer.b",
+      "kind": "hole",
+      "semantic_role": "retainer_bore",
+      "params": {
+        "inner_r_m": 0.021,
+        "diameter_m": 0.042,
+        "origin": "ASSUMED"
+      },
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "cad-designer",
+        "reason": "Retainer lip over bearing outer race.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "feat.shoulder.motor_mount.pattern",
+      "part": "part.shoulder.motor_mount",
+      "kind": "mount_pattern",
+      "semantic_role": "motor_flange_bolts",
+      "params": {
+        "count": 4,
+        "bolt_circle_m": 0.05,
+        "diameter_m": 0.004
+      },
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "cad-designer",
+        "reason": "GENERIC four-bolt motor flange pattern.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "feat.shoulder.shaft.journal",
+      "part": "part.shoulder.shaft",
+      "kind": "cylinder",
+      "semantic_role": "journal",
+      "params": {
+        "radius_m": 0.01,
+        "height_m": 0.118,
+        "origin": "DERIVED"
+      },
+      "provenance": {
+        "class": "DERIVED",
+        "created_by": "cad-designer",
+        "reason": "Journal DERIVED from GENERIC_6204 ID.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "feat.shoulder.shaft.step",
+      "part": "part.shoulder.shaft",
+      "kind": "shaft_step",
+      "semantic_role": "retention_shoulder",
+      "params": {
+        "diameter_m": 0.024,
+        "length_m": 0.008,
+        "origin": "ASSUMED"
+      },
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "cad-designer",
+        "reason": "Retention shoulder. Fit ASSUMED.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "feat.shoulder.spacer.bore",
+      "part": "part.shoulder.spacer",
+      "kind": "bearing_seat",
+      "semantic_role": "spacer_bore",
+      "params": {
+        "diameter_m": 0.02,
+        "inner_r_m": 0.01
+      },
+      "provenance": {
+        "class": "DERIVED",
+        "created_by": "cad-designer",
+        "reason": "Spacer bore matches shaft journal.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "feat.upper.extrude",
+      "part": "part.upper_arm.tube",
+      "kind": "extrude",
+      "semantic_role": "link_body",
+      "params": {
+        "depth_m": 0.4,
+        "driven_by": "upper_arm.length"
+      },
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "cad-designer",
+        "reason": "Link solid driven by parameter.",
+        "requirement_ids": [
+          "req.reach"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "feat.shoulder.cover.body",
+      "part": "part.shoulder.cover",
+      "kind": "box",
+      "semantic_role": "service_cover",
+      "params": {
+        "sx": 0.1,
+        "sy": 0.07,
+        "sz": 0.005
+      },
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "cad-designer",
+        "reason": "Service cover.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "feat.shoulder.mount.flange",
+      "part": "part.shoulder.mount.upper",
+      "kind": "flange",
+      "semantic_role": "upper_arm_flange",
+      "params": {
+        "sx": 0.014,
+        "sy": 0.07,
+        "sz": 0.07
+      },
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "cad-designer",
+        "reason": "Upper-arm interface flange. SEMANTIC until OCCT authors the ring.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "feat.shoulder.bolt.thread",
+      "part": "part.shoulder.bolt.cover.1",
+      "kind": "thread_reference",
+      "semantic_role": "thread_reference",
+      "params": {
+        "designation": "M4x0.7",
+        "mode": "cosmetic"
+      },
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "components",
+        "reason": "Thread reference only. Helix BREP not generated.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    }
   ],
   "constraints": [
-    {"id": "con.reach", "kind": "dimensional", "entities": ["part.upper_arm.tube", "part.forearm.tube", "part.wrist.housing"], "value": 0.8, "unit": "m",
-      "provenance": {"class": "DERIVED", "created_by": "constraint-engineer", "reason": "Σ lengths >= 800 mm.", "requirement_ids": ["req.reach"], "agent_id": "constraint-engineer", "tools": [], "evidence_ids": ["ev.reach-derived"], "revision_id": "rev.0001", "user_approved": true}}
+    {
+      "id": "con.reach",
+      "kind": "dimensional",
+      "entities": [
+        "part.upper_arm.tube",
+        "part.forearm.tube",
+        "part.wrist.housing"
+      ],
+      "value": 0.8,
+      "unit": "m",
+      "provenance": {
+        "class": "DERIVED",
+        "created_by": "constraint-engineer",
+        "reason": "\u03a3 lengths >= 800 mm.",
+        "requirement_ids": [
+          "req.reach"
+        ],
+        "agent_id": "constraint-engineer",
+        "tools": [],
+        "evidence_ids": [
+          "ev.reach-derived"
+        ],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    }
   ]
 }

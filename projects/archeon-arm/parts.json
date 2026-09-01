@@ -10,20 +10,56 @@
       "qty": 1,
       "catalog_ref": null,
       "spatial": {
-        "origin_m": [0, 0, 0.01],
-        "rpy_rad": [0, 0, 0],
-        "primitive": { "kind": "box", "sx": 0.22, "sy": 0.22, "sz": 0.02 },
+        "origin_m": [
+          0,
+          0,
+          0.01
+        ],
+        "rpy_rad": [
+          0,
+          0,
+          0
+        ],
+        "primitive": {
+          "kind": "box",
+          "sx": 0.22,
+          "sy": 0.22,
+          "sz": 0.02
+        },
         "assembly_stage": 1,
-        "explosion_vector": [0, 0, -1],
+        "explosion_vector": [
+          0,
+          0,
+          -1
+        ],
         "explosion_distance_m": 0.12,
         "radial_group": "base",
         "parent_axis": "datum.j1",
-        "service_path": [[0, 0, 0], [0, 0, -0.12]]
+        "service_path": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            -0.12
+          ]
+        ]
       },
       "provenance": {
-        "class": "GENERATED", "created_by": "cad-designer", "reason": "Simplified plate solid.",
-        "requirement_ids": [], "agent_id": "cad-designer", "tools": ["box"], "evidence_ids": [],
-        "revision_id": "rev.0001", "user_approved": true
+        "class": "GENERATED",
+        "created_by": "cad-designer",
+        "reason": "Simplified plate solid.",
+        "requirement_ids": [],
+        "agent_id": "cad-designer",
+        "tools": [
+          "box"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
       }
     },
     {
@@ -36,72 +72,44 @@
       "qty": 1,
       "catalog_ref": null,
       "spatial": {
-        "origin_m": [0, 0, 0.06],
-        "rpy_rad": [0, 0, 0],
-        "primitive": { "kind": "cylinder", "radius": 0.04, "height": 0.08 },
+        "origin_m": [
+          0,
+          0,
+          0.06
+        ],
+        "rpy_rad": [
+          0,
+          0,
+          0
+        ],
+        "primitive": {
+          "kind": "cylinder",
+          "radius": 0.04,
+          "height": 0.08
+        },
         "assembly_stage": 2,
-        "explosion_vector": [0, 0, -1],
+        "explosion_vector": [
+          0,
+          0,
+          -1
+        ],
         "explosion_distance_m": 0.08,
         "radial_group": "base",
         "parent_axis": "datum.j1",
         "service_path": []
       },
       "provenance": {
-        "class": "GENERATED", "created_by": "cad-designer", "reason": "Yaw pedestal.",
-        "requirement_ids": [], "agent_id": "cad-designer", "tools": ["cylinder"], "evidence_ids": [],
-        "revision_id": "rev.0001", "user_approved": true
-      }
-    },
-    {
-      "id": "part.shoulder.housing",
-      "name": "Shoulder housing",
-      "parent": "asm.shoulder",
-      "system": "sys.arm",
-      "material": "mat.al6061",
-      "semantic_role": "shoulder_housing",
-      "qty": 1,
-      "catalog_ref": null,
-      "spatial": {
-        "origin_m": [0, 0, 0.145],
-        "rpy_rad": [0, 0, 0],
-        "primitive": { "kind": "box", "sx": 0.14, "sy": 0.10, "sz": 0.09 },
-        "assembly_stage": 3,
-        "explosion_vector": [0, 0.4, 1],
-        "explosion_distance_m": 0.16,
-        "radial_group": "shoulder",
-        "parent_axis": "datum.j2",
-        "service_path": [[0, 0, 0.145], [0, 0.2, 0.145]]
-      },
-      "provenance": {
-        "class": "GENERATED", "created_by": "cad-designer", "reason": "ShoulderHousing semantic body.",
-        "requirement_ids": ["req.service"], "agent_id": "cad-designer", "tools": ["box"], "evidence_ids": [],
-        "revision_id": "rev.0001", "user_approved": true
-      }
-    },
-    {
-      "id": "part.shoulder.shaft",
-      "name": "Shoulder pitch shaft",
-      "parent": "asm.shoulder",
-      "system": "sys.arm",
-      "material": "mat.steel",
-      "semantic_role": "joint_axis",
-      "qty": 1,
-      "catalog_ref": "BEARING-PLACEHOLDER",
-      "spatial": {
-        "origin_m": [0.0, 0.0, 0.20],
-        "rpy_rad": [1.5708, 0, 0],
-        "primitive": { "kind": "cylinder", "radius": 0.018, "height": 0.12 },
-        "assembly_stage": 4,
-        "explosion_vector": [0, 1, 0],
-        "explosion_distance_m": 0.18,
-        "radial_group": "shoulder",
-        "parent_axis": "datum.j2",
-        "service_path": [[0, 0, 0.20], [0, 0.25, 0.20]]
-      },
-      "provenance": {
-        "class": "ASSUMED", "created_by": "components", "reason": "Catalog bearing/shaft placeholder — not a purchased PN.",
-        "requirement_ids": ["req.bearings"], "agent_id": "components", "tools": [], "evidence_ids": [],
-        "revision_id": "rev.0001", "user_approved": true
+        "class": "GENERATED",
+        "created_by": "cad-designer",
+        "reason": "Yaw pedestal.",
+        "requirement_ids": [],
+        "agent_id": "cad-designer",
+        "tools": [
+          "cylinder"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
       }
     },
     {
@@ -114,20 +122,49 @@
       "qty": 1,
       "catalog_ref": null,
       "spatial": {
-        "origin_m": [0.20, 0, 0.20],
-        "rpy_rad": [0, 0, 0],
-        "primitive": { "kind": "box", "sx": 0.40, "sy": 0.05, "sz": 0.05 },
+        "origin_m": [
+          0.2,
+          0,
+          0.2
+        ],
+        "rpy_rad": [
+          0,
+          0,
+          0
+        ],
+        "primitive": {
+          "kind": "box",
+          "sx": 0.4,
+          "sy": 0.05,
+          "sz": 0.05
+        },
         "assembly_stage": 5,
-        "explosion_vector": [1, 0, 0.15],
+        "explosion_vector": [
+          1,
+          0,
+          0.15
+        ],
         "explosion_distance_m": 0.22,
         "radial_group": "arm",
         "parent_axis": "datum.j2",
         "service_path": []
       },
       "provenance": {
-        "class": "GENERATED", "created_by": "cad-designer", "reason": "Parametric link driven by upper_arm.length.",
-        "requirement_ids": ["req.reach"], "agent_id": "cad-designer", "tools": ["box"], "evidence_ids": ["ev.reach-derived"],
-        "revision_id": "rev.0001", "user_approved": true
+        "class": "GENERATED",
+        "created_by": "cad-designer",
+        "reason": "Parametric link driven by upper_arm.length.",
+        "requirement_ids": [
+          "req.reach"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "box"
+        ],
+        "evidence_ids": [
+          "ev.reach-derived"
+        ],
+        "revision_id": "rev.0001",
+        "user_approved": true
       }
     },
     {
@@ -140,20 +177,58 @@
       "qty": 1,
       "catalog_ref": null,
       "spatial": {
-        "origin_m": [0.42, 0, 0.20],
-        "rpy_rad": [0, 0, 0],
-        "primitive": { "kind": "box", "sx": 0.09, "sy": 0.08, "sz": 0.08 },
+        "origin_m": [
+          0.42,
+          0,
+          0.2
+        ],
+        "rpy_rad": [
+          0,
+          0,
+          0
+        ],
+        "primitive": {
+          "kind": "box",
+          "sx": 0.09,
+          "sy": 0.08,
+          "sz": 0.08
+        },
         "assembly_stage": 6,
-        "explosion_vector": [1, 0.2, 0.2],
-        "explosion_distance_m": 0.20,
+        "explosion_vector": [
+          1,
+          0.2,
+          0.2
+        ],
+        "explosion_distance_m": 0.2,
         "radial_group": "arm",
         "parent_axis": "datum.j3",
-        "service_path": [[0.42, 0, 0.20], [0.42, 0.2, 0.20]]
+        "service_path": [
+          [
+            0.42,
+            0,
+            0.2
+          ],
+          [
+            0.42,
+            0.2,
+            0.2
+          ]
+        ]
       },
       "provenance": {
-        "class": "GENERATED", "created_by": "cad-designer", "reason": "Elbow joint body.",
-        "requirement_ids": ["req.service"], "agent_id": "cad-designer", "tools": ["box"], "evidence_ids": [],
-        "revision_id": "rev.0001", "user_approved": true
+        "class": "GENERATED",
+        "created_by": "cad-designer",
+        "reason": "Elbow joint body.",
+        "requirement_ids": [
+          "req.service"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "box"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
       }
     },
     {
@@ -166,20 +241,49 @@
       "qty": 1,
       "catalog_ref": null,
       "spatial": {
-        "origin_m": [0.605, 0, 0.20],
-        "rpy_rad": [0, 0, 0],
-        "primitive": { "kind": "box", "sx": 0.33, "sy": 0.042, "sz": 0.042 },
+        "origin_m": [
+          0.605,
+          0,
+          0.2
+        ],
+        "rpy_rad": [
+          0,
+          0,
+          0
+        ],
+        "primitive": {
+          "kind": "box",
+          "sx": 0.33,
+          "sy": 0.042,
+          "sz": 0.042
+        },
         "assembly_stage": 7,
-        "explosion_vector": [1, 0, 0.1],
+        "explosion_vector": [
+          1,
+          0,
+          0.1
+        ],
         "explosion_distance_m": 0.24,
         "radial_group": "arm",
         "parent_axis": "datum.j3",
         "service_path": []
       },
       "provenance": {
-        "class": "GENERATED", "created_by": "cad-designer", "reason": "Parametric link driven by forearm.length.",
-        "requirement_ids": ["req.reach"], "agent_id": "cad-designer", "tools": ["box"], "evidence_ids": ["ev.reach-derived"],
-        "revision_id": "rev.0001", "user_approved": true
+        "class": "GENERATED",
+        "created_by": "cad-designer",
+        "reason": "Parametric link driven by forearm.length.",
+        "requirement_ids": [
+          "req.reach"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "box"
+        ],
+        "evidence_ids": [
+          "ev.reach-derived"
+        ],
+        "revision_id": "rev.0001",
+        "user_approved": true
       }
     },
     {
@@ -192,20 +296,57 @@
       "qty": 1,
       "catalog_ref": null,
       "spatial": {
-        "origin_m": [0.805, 0, 0.20],
-        "rpy_rad": [0, 1.5708, 0],
-        "primitive": { "kind": "cylinder", "radius": 0.028, "height": 0.07 },
+        "origin_m": [
+          0.805,
+          0,
+          0.2
+        ],
+        "rpy_rad": [
+          0,
+          1.5708,
+          0
+        ],
+        "primitive": {
+          "kind": "cylinder",
+          "radius": 0.028,
+          "height": 0.07
+        },
         "assembly_stage": 8,
-        "explosion_vector": [1, 0, 0],
+        "explosion_vector": [
+          1,
+          0,
+          0
+        ],
         "explosion_distance_m": 0.18,
         "radial_group": "wrist",
         "parent_axis": "datum.j4",
-        "service_path": [[0.805, 0, 0.20], [1.0, 0, 0.20]]
+        "service_path": [
+          [
+            0.805,
+            0,
+            0.2
+          ],
+          [
+            1.0,
+            0,
+            0.2
+          ]
+        ]
       },
       "provenance": {
-        "class": "GENERATED", "created_by": "cad-designer", "reason": "Simplified 3-DOF wrist as one cylinder.",
-        "requirement_ids": ["req.dof"], "agent_id": "cad-designer", "tools": ["cylinder"], "evidence_ids": [],
-        "revision_id": "rev.0001", "user_approved": true
+        "class": "GENERATED",
+        "created_by": "cad-designer",
+        "reason": "Simplified 3-DOF wrist as one cylinder.",
+        "requirement_ids": [
+          "req.dof"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "cylinder"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
       }
     },
     {
@@ -218,20 +359,1339 @@
       "qty": 1,
       "catalog_ref": null,
       "spatial": {
-        "origin_m": [0.86, 0, 0.20],
-        "rpy_rad": [0, 0, 0],
-        "primitive": { "kind": "box", "sx": 0.06, "sy": 0.06, "sz": 0.028 },
+        "origin_m": [
+          0.86,
+          0,
+          0.2
+        ],
+        "rpy_rad": [
+          0,
+          0,
+          0
+        ],
+        "primitive": {
+          "kind": "box",
+          "sx": 0.06,
+          "sy": 0.06,
+          "sz": 0.028
+        },
         "assembly_stage": 9,
-        "explosion_vector": [1, 0, 0],
+        "explosion_vector": [
+          1,
+          0,
+          0
+        ],
         "explosion_distance_m": 0.16,
         "radial_group": "wrist",
         "parent_axis": "datum.j6",
         "service_path": []
       },
       "provenance": {
-        "class": "GENERATED", "created_by": "cad-designer", "reason": "Tool flange placeholder. No gripper.",
-        "requirement_ids": ["req.payload"], "agent_id": "cad-designer", "tools": ["box"], "evidence_ids": [],
-        "revision_id": "rev.0001", "user_approved": true
+        "class": "GENERATED",
+        "created_by": "cad-designer",
+        "reason": "Tool flange placeholder. No gripper.",
+        "requirement_ids": [
+          "req.payload"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "box"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0001",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "part.shoulder.base",
+      "name": "Shoulder base",
+      "parent": "asm.shoulder",
+      "system": "sys.arm",
+      "material": "mat.al6061",
+      "semantic_role": "shoulder_base",
+      "qty": 1,
+      "catalog_ref": null,
+      "component_class": null,
+      "detail_tier": "primary",
+      "spatial": {
+        "origin_m": [
+          0.0,
+          0.0,
+          0.128
+        ],
+        "rpy_rad": [
+          0,
+          0,
+          0
+        ],
+        "primitive": {
+          "kind": "box",
+          "sx": 0.12,
+          "sy": 0.09,
+          "sz": 0.018
+        },
+        "assembly_stage": 3,
+        "explosion_vector": [
+          0,
+          0,
+          -1
+        ],
+        "explosion_distance_m": 0.1,
+        "radial_group": "shoulder",
+        "parent_axis": "datum.j2",
+        "service_path": []
+      },
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "cad-designer",
+        "reason": "Mounting plate between yaw column and pitch housing.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "part.shoulder.housing",
+      "name": "Shoulder housing",
+      "parent": "asm.shoulder",
+      "system": "sys.arm",
+      "material": "mat.al6061",
+      "semantic_role": "shoulder_housing",
+      "qty": 1,
+      "catalog_ref": null,
+      "component_class": null,
+      "detail_tier": "primary",
+      "spatial": {
+        "origin_m": [
+          0.0,
+          0.0,
+          0.2
+        ],
+        "rpy_rad": [
+          0,
+          0,
+          0
+        ],
+        "primitive": {
+          "kind": "box",
+          "sx": 0.155,
+          "sy": 0.096,
+          "sz": 0.11
+        },
+        "assembly_stage": 4,
+        "explosion_vector": [
+          0.25,
+          0,
+          1
+        ],
+        "explosion_distance_m": 0.16,
+        "radial_group": "shoulder",
+        "parent_axis": "datum.j2",
+        "service_path": [
+          [
+            0,
+            0,
+            0.2
+          ],
+          [
+            0,
+            0.22,
+            0.2
+          ]
+        ]
+      },
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "cad-designer",
+        "reason": "Machined housing around the pitch bearing pair.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "part.shoulder.motor",
+      "name": "Shoulder pitch motor envelope",
+      "parent": "asm.shoulder",
+      "system": "sys.arm",
+      "material": "mat.al_anodized",
+      "semantic_role": "motor_envelope",
+      "qty": 1,
+      "catalog_ref": "GENERIC_SERVO_ENVELOPE_60",
+      "component_class": "motor",
+      "detail_tier": "primary",
+      "spatial": {
+        "origin_m": [
+          0.0,
+          -0.132,
+          0.2
+        ],
+        "rpy_rad": [
+          1.5708,
+          0,
+          0
+        ],
+        "primitive": {
+          "kind": "cylinder",
+          "radius": 0.03,
+          "height": 0.075
+        },
+        "assembly_stage": 5,
+        "explosion_vector": [
+          0,
+          -1,
+          0
+        ],
+        "explosion_distance_m": 0.2,
+        "radial_group": "shoulder",
+        "parent_axis": "datum.j2",
+        "service_path": []
+      },
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "components",
+        "reason": "GENERIC servo envelope. Not a catalog motor PN. No winding model.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "part.shoulder.motor_mount",
+      "name": "Motor mount flange",
+      "parent": "asm.shoulder",
+      "system": "sys.arm",
+      "material": "mat.al6061",
+      "semantic_role": "motor_mount",
+      "qty": 1,
+      "catalog_ref": null,
+      "component_class": null,
+      "detail_tier": "primary",
+      "spatial": {
+        "origin_m": [
+          0.0,
+          -0.1,
+          0.2
+        ],
+        "rpy_rad": [
+          1.5708,
+          0,
+          0
+        ],
+        "primitive": {
+          "kind": "cylinder",
+          "radius": 0.038,
+          "height": 0.008
+        },
+        "assembly_stage": 6,
+        "explosion_vector": [
+          0,
+          -1,
+          0
+        ],
+        "explosion_distance_m": 0.14,
+        "radial_group": "shoulder",
+        "parent_axis": "datum.j2",
+        "service_path": []
+      },
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "cad-designer",
+        "reason": "Front mounting flange between motor envelope and gearbox input. Bolt circle is PARAMETRIC_REFERENCE.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "part.shoulder.gearbox",
+      "name": "Reduction gearbox envelope",
+      "parent": "asm.shoulder",
+      "system": "sys.arm",
+      "material": "mat.al_anodized",
+      "semantic_role": "gearbox_envelope",
+      "qty": 1,
+      "catalog_ref": "GENERIC_PLANETARY_ENVELOPE_80",
+      "component_class": "gearbox",
+      "detail_tier": "primary",
+      "spatial": {
+        "origin_m": [
+          0.0,
+          -0.078,
+          0.2
+        ],
+        "rpy_rad": [
+          1.5708,
+          0,
+          0
+        ],
+        "primitive": {
+          "kind": "cylinder",
+          "radius": 0.04,
+          "height": 0.048
+        },
+        "assembly_stage": 6,
+        "explosion_vector": [
+          0,
+          -1,
+          0
+        ],
+        "explosion_distance_m": 0.16,
+        "radial_group": "shoulder",
+        "parent_axis": "datum.j2",
+        "service_path": []
+      },
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "components",
+        "reason": "GENERIC planetary envelope. Internal gears are not modeled.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "part.shoulder.shaft",
+      "name": "Drive shaft",
+      "parent": "asm.shoulder",
+      "system": "sys.arm",
+      "material": "mat.steel",
+      "semantic_role": "drive_shaft",
+      "qty": 1,
+      "catalog_ref": "GENERIC_SHAFT_D20",
+      "component_class": "shaft",
+      "detail_tier": "primary",
+      "spatial": {
+        "origin_m": [
+          0.0,
+          -0.008,
+          0.2
+        ],
+        "rpy_rad": [
+          1.5708,
+          0,
+          0
+        ],
+        "primitive": {
+          "kind": "cylinder",
+          "radius": 0.01,
+          "height": 0.118
+        },
+        "assembly_stage": 7,
+        "explosion_vector": [
+          0,
+          1,
+          0
+        ],
+        "explosion_distance_m": 0.18,
+        "radial_group": "shoulder",
+        "parent_axis": "datum.j2",
+        "service_path": []
+      },
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "cad-designer",
+        "reason": "Journal \u00d820 mm DERIVED from GENERIC_6204 inner diameter.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "part.shoulder.bearing.a",
+      "name": "Pitch bearing A",
+      "parent": "asm.shoulder",
+      "system": "sys.arm",
+      "material": "mat.bearing_steel",
+      "semantic_role": "bearing",
+      "qty": 1,
+      "catalog_ref": "GENERIC_6204_BEARING",
+      "component_class": "bearing",
+      "detail_tier": "primary",
+      "spatial": {
+        "origin_m": [
+          0.0,
+          -0.022,
+          0.2
+        ],
+        "rpy_rad": [
+          1.5708,
+          0,
+          0
+        ],
+        "primitive": {
+          "kind": "cylinder",
+          "radius": 0.0235,
+          "height": 0.014
+        },
+        "assembly_stage": 8,
+        "explosion_vector": [
+          0,
+          -1,
+          0
+        ],
+        "explosion_distance_m": 0.14,
+        "radial_group": "shoulder",
+        "parent_axis": "datum.j2",
+        "service_path": []
+      },
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "components",
+        "reason": "GENERIC_6204 envelope 20\u00d747\u00d714 mm. PARAMETRIC_REFERENCE, not SKF/NSK.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "part.shoulder.bearing.b",
+      "name": "Pitch bearing B",
+      "parent": "asm.shoulder",
+      "system": "sys.arm",
+      "material": "mat.bearing_steel",
+      "semantic_role": "bearing",
+      "qty": 1,
+      "catalog_ref": "GENERIC_6204_BEARING",
+      "component_class": "bearing",
+      "detail_tier": "primary",
+      "spatial": {
+        "origin_m": [
+          0.0,
+          0.022,
+          0.2
+        ],
+        "rpy_rad": [
+          1.5708,
+          0,
+          0
+        ],
+        "primitive": {
+          "kind": "cylinder",
+          "radius": 0.0235,
+          "height": 0.014
+        },
+        "assembly_stage": 9,
+        "explosion_vector": [
+          0,
+          1,
+          0
+        ],
+        "explosion_distance_m": 0.14,
+        "radial_group": "shoulder",
+        "parent_axis": "datum.j2",
+        "service_path": []
+      },
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "components",
+        "reason": "GENERIC_6204 envelope 20\u00d747\u00d714 mm. PARAMETRIC_REFERENCE, not SKF/NSK.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "part.shoulder.spacer",
+      "name": "Bearing spacer",
+      "parent": "asm.shoulder",
+      "system": "sys.arm",
+      "material": "mat.steel",
+      "semantic_role": "spacer",
+      "qty": 1,
+      "catalog_ref": null,
+      "component_class": "spacer",
+      "detail_tier": "primary",
+      "spatial": {
+        "origin_m": [
+          0.0,
+          0.0,
+          0.2
+        ],
+        "rpy_rad": [
+          1.5708,
+          0,
+          0
+        ],
+        "primitive": {
+          "kind": "cylinder",
+          "radius": 0.016,
+          "height": 0.016
+        },
+        "assembly_stage": 10,
+        "explosion_vector": [
+          0,
+          0.2,
+          0
+        ],
+        "explosion_distance_m": 0.1,
+        "radial_group": "shoulder",
+        "parent_axis": "datum.j2",
+        "service_path": []
+      },
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "cad-designer",
+        "reason": "Axial spacer between bearing inner rings.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "part.shoulder.retainer.a",
+      "name": "Bearing retainer A",
+      "parent": "asm.shoulder",
+      "system": "sys.arm",
+      "material": "mat.steel_black_oxide",
+      "semantic_role": "bearing_retainer",
+      "qty": 1,
+      "catalog_ref": null,
+      "component_class": null,
+      "detail_tier": "primary",
+      "spatial": {
+        "origin_m": [
+          0.0,
+          -0.032,
+          0.2
+        ],
+        "rpy_rad": [
+          1.5708,
+          0,
+          0
+        ],
+        "primitive": {
+          "kind": "cylinder",
+          "radius": 0.027,
+          "height": 0.003
+        },
+        "assembly_stage": 11,
+        "explosion_vector": [
+          0,
+          -1,
+          0
+        ],
+        "explosion_distance_m": 0.12,
+        "radial_group": "shoulder",
+        "parent_axis": "datum.j2",
+        "service_path": []
+      },
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "cad-designer",
+        "reason": "Retention ring outboard of bearing A.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "part.shoulder.retainer.b",
+      "name": "Bearing retainer B",
+      "parent": "asm.shoulder",
+      "system": "sys.arm",
+      "material": "mat.steel_black_oxide",
+      "semantic_role": "bearing_retainer",
+      "qty": 1,
+      "catalog_ref": null,
+      "component_class": null,
+      "detail_tier": "primary",
+      "spatial": {
+        "origin_m": [
+          0.0,
+          0.032,
+          0.2
+        ],
+        "rpy_rad": [
+          1.5708,
+          0,
+          0
+        ],
+        "primitive": {
+          "kind": "cylinder",
+          "radius": 0.027,
+          "height": 0.003
+        },
+        "assembly_stage": 12,
+        "explosion_vector": [
+          0,
+          1,
+          0
+        ],
+        "explosion_distance_m": 0.12,
+        "radial_group": "shoulder",
+        "parent_axis": "datum.j2",
+        "service_path": []
+      },
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "cad-designer",
+        "reason": "Retention ring outboard of bearing B.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "part.shoulder.mount.upper",
+      "name": "Upper arm mount",
+      "parent": "asm.shoulder",
+      "system": "sys.arm",
+      "material": "mat.al6061",
+      "semantic_role": "upper_arm_mount",
+      "qty": 1,
+      "catalog_ref": null,
+      "component_class": null,
+      "detail_tier": "primary",
+      "spatial": {
+        "origin_m": [
+          0.084,
+          0.0,
+          0.2
+        ],
+        "rpy_rad": [
+          0,
+          0,
+          0
+        ],
+        "primitive": {
+          "kind": "box",
+          "sx": 0.014,
+          "sy": 0.07,
+          "sz": 0.07
+        },
+        "assembly_stage": 13,
+        "explosion_vector": [
+          1,
+          0,
+          0
+        ],
+        "explosion_distance_m": 0.16,
+        "radial_group": "shoulder",
+        "parent_axis": "datum.j2",
+        "service_path": []
+      },
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "cad-designer",
+        "reason": "Interface plate from pitch shaft/housing to the upper-arm link.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "part.shoulder.cover",
+      "name": "Service cover",
+      "parent": "asm.shoulder",
+      "system": "sys.arm",
+      "material": "mat.al6061",
+      "semantic_role": "service_cover",
+      "qty": 1,
+      "catalog_ref": null,
+      "component_class": null,
+      "detail_tier": "primary",
+      "spatial": {
+        "origin_m": [
+          0.0,
+          0.0,
+          0.258
+        ],
+        "rpy_rad": [
+          0,
+          0,
+          0
+        ],
+        "primitive": {
+          "kind": "box",
+          "sx": 0.1,
+          "sy": 0.07,
+          "sz": 0.005
+        },
+        "assembly_stage": 14,
+        "explosion_vector": [
+          0,
+          0,
+          1
+        ],
+        "explosion_distance_m": 0.14,
+        "radial_group": "shoulder",
+        "parent_axis": "datum.j2",
+        "service_path": [
+          [
+            0,
+            0,
+            0.258
+          ],
+          [
+            0,
+            0,
+            0.4
+          ]
+        ]
+      },
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "cad-designer",
+        "reason": "Removable cover for bearing/service access.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "part.shoulder.grommet",
+      "name": "Cable passage grommet",
+      "parent": "asm.shoulder",
+      "system": "sys.arm",
+      "material": "mat.rubber",
+      "semantic_role": "cable_passage",
+      "qty": 1,
+      "catalog_ref": null,
+      "component_class": "grommet",
+      "detail_tier": "primary",
+      "spatial": {
+        "origin_m": [
+          -0.082,
+          0.0,
+          0.2
+        ],
+        "rpy_rad": [
+          0,
+          1.5708,
+          0
+        ],
+        "primitive": {
+          "kind": "cylinder",
+          "radius": 0.008,
+          "height": 0.012
+        },
+        "assembly_stage": 15,
+        "explosion_vector": [
+          -1,
+          0,
+          0
+        ],
+        "explosion_distance_m": 0.1,
+        "radial_group": "shoulder",
+        "parent_axis": "datum.j2",
+        "service_path": []
+      },
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "cad-designer",
+        "reason": "Cable passage through the housing wall. Not a harness model.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "part.shoulder.encoder_mount",
+      "name": "Encoder mount",
+      "parent": "asm.shoulder",
+      "system": "sys.arm",
+      "material": "mat.al6061",
+      "semantic_role": "encoder_mount",
+      "qty": 1,
+      "catalog_ref": null,
+      "component_class": null,
+      "detail_tier": "primary",
+      "spatial": {
+        "origin_m": [
+          0.0,
+          -0.176,
+          0.2
+        ],
+        "rpy_rad": [
+          0,
+          0,
+          0
+        ],
+        "primitive": {
+          "kind": "box",
+          "sx": 0.04,
+          "sy": 0.006,
+          "sz": 0.04
+        },
+        "assembly_stage": 16,
+        "explosion_vector": [
+          0,
+          -1,
+          0
+        ],
+        "explosion_distance_m": 0.18,
+        "radial_group": "shoulder",
+        "parent_axis": "datum.j2",
+        "service_path": []
+      },
+      "provenance": {
+        "class": "GENERATED",
+        "created_by": "cad-designer",
+        "reason": "Rear plate for a GENERIC encoder envelope. Encoder itself is not a purchased PN.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "cad-designer",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "part.shoulder.bolt.cover.1",
+      "name": "Cover bolt 1",
+      "parent": "asm.shoulder",
+      "system": "sys.arm",
+      "material": "mat.steel_black_oxide",
+      "semantic_role": "fastener",
+      "qty": 1,
+      "catalog_ref": "GENERIC_SHCS_M4",
+      "component_class": "bolt",
+      "detail_tier": "instance",
+      "spatial": {
+        "origin_m": [
+          -0.038,
+          -0.024,
+          0.266
+        ],
+        "rpy_rad": [
+          0,
+          0,
+          0
+        ],
+        "primitive": {
+          "kind": "cylinder",
+          "radius": 0.002,
+          "height": 0.012
+        },
+        "assembly_stage": 17,
+        "explosion_vector": [
+          0,
+          0,
+          1
+        ],
+        "explosion_distance_m": 0.08,
+        "radial_group": "shoulder",
+        "parent_axis": "datum.j2",
+        "service_path": []
+      },
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "components",
+        "reason": "Cosmetic M4 SHCS analog. Thread is THREAD_REFERENCE.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "part.shoulder.bolt.cover.2",
+      "name": "Cover bolt 2",
+      "parent": "asm.shoulder",
+      "system": "sys.arm",
+      "material": "mat.steel_black_oxide",
+      "semantic_role": "fastener",
+      "qty": 1,
+      "catalog_ref": "GENERIC_SHCS_M4",
+      "component_class": "bolt",
+      "detail_tier": "instance",
+      "spatial": {
+        "origin_m": [
+          0.038,
+          -0.024,
+          0.266
+        ],
+        "rpy_rad": [
+          0,
+          0,
+          0
+        ],
+        "primitive": {
+          "kind": "cylinder",
+          "radius": 0.002,
+          "height": 0.012
+        },
+        "assembly_stage": 17,
+        "explosion_vector": [
+          0,
+          0,
+          1
+        ],
+        "explosion_distance_m": 0.08,
+        "radial_group": "shoulder",
+        "parent_axis": "datum.j2",
+        "service_path": []
+      },
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "components",
+        "reason": "Cosmetic M4 SHCS analog. Thread is THREAD_REFERENCE.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "part.shoulder.bolt.cover.3",
+      "name": "Cover bolt 3",
+      "parent": "asm.shoulder",
+      "system": "sys.arm",
+      "material": "mat.steel_black_oxide",
+      "semantic_role": "fastener",
+      "qty": 1,
+      "catalog_ref": "GENERIC_SHCS_M4",
+      "component_class": "bolt",
+      "detail_tier": "instance",
+      "spatial": {
+        "origin_m": [
+          0.038,
+          0.024,
+          0.266
+        ],
+        "rpy_rad": [
+          0,
+          0,
+          0
+        ],
+        "primitive": {
+          "kind": "cylinder",
+          "radius": 0.002,
+          "height": 0.012
+        },
+        "assembly_stage": 17,
+        "explosion_vector": [
+          0,
+          0,
+          1
+        ],
+        "explosion_distance_m": 0.08,
+        "radial_group": "shoulder",
+        "parent_axis": "datum.j2",
+        "service_path": []
+      },
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "components",
+        "reason": "Cosmetic M4 SHCS analog. Thread is THREAD_REFERENCE.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "part.shoulder.bolt.cover.4",
+      "name": "Cover bolt 4",
+      "parent": "asm.shoulder",
+      "system": "sys.arm",
+      "material": "mat.steel_black_oxide",
+      "semantic_role": "fastener",
+      "qty": 1,
+      "catalog_ref": "GENERIC_SHCS_M4",
+      "component_class": "bolt",
+      "detail_tier": "instance",
+      "spatial": {
+        "origin_m": [
+          -0.038,
+          0.024,
+          0.266
+        ],
+        "rpy_rad": [
+          0,
+          0,
+          0
+        ],
+        "primitive": {
+          "kind": "cylinder",
+          "radius": 0.002,
+          "height": 0.012
+        },
+        "assembly_stage": 17,
+        "explosion_vector": [
+          0,
+          0,
+          1
+        ],
+        "explosion_distance_m": 0.08,
+        "radial_group": "shoulder",
+        "parent_axis": "datum.j2",
+        "service_path": []
+      },
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "components",
+        "reason": "Cosmetic M4 SHCS analog. Thread is THREAD_REFERENCE.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "part.shoulder.bolt.base.1",
+      "name": "Housing base bolt 1",
+      "parent": "asm.shoulder",
+      "system": "sys.arm",
+      "material": "mat.steel_black_oxide",
+      "semantic_role": "fastener",
+      "qty": 1,
+      "catalog_ref": "GENERIC_SHCS_M5",
+      "component_class": "bolt",
+      "detail_tier": "instance",
+      "spatial": {
+        "origin_m": [
+          -0.045,
+          -0.032,
+          0.14
+        ],
+        "rpy_rad": [
+          0,
+          0,
+          0
+        ],
+        "primitive": {
+          "kind": "cylinder",
+          "radius": 0.0025,
+          "height": 0.016
+        },
+        "assembly_stage": 18,
+        "explosion_vector": [
+          0,
+          0,
+          -1
+        ],
+        "explosion_distance_m": 0.08,
+        "radial_group": "shoulder",
+        "parent_axis": "datum.j2",
+        "service_path": []
+      },
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "components",
+        "reason": "Cosmetic M5 SHCS analog. Thread is THREAD_REFERENCE.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "part.shoulder.bolt.base.2",
+      "name": "Housing base bolt 2",
+      "parent": "asm.shoulder",
+      "system": "sys.arm",
+      "material": "mat.steel_black_oxide",
+      "semantic_role": "fastener",
+      "qty": 1,
+      "catalog_ref": "GENERIC_SHCS_M5",
+      "component_class": "bolt",
+      "detail_tier": "instance",
+      "spatial": {
+        "origin_m": [
+          0.045,
+          -0.032,
+          0.14
+        ],
+        "rpy_rad": [
+          0,
+          0,
+          0
+        ],
+        "primitive": {
+          "kind": "cylinder",
+          "radius": 0.0025,
+          "height": 0.016
+        },
+        "assembly_stage": 18,
+        "explosion_vector": [
+          0,
+          0,
+          -1
+        ],
+        "explosion_distance_m": 0.08,
+        "radial_group": "shoulder",
+        "parent_axis": "datum.j2",
+        "service_path": []
+      },
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "components",
+        "reason": "Cosmetic M5 SHCS analog. Thread is THREAD_REFERENCE.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "part.shoulder.bolt.base.3",
+      "name": "Housing base bolt 3",
+      "parent": "asm.shoulder",
+      "system": "sys.arm",
+      "material": "mat.steel_black_oxide",
+      "semantic_role": "fastener",
+      "qty": 1,
+      "catalog_ref": "GENERIC_SHCS_M5",
+      "component_class": "bolt",
+      "detail_tier": "instance",
+      "spatial": {
+        "origin_m": [
+          0.045,
+          0.032,
+          0.14
+        ],
+        "rpy_rad": [
+          0,
+          0,
+          0
+        ],
+        "primitive": {
+          "kind": "cylinder",
+          "radius": 0.0025,
+          "height": 0.016
+        },
+        "assembly_stage": 18,
+        "explosion_vector": [
+          0,
+          0,
+          -1
+        ],
+        "explosion_distance_m": 0.08,
+        "radial_group": "shoulder",
+        "parent_axis": "datum.j2",
+        "service_path": []
+      },
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "components",
+        "reason": "Cosmetic M5 SHCS analog. Thread is THREAD_REFERENCE.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
+      }
+    },
+    {
+      "id": "part.shoulder.bolt.base.4",
+      "name": "Housing base bolt 4",
+      "parent": "asm.shoulder",
+      "system": "sys.arm",
+      "material": "mat.steel_black_oxide",
+      "semantic_role": "fastener",
+      "qty": 1,
+      "catalog_ref": "GENERIC_SHCS_M5",
+      "component_class": "bolt",
+      "detail_tier": "instance",
+      "spatial": {
+        "origin_m": [
+          -0.045,
+          0.032,
+          0.14
+        ],
+        "rpy_rad": [
+          0,
+          0,
+          0
+        ],
+        "primitive": {
+          "kind": "cylinder",
+          "radius": 0.0025,
+          "height": 0.016
+        },
+        "assembly_stage": 18,
+        "explosion_vector": [
+          0,
+          0,
+          -1
+        ],
+        "explosion_distance_m": 0.08,
+        "radial_group": "shoulder",
+        "parent_axis": "datum.j2",
+        "service_path": []
+      },
+      "provenance": {
+        "class": "ASSUMED",
+        "created_by": "components",
+        "reason": "Cosmetic M5 SHCS analog. Thread is THREAD_REFERENCE.",
+        "requirement_ids": [
+          "req.bearings",
+          "req.service"
+        ],
+        "agent_id": "components",
+        "tools": [
+          "parametric_generator"
+        ],
+        "evidence_ids": [],
+        "revision_id": "rev.0002",
+        "user_approved": true
       }
     }
   ]

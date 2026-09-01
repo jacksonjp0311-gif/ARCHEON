@@ -33,6 +33,44 @@ def test_stl_has_facets(tmp_path: Path):
     assert text.count("facet normal") == 12
 
 
+def test_tube_step_is_brep(tmp_path: Path):
+    from archeon_cad.step_writer import write_tube_step
+
+    p = tmp_path / "tube.step"
+    write_tube_step(str(p), 0.01, 0.02, 0.04, "demo_tube")
+    text = p.read_text(encoding="ascii")
+    assert "ISO-10303-21" in text
+    assert "CYLINDRICAL_SURFACE" in text
+    assert "MANIFOLD_SOLID_BREP" in text
+
+
+def test_kernel_applies_bearing_seat_as_tube(tmp_path: Path):
+    doc = {
+        "parts": [
+            {
+                "id": "part.demo.spacer",
+                "material": "mat.steel",
+                "spatial": {"primitive": {"kind": "cylinder", "radius": 0.016, "height": 0.016}},
+            }
+        ],
+        "features": [
+            {
+                "id": "feat.demo.bore",
+                "part": "part.demo.spacer",
+                "kind": "bearing_seat",
+                "params": {"inner_r_m": 0.010, "diameter_m": 0.020},
+            }
+        ],
+        "materials": [{"id": "mat.steel", "density_kg_m3": 7850}],
+    }
+    out = tmp_path / "gen"
+    result = PrimitiveKernelAdapter().regenerate(doc, out)
+    rec = result["parts"][0]
+    assert "tube" in rec["applied_features"]
+    assert rec["exact"] is True
+    assert Path(rec["step"]).exists()
+
+
 def test_kernel_regenerate_from_minimal_doc(tmp_path: Path):
     doc = {
         "parts": [

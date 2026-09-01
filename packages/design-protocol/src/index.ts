@@ -74,10 +74,10 @@ export interface Requirement {
 
 export const LOCAL_COMMANDS = [
   'give me the shoulder',
-  'break it apart',
-  'show connections',
-  'make the arm 50 mm longer',
-  'try three versions',
+  'open the shoulder',
+  'show me the internal stack',
+  'show the load-carrying interfaces',
+  'make it detailed',
   'put it back together',
   'run the checks',
   'clear selection'
@@ -101,4 +101,44 @@ export function neighborhoodOf(
   }
   out.delete(id);
   return [...out];
+}
+
+/** 1-hop interface graph around a part, port, interface, or assembly (via child parts). */
+export function localInterfaceGraph(
+  selectedId: string | null,
+  parts: { id: string; parent: string | null }[],
+  ports: { id: string; host: string }[],
+  interfaces: { id: string; a: string; b: string }[]
+): { hostIds: Set<string>; portIds: Set<string>; ifaceIds: Set<string> } {
+  const hostIds = new Set<string>();
+  const portIds = new Set<string>();
+  const ifaceIds = new Set<string>();
+  if (!selectedId) return { hostIds, portIds, ifaceIds };
+  const seeds = new Set<string>([selectedId]);
+  for (const p of parts) {
+    if (p.parent === selectedId || p.id === selectedId) seeds.add(p.id);
+  }
+  for (const port of ports) {
+    if (seeds.has(port.host) || seeds.has(port.id)) {
+      seeds.add(port.host);
+      portIds.add(port.id);
+    }
+  }
+  for (const iface of interfaces) {
+    const aHost = ports.find((p) => p.id === iface.a)?.host;
+    const bHost = ports.find((p) => p.id === iface.b)?.host;
+    const hit =
+      seeds.has(iface.id) ||
+      seeds.has(iface.a) ||
+      seeds.has(iface.b) ||
+      (aHost != null && seeds.has(aHost)) ||
+      (bHost != null && seeds.has(bHost));
+    if (!hit) continue;
+    ifaceIds.add(iface.id);
+    if (aHost) hostIds.add(aHost);
+    if (bHost) hostIds.add(bHost);
+    portIds.add(iface.a);
+    portIds.add(iface.b);
+  }
+  return { hostIds, portIds, ifaceIds };
 }

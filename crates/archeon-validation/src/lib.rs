@@ -46,6 +46,7 @@ pub fn validate(doc: &DesignDocument) -> Report {
     mate_refs(doc, &mut findings);
     orphan_features(doc, &mut findings);
     requirement_refs(doc, &mut findings);
+    engineering_heuristics(doc, &mut findings);
     let error_count = findings
         .iter()
         .filter(|f| matches!(f.severity, Severity::Error | Severity::Fatal))
@@ -222,6 +223,341 @@ fn orphan_features(doc: &DesignDocument, out: &mut Vec<Finding>) {
     }
 }
 
+fn engineering_heuristics(doc: &DesignDocument, out: &mut Vec<Finding>) {
+    missing_interfaces(doc, out);
+    orphan_parts(doc, out);
+    unsupported_feature_claims(doc, out);
+    bearing_seat_mismatch(doc, out);
+    shaft_bearing_mismatch(doc, out);
+    missing_fasteners(doc, out);
+    envelope_overlap(doc, out);
+    failed_cad_hints(doc, out);
+}
+
+fn missing_interfaces(doc: &DesignDocument, out: &mut Vec<Finding>) {
+    let mut used: BTreeSet<String> = BTreeSet::new();
+    for i in &doc.interfaces {
+        used.insert(i.a.0.clone());
+        used.insert(i.b.0.clone());
+    }
+    for p in &doc.ports {
+        if !used.contains(&p.id.0) {
+            push(
+                out,
+                Severity::Warning,
+                "missing_interface",
+                Some(p.id.as_str()),
+                "port has no interface (heuristic — may be intentional service/access)",
+            );
+        }
+    }
+}
+
+fn orphan_parts(doc: &DesignDocument, out: &mut Vec<Finding>) {
+    let child: BTreeSet<_> = doc
+        .assemblies
+        .iter()
+        .flat_map(|a| a.children.iter().map(|c| c.0.clone()))
+        .collect();
+    for p in &doc.parts {
+        if !child.contains(&p.id.0) {
+            push(
+                out,
+                Severity::Warning,
+                "orphan_part",
+                Some(p.id.as_str()),
+                "part is not listed in any assembly.children",
+            );
+        }
+    }
+}
+
+fn unsupported_feature_claims(doc: &DesignDocument, out: &mut Vec<Finding>) {
+    use archeon_design_ir::KernelGeometry;
+    for f in &doc.features {
+        if f.kind.kernel_geometry() == KernelGeometry::SemanticOnly {
+            push(
+                out,
+                Severity::Info,
+                "unsupported_component_feature",
+                Some(f.id.as_str()),
+                &format!(
+                    "{:?} is stored on DesignIR; primitive kernel does not author this solid",
+                    f.kind
+                ),
+            );
+        }
+    }
+}
+
+fn f64_param(f: &archeon_design_ir::Feature, keys: &[&str]) -> Option<f64> {
+    for k in keys {
+        if let Some(v) = f.params.get(*k) {
+            if let Some(n) = v.as_f64() {
+                return Some(n);
+            }
+        }
+    }
+    None
+}
+
+fn bearing_seat_mismatch(doc: &DesignDocument, out: &mut Vec<Finding>) {
+    let seats: Vec<_> = doc
+        .features
+        .iter()
+        .filter(|f| {
+            matches!(
+                f.kind,
+                archeon_design_ir::FeatureKind::BearingSeat | archeon_design_ir::FeatureKind::Hole
+            ) && (f.semantic_role.contains("bearing")
+                || f.kind == archeon_design_ir::FeatureKind::BearingSeat)
+        })
+        .collect();
+    let bearings: Vec<_> = doc
+        .parts
+        .iter()
+        .filter(|p| {
+            p.component_class.as_deref() == Some("bearing")
+                || p.semantic_role.contains("bearing")
+                || p.catalog_ref.as_deref().unwrap_or("").contains("BEARING")
+                || p.catalog_ref.as_deref().unwrap_or("").contains("6204")
+        })
+        .collect();
+    for seat in seats {
+        let seat_d = f64_param(seat, &["diameter_m", "bearing_od_m"]);
+        for b in &bearings {
+            if let archeon_design_ir::Primitive::Cylinder { radius, .. } = b.spatial.primitive {
+                let od = radius * 2.0;
+                if let Some(sd) = seat_d {
+                    if (sd - od).abs() > 0.0006 {
+                        push(
+                            out,
+                            Severity::Warning,
+                            "bearing_seat_mismatch",
+                            Some(seat.id.as_str()),
+                            &format!(
+                                "seat diameter {sd:.5} m vs bearing OD {od:.5} m (heuristic AABB/param, not a qualified H7/g6)"
+                            ),
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn shaft_bearing_mismatch(doc: &DesignDocument, out: &mut Vec<Finding>) {
+    let shafts: Vec<_> = doc
+        .parts
+        .iter()
+        .filter(|p| {
+            p.semantic_role.contains("shaft") || p.component_class.as_deref() == Some("shaft")
+        })
+        .collect();
+    let bearings: Vec<_> = doc
+        .parts
+        .iter()
+        .filter(|p| {
+            p.component_class.as_deref() == Some("bearing") || p.semantic_role.contains("bearing")
+        })
+        .collect();
+    for s in shafts {
+        let journal = match s.spatial.primitive {
+            archeon_design_ir::Primitive::Cylinder { radius, .. } => radius * 2.0,
+            _ => continue,
+        };
+        for b in &bearings {
+            if let Some(lib) = doc.component_library.iter().find(|c| {
+                Some(c.designation.as_str()) == s.catalog_ref.as_deref()
+                    || Some(c.designation.as_str()) == b.catalog_ref.as_deref()
+            }) {
+                if let Some(id) = lib.params.get("inner_diameter_m") {
+                    if (journal - *id).abs() > 0.0006 {
+                        push(
+                            out,
+                            Severity::Warning,
+                            "shaft_bearing_mismatch",
+                            Some(s.id.as_str()),
+                            &format!(
+                                "shaft journal {journal:.5} m vs library ID {id:.5} m — HEURISTIC, not a measured fit"
+                            ),
+                        );
+                    }
+                }
+            } else if let archeon_design_ir::Primitive::Cylinder { radius, .. } =
+                b.spatial.primitive
+            {
+                // envelope OD is not ID; skip unless catalog params exist
+                let _ = radius;
+            }
+        }
+        for fit in &doc.fit_relations {
+            if fit.quantity.contains("journal") || fit.quantity.contains("shaft") {
+                if (fit.a_value_m - fit.b_value_m).abs() > 0.0006
+                    && fit.origin != archeon_design_ir::FitOrigin::Assumed
+                {
+                    // labeled mismatch with non-assumed origin
+                    if (fit.a.0 == s.id.0 || fit.b.0 == s.id.0)
+                        && (fit.a_value_m - journal).abs() > 0.0006
+                        && (fit.b_value_m - journal).abs() > 0.0006
+                    {
+                        push(
+                            out,
+                            Severity::Warning,
+                            "shaft_bearing_mismatch",
+                            Some(fit.id.as_str()),
+                            "fit relation values do not match shaft envelope (heuristic)",
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn missing_fasteners(doc: &DesignDocument, out: &mut Vec<Finding>) {
+    if doc.fastener_groups.is_empty() {
+        let covers = doc
+            .parts
+            .iter()
+            .any(|p| p.semantic_role.contains("cover") || p.semantic_role.contains("flange"));
+        if covers {
+            push(
+                out,
+                Severity::Warning,
+                "missing_fasteners",
+                None,
+                "service/cover parts exist but no FastenerGroup is recorded",
+            );
+        }
+        return;
+    }
+    for g in &doc.fastener_groups {
+        if g.count == 0 || g.instance_ids.is_empty() {
+            push(
+                out,
+                Severity::Warning,
+                "missing_fasteners",
+                Some(g.id.as_str()),
+                "fastener group has no instance parts",
+            );
+        }
+    }
+}
+
+fn envelope_overlap(doc: &DesignDocument, out: &mut Vec<Finding>) {
+    fn aabb(p: &archeon_design_ir::Part) -> ([f64; 3], [f64; 3]) {
+        let bb = p.spatial.primitive.bbox_m();
+        let o = p.spatial.origin_m;
+        (
+            [o[0] - bb[0] / 2.0, o[1] - bb[1] / 2.0, o[2] - bb[2] / 2.0],
+            [o[0] + bb[0] / 2.0, o[1] + bb[1] / 2.0, o[2] + bb[2] / 2.0],
+        )
+    }
+    fn overlap(a: ([f64; 3], [f64; 3]), b: ([f64; 3], [f64; 3])) -> bool {
+        (0..3).all(|i| a.0[i] < b.1[i] && b.0[i] < a.1[i])
+    }
+    let fitted: BTreeSet<(String, String)> = doc
+        .fit_relations
+        .iter()
+        .map(|f| {
+            let mut k = [f.a.0.clone(), f.b.0.clone()];
+            k.sort();
+            (k[0].clone(), k[1].clone())
+        })
+        .collect();
+    let same_parent_ok = |a: &archeon_design_ir::Part, b: &archeon_design_ir::Part| -> bool {
+        a.parent == b.parent
+            && (a.component_class.as_deref() == Some("bearing")
+                || b.component_class.as_deref() == Some("bearing")
+                || a.semantic_role.contains("bearing")
+                || b.semantic_role.contains("bearing")
+                || a.detail_tier == "instance"
+                || b.detail_tier == "instance")
+    };
+    for (i, a) in doc.parts.iter().enumerate() {
+        for b in doc.parts.iter().skip(i + 1) {
+            if a.parent != b.parent {
+                continue;
+            }
+            let mut key = [a.id.0.clone(), b.id.0.clone()];
+            key.sort();
+            if fitted.contains(&(key[0].clone(), key[1].clone())) || same_parent_ok(a, b) {
+                continue;
+            }
+            if overlap(aabb(a), aabb(b)) {
+                // nested designed parts (shaft through housing) are expected
+                let nested = a.semantic_role.contains("housing")
+                    || b.semantic_role.contains("housing")
+                    || a.semantic_role.contains("shaft")
+                    || b.semantic_role.contains("shaft");
+                if nested {
+                    continue;
+                }
+                push(
+                    out,
+                    Severity::Info,
+                    "envelope_overlap",
+                    Some(a.id.as_str()),
+                    &format!(
+                        "AABB overlap with {} — HEURISTIC envelope, not a Boolean interference",
+                        b.id.as_str()
+                    ),
+                );
+            }
+        }
+    }
+}
+
+fn failed_cad_hints(doc: &DesignDocument, out: &mut Vec<Finding>) {
+    for p in &doc.parts {
+        if let Some(cad) = &p.spatial.cad {
+            if cad.note.to_lowercase().contains("fail") {
+                push(
+                    out,
+                    Severity::Error,
+                    "failed_cad_operation",
+                    Some(p.id.as_str()),
+                    "CAD note reports a failed operation",
+                );
+            }
+        }
+        if let archeon_design_ir::Primitive::Box { sx, sy, sz } = p.spatial.primitive {
+            if sx <= 0.0 || sy <= 0.0 || sz <= 0.0 {
+                push(
+                    out,
+                    Severity::Error,
+                    "zero_thickness",
+                    Some(p.id.as_str()),
+                    "box envelope has a non-positive dimension",
+                );
+            }
+        }
+        if let archeon_design_ir::Primitive::Cylinder { radius, height } = p.spatial.primitive {
+            if radius <= 0.0 || height <= 0.0 {
+                push(
+                    out,
+                    Severity::Error,
+                    "zero_thickness",
+                    Some(p.id.as_str()),
+                    "cylinder envelope has a non-positive dimension",
+                );
+            }
+        }
+    }
+    for f in &doc.features {
+        if doc.part(f.part.as_str()).is_none() {
+            push(
+                out,
+                Severity::Error,
+                "invalid_feature_reference",
+                Some(f.id.as_str()),
+                "feature.part does not exist",
+            );
+        }
+    }
+}
+
 fn requirement_refs(doc: &DesignDocument, out: &mut Vec<Finding>) {
     let reqs: BTreeSet<_> = doc.requirements.iter().map(|r| r.id.0.clone()).collect();
     for p in &doc.parts {
@@ -256,6 +592,7 @@ mod tests {
                 branch: "main".into(),
                 kernel: "primitive".into(),
                 domain: "mechanical".into(),
+                fidelity: Default::default(),
                 provenance: Provenance::generated("t", "t"),
             },
             systems: vec![],
@@ -278,6 +615,11 @@ mod tests {
             revisions: vec![],
             parameters: Default::default(),
             assembly_sequence: vec![],
+            fastener_groups: vec![],
+            assembly_plans: vec![],
+            fit_relations: vec![],
+            component_library: vec![],
+            detail_budget: vec![],
         }
     }
 

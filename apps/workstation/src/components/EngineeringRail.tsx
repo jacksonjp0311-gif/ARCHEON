@@ -31,6 +31,7 @@ export function EngineeringRail() {
               else openHud(item.hud);
             }}
           >
+            <span className="glyph">{item.glyph}</span>
             {item.label}
           </button>
         );

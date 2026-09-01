@@ -199,6 +199,8 @@ pub fn create_imported_part(
         semantic_role: "imported_cad".into(),
         qty: 1,
         catalog_ref: None,
+        component_class: None,
+        detail_tier: "primary".into(),
         spatial: Spatial {
             origin_m: [0.0, 0.0, sz / 2.0],
             rpy_rad: [0.0, 0.0, 0.0],

@@ -8,7 +8,9 @@
         "class": "GENERATED",
         "created_by": "architect",
         "reason": "Top-level system.",
-        "requirement_ids": ["req.dof"],
+        "requirement_ids": [
+          "req.dof"
+        ],
         "agent_id": "architect",
         "tools": [],
         "evidence_ids": [],
@@ -23,13 +25,23 @@
       "name": "ARCHEON Arm",
       "parent": null,
       "system": "sys.arm",
-      "children": ["asm.base", "asm.shoulder", "asm.upper_arm", "asm.elbow", "asm.forearm", "asm.wrist", "asm.end_effector"],
+      "children": [
+        "asm.base",
+        "asm.shoulder",
+        "asm.upper_arm",
+        "asm.elbow",
+        "asm.forearm",
+        "asm.wrist",
+        "asm.end_effector"
+      ],
       "semantic_role": "root_machine",
       "provenance": {
         "class": "GENERATED",
         "created_by": "architect",
         "reason": "Root assembly.",
-        "requirement_ids": ["req.dof"],
+        "requirement_ids": [
+          "req.dof"
+        ],
         "agent_id": "architect",
         "tools": [],
         "evidence_ids": [],
@@ -42,7 +54,10 @@
       "name": "BaseAssembly",
       "parent": "asm.arm",
       "system": "sys.arm",
-      "children": ["part.base.plate", "part.base.column"],
+      "children": [
+        "part.base.plate",
+        "part.base.column"
+      ],
       "semantic_role": "fixed_base",
       "provenance": {
         "class": "GENERATED",
@@ -61,17 +76,44 @@
       "name": "ShoulderAssembly",
       "parent": "asm.arm",
       "system": "sys.arm",
-      "children": ["part.shoulder.housing", "part.shoulder.shaft"],
+      "children": [
+        "part.shoulder.base",
+        "part.shoulder.housing",
+        "part.shoulder.motor",
+        "part.shoulder.motor_mount",
+        "part.shoulder.gearbox",
+        "part.shoulder.shaft",
+        "part.shoulder.bearing.a",
+        "part.shoulder.bearing.b",
+        "part.shoulder.spacer",
+        "part.shoulder.retainer.a",
+        "part.shoulder.retainer.b",
+        "part.shoulder.mount.upper",
+        "part.shoulder.cover",
+        "part.shoulder.grommet",
+        "part.shoulder.encoder_mount",
+        "part.shoulder.bolt.cover.1",
+        "part.shoulder.bolt.cover.2",
+        "part.shoulder.bolt.cover.3",
+        "part.shoulder.bolt.cover.4",
+        "part.shoulder.bolt.base.1",
+        "part.shoulder.bolt.base.2",
+        "part.shoulder.bolt.base.3",
+        "part.shoulder.bolt.base.4"
+      ],
       "semantic_role": "joint_1_2",
       "provenance": {
         "class": "GENERATED",
         "created_by": "assembly-designer",
-        "reason": "Yaw + pitch shoulder.",
-        "requirement_ids": ["req.dof", "req.service"],
+        "reason": "Interface-first pitch joint: motor, gearbox, shaft, bearing pair, housing, mount, fasteners, cover.",
+        "requirement_ids": [
+          "req.dof",
+          "req.service"
+        ],
         "agent_id": "assembly-designer",
         "tools": [],
         "evidence_ids": [],
-        "revision_id": "rev.0001",
+        "revision_id": "rev.0002",
         "user_approved": true
       }
     },
@@ -80,13 +122,17 @@
       "name": "UpperArmAssembly",
       "parent": "asm.arm",
       "system": "sys.arm",
-      "children": ["part.upper_arm.tube"],
+      "children": [
+        "part.upper_arm.tube"
+      ],
       "semantic_role": "link_2",
       "provenance": {
         "class": "GENERATED",
         "created_by": "assembly-designer",
         "reason": "Primary reach link.",
-        "requirement_ids": ["req.reach"],
+        "requirement_ids": [
+          "req.reach"
+        ],
         "agent_id": "assembly-designer",
         "tools": [],
         "evidence_ids": [],
@@ -99,13 +145,18 @@
       "name": "ElbowAssembly",
       "parent": "asm.arm",
       "system": "sys.arm",
-      "children": ["part.elbow.housing"],
+      "children": [
+        "part.elbow.housing"
+      ],
       "semantic_role": "joint_3",
       "provenance": {
         "class": "GENERATED",
         "created_by": "assembly-designer",
         "reason": "Elbow pitch.",
-        "requirement_ids": ["req.dof", "req.service"],
+        "requirement_ids": [
+          "req.dof",
+          "req.service"
+        ],
         "agent_id": "assembly-designer",
         "tools": [],
         "evidence_ids": [],
@@ -118,13 +169,17 @@
       "name": "ForearmAssembly",
       "parent": "asm.arm",
       "system": "sys.arm",
-      "children": ["part.forearm.tube"],
+      "children": [
+        "part.forearm.tube"
+      ],
       "semantic_role": "link_3",
       "provenance": {
         "class": "GENERATED",
         "created_by": "assembly-designer",
         "reason": "Second reach link.",
-        "requirement_ids": ["req.reach"],
+        "requirement_ids": [
+          "req.reach"
+        ],
         "agent_id": "assembly-designer",
         "tools": [],
         "evidence_ids": [],
@@ -137,13 +192,17 @@
       "name": "WristAssembly",
       "parent": "asm.arm",
       "system": "sys.arm",
-      "children": ["part.wrist.housing"],
+      "children": [
+        "part.wrist.housing"
+      ],
       "semantic_role": "joints_4_5_6",
       "provenance": {
         "class": "GENERATED",
         "created_by": "assembly-designer",
         "reason": "Spherical wrist stack (simplified as one housing).",
-        "requirement_ids": ["req.dof"],
+        "requirement_ids": [
+          "req.dof"
+        ],
         "agent_id": "assembly-designer",
         "tools": [],
         "evidence_ids": [],
@@ -156,13 +215,17 @@
       "name": "EndEffectorInterface",
       "parent": "asm.arm",
       "system": "sys.arm",
-      "children": ["part.ee.adapter"],
+      "children": [
+        "part.ee.adapter"
+      ],
       "semantic_role": "tool_flange",
       "provenance": {
         "class": "GENERATED",
         "created_by": "assembly-designer",
         "reason": "Tool flange. No gripper designed in Phase 1.",
-        "requirement_ids": ["req.payload"],
+        "requirement_ids": [
+          "req.payload"
+        ],
         "agent_id": "assembly-designer",
         "tools": [],
         "evidence_ids": [],

@@ -321,6 +321,8 @@ fn apply_one(doc: &mut DesignDocument, op: &Operation) -> Result<(), TxError> {
                 semantic_role: semantic_role.clone(),
                 qty: 1,
                 catalog_ref: None,
+                component_class: None,
+                detail_tier: "primary".into(),
                 spatial: Spatial {
                     origin_m: *origin_m,
                     rpy_rad: [0.0, 0.0, 0.0],
@@ -530,6 +532,7 @@ mod tests {
                 branch: "main".into(),
                 kernel: "primitive".into(),
                 domain: "mechanical".into(),
+                fidelity: Default::default(),
                 provenance: Provenance::generated("t", "t"),
             },
             systems: vec![],
@@ -552,6 +555,11 @@ mod tests {
             revisions: vec![],
             parameters: Default::default(),
             assembly_sequence: vec![],
+            fastener_groups: vec![],
+            assembly_plans: vec![],
+            fit_relations: vec![],
+            component_library: vec![],
+            detail_budget: vec![],
         };
         let err = apply_operations(
             &mut doc,
