@@ -1,7 +1,7 @@
 {
   "id": "project.archeon-arm",
   "name": "ARCHEON Arm",
-  "description": "Six-axis benchtop arm. v0.5 ENGINEERING shoulder: interface-first bearing-supported pitch joint. Not a production robot.",
+  "description": "Six-axis benchtop arm benchmark for ARCHEON v0.6.0 executable mechanical intelligence. Not a production robot.",
   "revision_id": "rev.0002",
   "branch": "main",
   "kernel": "primitive",
@@ -9,7 +9,7 @@
   "provenance": {
     "class": "GENERATED",
     "created_by": "archeon.seed",
-    "reason": "Canonical example project for Phase 1 architecture proof.",
+    "reason": "Canonical v0.6 mechanism-generalization benchmark.",
     "requirement_ids": [
       "req.payload",
       "req.reach",

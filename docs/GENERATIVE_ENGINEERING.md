@@ -1,4 +1,4 @@
-# Generative engineering fidelity (v0.5)
+# Executable mechanical intelligence (v0.6.0)
 
 ARCHEON generates **mechanically coherent assemblies**, not decorative sci-fi solids.
 
@@ -9,15 +9,17 @@ requirements → system decomposition → assemblies → interfaces
 
 Engineering coherence first. Visual detail second. A 12-part bearing-supported joint beats 80 meaningless fillets.
 
-## Geometry truth labels
+## Geometry truth classes
 
 | Label | Meaning |
 |---|---|
-| **EXACT** | Kernel authored a real B-rep (STEP). Box, cylinder, tube always. OCCT solids when build123d is installed. |
-| **PARAMETRIC** | Dimensions live on DesignIR features/parameters and drive regeneration. |
-| **PREVIEW** | STL tessellation of the solid, or a preview of a feature the primitive kernel cannot Boolean (box hole, shaft steps, fastener cap head). |
-| **ASSUMED** | A number used to build geometry that is not a measured or standard-class value (wall 8 mm, cover gap 1 mm). |
-| **VISUAL ONLY** | Cosmetic representation (THREAD_REFERENCE, bolt head preview). Not helix BREP. |
+| `EXACT_BREP` | Imported authoritative STEP/BREP artifact. |
+| `EXACT_BREP_TESSELLATION` | Display mesh derived from exact BREP. |
+| `SOURCE_MESH` | Imported STL/glTF/OBJ; source geometry but not BREP. |
+| `GENERATED_EXACT` | Kernel-authored exact solid for all reported applied features. |
+| `GENERATED_PREVIEW` | Incomplete/tessellated generated projection. |
+| `SEMANTIC_ONLY` | Feature exists in DesignIR but no geometry is authored. |
+| `PRIMITIVE_FALLBACK` | DesignIR envelope used because richer geometry is unavailable. |
 
 Three.js boxes/cylinders remain a **viewport fallback envelope** when no STL is attached. They are not the generated design path.
 
@@ -39,6 +41,6 @@ Agents propose. Humans COMMIT.
 
 `MotorOutputPort` and `GearboxInputPort` exist before the solids hope to mate. Fits are labeled `ASSUMED | STANDARD_REFERENCE | USER_SPECIFIED | DERIVED | VALIDATED`. ARCHEON never silently invents an H7/g6.
 
-## Shoulder benchmark
+## Mechanism benchmark
 
-`plan.shoulder` is the in-tree proof: base, housing, motor envelope, gearbox envelope, shaft, GENERIC_6204 pair, retainers, spacer, upper-arm mount, fastener groups, service cover, cable passage, joint axis.
+The shoulder and elbow are resolved from DesignIR names, semantic roles, membership, joints, interfaces, and load paths. The elbow intentionally has no declared bearing support; the runtime reports that fact as `UNVERIFIED` rather than borrowing shoulder knowledge.

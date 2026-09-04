@@ -1,36 +1,36 @@
 import { TREE_TABS, type TreeTab } from '@archeon/spatial-grammar';
 import { Navigator } from './Navigator';
 import { useUi } from '../store';
-import type { Part, Requirement } from '@archeon/design-protocol';
+import type { DesignDocument } from '@archeon/design-protocol';
+import { groupPalette, searchPalette, semanticCatalog } from '../services/palette';
+import { useMemo, useState } from 'react';
 
 const FILTERS = ['ALL', ...TREE_TABS] as const;
 
 interface Props {
-  parts: Part[];
-  assemblies: { id: string; name: string; parent: string | null; semantic_role: string }[];
-  features: { id: string; part: string; kind: string; semantic_role: string }[];
-  interfaces: { id: string; name: string; kind: string; semantic_role: string }[];
-  requirements: Requirement[];
+  document: DesignDocument;
 }
 
 export function ProjectBrowser(props: Props) {
+  const { document } = props;
+  const [query, setQuery] = useState('');
   const filter = useUi((s) => s.browserFilter);
   const setFilter = useUi((s) => s.setBrowserFilter);
   const setTab = useUi((s) => s.setTreeTab);
   const setSelected = useUi((s) => s.setSelected);
+  const setFocus = useUi((s) => s.setFocusId);
+  const results = useMemo(
+    () => groupPalette(searchPalette(query, semanticCatalog(document))),
+    [query, document]
+  );
 
   return (
     <div className="browser">
       <input
         className="browser-search"
         placeholder="filter name or id…"
-        onChange={(e) => {
-          const v = e.target.value.trim().toLowerCase();
-          if (!v) return;
-          const hit = props.parts.find((p) => p.name.toLowerCase().includes(v) || p.id.includes(v))
-            ?? props.assemblies.find((a) => a.name.toLowerCase().includes(v) || a.id.includes(v));
-          if (hit) setSelected(hit.id);
-        }}
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
       />
       <div className="browser-filters">
         {FILTERS.map((f) => (
@@ -43,16 +43,32 @@ export function ProjectBrowser(props: Props) {
           </button>
         ))}
       </div>
-      <div className="browser-tree">
+      {query.trim() ? (
+        <div className="browser-tree semantic-results">
+          {Object.entries(results).map(([kind, items]) => (
+            <section key={kind}>
+              <h3>{kind}</h3>
+              {items.map((item) => (
+                <button key={item.id} type="button" onClick={() => {
+                  if (item.focusId) setFocus(item.focusId);
+                  setSelected(item.id);
+                }}>
+                  <b>{item.label}</b><small>{item.id}</small>
+                </button>
+              ))}
+            </section>
+          ))}
+        </div>
+      ) : <div className="browser-tree">
         <Navigator
           embedded
-          parts={props.parts}
-          assemblies={props.assemblies}
-          features={props.features}
-          interfaces={props.interfaces}
-          requirements={props.requirements}
+          parts={document.parts}
+          assemblies={document.assemblies}
+          features={document.features}
+          interfaces={document.interfaces}
+          requirements={document.requirements}
         />
-      </div>
+      </div>}
       <p className="notes">Filters, not destinations. The machine is the primary surface.</p>
     </div>
   );

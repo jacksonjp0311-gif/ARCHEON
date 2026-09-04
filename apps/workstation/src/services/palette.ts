@@ -1,10 +1,34 @@
-export type PaletteKind = 'PART' | 'ASSEMBLY' | 'FEATURE' | 'JOINT' | 'INTERFACE' | 'REQUIREMENT' | 'ANALYSIS' | 'COMMAND' | 'VIEW' | 'AGENT';
+import type { DesignDocument } from '@archeon/design-protocol';
+
+export type PaletteKind = 'PART' | 'ASSEMBLY' | 'FEATURE' | 'JOINT' | 'INTERFACE' | 'MATE' | 'REQUIREMENT' | 'MATERIAL' | 'ANALYSIS' | 'EVIDENCE' | 'COMMAND' | 'VIEW' | 'AGENT';
 
 export interface PaletteItem {
   id: string;
   label: string;
   kind: PaletteKind;
   hint?: string;
+  /** Geometry to frame while the semantic entity remains selected. */
+  focusId?: string;
+}
+
+export function semanticCatalog(doc: DesignDocument): PaletteItem[] {
+  const hostForPort = (portId: string) => doc.ports.find((port) => port.id === portId)?.host;
+  const focusForInterface = (id: string) => {
+    const iface = doc.interfaces.find((candidate) => candidate.id === id);
+    return iface ? hostForPort(iface.a) ?? hostForPort(iface.b) : undefined;
+  };
+  return [
+    ...doc.parts.map((part) => ({ id: part.id, label: part.name, kind: 'PART' as const, hint: part.semantic_role, focusId: part.id })),
+    ...doc.assemblies.map((assembly) => ({ id: assembly.id, label: assembly.name, kind: 'ASSEMBLY' as const, hint: assembly.semantic_role, focusId: assembly.id })),
+    ...doc.features.map((feature) => ({ id: feature.id, label: feature.semantic_role || feature.id, kind: 'FEATURE' as const, hint: feature.kind, focusId: feature.part })),
+    ...doc.joints.map((joint) => ({ id: joint.id, label: joint.name, kind: 'JOINT' as const, hint: `${joint.joint_type} ${joint.load_role}`, focusId: joint.child })),
+    ...doc.interfaces.map((iface) => ({ id: iface.id, label: iface.name, kind: 'INTERFACE' as const, hint: `${iface.kind} ${iface.semantic_role}`, focusId: focusForInterface(iface.id) })),
+    ...doc.mates.map((mate) => ({ id: mate.id, label: `${mate.kind} mate`, kind: 'MATE' as const, hint: `${mate.state} ${mate.interface}`, focusId: focusForInterface(mate.interface) })),
+    ...doc.requirements.map((req) => ({ id: req.id, label: req.text, kind: 'REQUIREMENT' as const, hint: req.quantity ?? '', focusId: doc.parts.find((part) => part.provenance.requirement_ids.includes(req.id))?.id })),
+    ...doc.materials.map((material) => ({ id: material.id, label: material.name, kind: 'MATERIAL' as const, hint: material.notes, focusId: doc.parts.find((part) => part.material === material.id)?.id })),
+    ...doc.analyses.map((analysis) => ({ id: analysis.id, label: analysis.kind, kind: 'ANALYSIS' as const, hint: `${analysis.status} ${analysis.notes}` })),
+    ...doc.evidence.map((evidence) => ({ id: evidence.id, label: evidence.text, kind: 'EVIDENCE' as const, hint: evidence.kind }))
+  ];
 }
 
 export function searchPalette(q: string, catalog: PaletteItem[]): PaletteItem[] {
@@ -97,5 +121,6 @@ export function objectHudActions(kind: ContextKind): { id: string; label: string
     ];
   }
   const all = contextActions(kind);
-  return all.slice(0, 4).concat(all.length > 4 ? [{ id: 'more', label: 'MORE' }] : []);
+  const visible = all.slice(0, 4).map(({ id, label }) => ({ id, label }));
+  return visible.concat(all.length > 4 ? [{ id: 'more', label: 'MORE' }] : []);
 }

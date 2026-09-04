@@ -15,6 +15,7 @@
 /workers/cad-occt/**/*.pyc
 /workers/cad-occt/.pytest_cache
 /projects/**/generated/
+/projects/**/.preview/
 /benchmarks/results/*.json
 !/benchmarks/results/.gitkeep
 .idea

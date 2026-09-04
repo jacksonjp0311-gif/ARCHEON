@@ -133,12 +133,12 @@ pub fn queue_update_compiler(root: &Path) -> Result<Value, String> {
         command
             .spawn()
             .map_err(|err| format!("start update compiler: {err}"))?;
-        return Ok(json!({
+        Ok(json!({
             "queued": true,
             "phase": "queued-hard-reset",
             "version": version,
             "script": script.display().to_string()
-        }));
+        }))
     }
 
     #[cfg(not(windows))]

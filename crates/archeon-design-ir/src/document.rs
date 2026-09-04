@@ -26,6 +26,8 @@ pub struct DesignDocument {
     #[serde(default)]
     pub mates: Vec<Mate>,
     #[serde(default)]
+    pub joints: Vec<Joint>,
+    #[serde(default)]
     pub constraints: Vec<ConstraintEntity>,
     #[serde(default)]
     pub functions: Vec<FunctionEntity>,
@@ -62,7 +64,7 @@ pub struct DesignDocument {
 }
 
 fn schema() -> String {
-    "0.1.0".into()
+    "0.6.0".into()
 }
 
 impl DesignDocument {
@@ -77,6 +79,7 @@ impl DesignDocument {
         ids.extend(self.ports.iter().map(|e| e.id.clone()));
         ids.extend(self.interfaces.iter().map(|e| e.id.clone()));
         ids.extend(self.mates.iter().map(|e| e.id.clone()));
+        ids.extend(self.joints.iter().map(|e| e.id.clone()));
         ids.extend(self.constraints.iter().map(|e| e.id.clone()));
         ids.extend(self.functions.iter().map(|e| e.id.clone()));
         ids.extend(self.flows.iter().map(|e| e.id.clone()));
@@ -103,6 +106,10 @@ impl DesignDocument {
 
     pub fn part_mut(&mut self, id: &str) -> Option<&mut Part> {
         self.parts.iter_mut().find(|p| p.id.as_str() == id)
+    }
+
+    pub fn joint(&self, id: &str) -> Option<&Joint> {
+        self.joints.iter().find(|joint| joint.id.as_str() == id)
     }
 
     pub fn design_hash(&self) -> String {

@@ -1,5 +1,6 @@
 //! Graph validators. These do not run FEA, collision, or manufacturing simulation.
-use archeon_design_ir::{is_semantic_id, DesignDocument};
+use archeon_design_ir::{is_semantic_id, DesignDocument, JointType};
+use archeon_provenance::ProvenanceClass;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -28,6 +29,29 @@ pub struct Report {
     pub findings: Vec<Finding>,
     pub error_count: usize,
     pub warning_count: usize,
+    #[serde(default)]
+    pub contracts: Vec<ContractResult>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ValidationStatus {
+    Validated,
+    Warning,
+    Assumed,
+    Unverified,
+    Unsupported,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContractResult {
+    pub contract: String,
+    pub status: ValidationStatus,
+    #[serde(default)]
+    pub entity: Option<String>,
+    pub message: String,
+    #[serde(default)]
+    pub evidence: Vec<String>,
 }
 
 impl Report {
@@ -55,11 +79,350 @@ pub fn validate(doc: &DesignDocument) -> Report {
         .iter()
         .filter(|f| f.severity == Severity::Warning)
         .count();
+    let contracts = validation_contracts(doc);
     Report {
         findings,
         error_count,
         warning_count,
+        contracts,
     }
+}
+
+/// Explicit contracts preserve epistemic state. A graph-consistent ASSUMED
+/// relationship remains ASSUMED; it is never promoted by passing heuristics.
+pub fn validation_contracts(doc: &DesignDocument) -> Vec<ContractResult> {
+    let mut results = Vec::new();
+    results.extend(feature_frame_contract(doc));
+    results.extend(joint_contract(doc));
+    results.extend(interface_contract(doc));
+    results.extend(bearing_support_contract(doc));
+    results.extend(fastener_pattern_contract(doc));
+    results.push(assembly_closure_contract(doc));
+    results
+}
+
+fn contract(
+    name: &str,
+    status: ValidationStatus,
+    entity: Option<&str>,
+    message: impl Into<String>,
+    evidence: Vec<String>,
+) -> ContractResult {
+    ContractResult {
+        contract: name.into(),
+        status,
+        entity: entity.map(str::to_owned),
+        message: message.into(),
+        evidence,
+    }
+}
+
+fn feature_frame_contract(doc: &DesignDocument) -> Vec<ContractResult> {
+    doc.features
+        .iter()
+        .map(|feature| {
+            let axis = feature.frame.local.axis;
+            let magnitude = axis.iter().map(|value| value * value).sum::<f64>().sqrt();
+            let finite = feature
+                .frame
+                .local
+                .origin_m
+                .iter()
+                .chain(feature.frame.local.rpy_rad.iter())
+                .chain(axis.iter())
+                .all(|value| value.is_finite());
+            let host_ok = feature.frame.host.as_ref() == Some(&feature.part);
+            let datum_ok = feature
+                .frame
+                .datum_id
+                .as_ref()
+                .is_none_or(|id| doc.datums.iter().any(|datum| datum.id == *id));
+            let valid = finite && host_ok && datum_ok && (magnitude - 1.0).abs() < 1e-6;
+            contract(
+                "FeatureFrameContract",
+                if valid {
+                    ValidationStatus::Validated
+                } else {
+                    ValidationStatus::Warning
+                },
+                Some(feature.id.as_str()),
+                if valid {
+                    "Explicit right-handed Z-up/X-forward meter frame is graph-consistent."
+                } else {
+                    "Feature frame host, datum, finite transform, or unit axis is invalid."
+                },
+                vec![feature.part.0.clone()],
+            )
+        })
+        .collect()
+}
+
+fn joint_contract(doc: &DesignDocument) -> Vec<ContractResult> {
+    let ids = doc.id_set();
+    doc.joints
+        .iter()
+        .map(|joint| {
+            let mag = joint
+                .axis
+                .iter()
+                .map(|value| value * value)
+                .sum::<f64>()
+                .sqrt();
+            let hosts = ids.contains(joint.parent.as_str()) && ids.contains(joint.child.as_str());
+            let limits = joint
+                .limits
+                .as_ref()
+                .is_none_or(|limits| limits.lower <= limits.upper);
+            let dof_valid = joint.dof == joint.dof();
+            let interfaces = joint
+                .interfaces
+                .iter()
+                .all(|id| doc.interfaces.iter().any(|interface| interface.id == *id));
+            let paths = joint
+                .load_path
+                .iter()
+                .chain(&joint.rotating_group)
+                .all(|id| ids.contains(id.as_str()));
+            let parent_axis = joint.parent_frame.axis_in_parent();
+            let child_axis = joint.child_frame.axis_in_parent();
+            let coaxial = parent_axis
+                .iter()
+                .zip(joint.axis)
+                .all(|(a, b)| (a.abs() - b.abs()).abs() < 1e-6)
+                && child_axis
+                    .iter()
+                    .zip(joint.axis)
+                    .all(|(a, b)| (a.abs() - b.abs()).abs() < 1e-6);
+            let graph_valid = hosts
+                && limits
+                && dof_valid
+                && interfaces
+                && paths
+                && coaxial
+                && (mag - 1.0).abs() < 1e-6;
+            let status = if !graph_valid {
+                ValidationStatus::Warning
+            } else if joint.provenance.class == ProvenanceClass::Assumed {
+                ValidationStatus::Assumed
+            } else if joint.provenance.class == ProvenanceClass::Unverified {
+                ValidationStatus::Unverified
+            } else {
+                ValidationStatus::Validated
+            };
+            contract(
+                "JointContract",
+                status,
+                Some(joint.id.as_str()),
+                format!(
+                    "{:?} joint declares DOF {}, axis {:?}, and {} interface(s).",
+                    joint.joint_type,
+                    joint.dof(),
+                    joint.axis,
+                    joint.interfaces.len()
+                ),
+                joint.interfaces.iter().map(|id| id.0.clone()).collect(),
+            )
+        })
+        .collect()
+}
+
+fn interface_contract(doc: &DesignDocument) -> Vec<ContractResult> {
+    let ports: BTreeSet<_> = doc.ports.iter().map(|port| port.id.as_str()).collect();
+    doc.interfaces
+        .iter()
+        .map(|interface| {
+            let valid = interface.a != interface.b
+                && ports.contains(interface.a.as_str())
+                && ports.contains(interface.b.as_str());
+            contract(
+                "InterfaceContract",
+                if valid {
+                    ValidationStatus::Validated
+                } else {
+                    ValidationStatus::Warning
+                },
+                Some(interface.id.as_str()),
+                if valid {
+                    "Both distinct interface endpoints resolve to declared ports."
+                } else {
+                    "Interface endpoints are missing or self-referential."
+                },
+                vec![interface.a.0.clone(), interface.b.0.clone()],
+            )
+        })
+        .collect()
+}
+
+fn bearing_support_contract(doc: &DesignDocument) -> Vec<ContractResult> {
+    doc.joints
+        .iter()
+        .filter(|joint| joint.joint_type != JointType::Fixed)
+        .map(|joint| {
+            let bearings: Vec<_> = joint
+                .load_path
+                .iter()
+                .filter(|id| {
+                    doc.part(id.as_str()).is_some_and(|part| {
+                        part.component_class.as_deref() == Some("bearing")
+                            || part.semantic_role.contains("bearing")
+                    })
+                })
+                .map(|id| id.0.clone())
+                .collect();
+            let has_seat = doc.features.iter().any(|feature| {
+                joint.load_path.contains(&feature.part)
+                    && matches!(feature.kind, archeon_design_ir::FeatureKind::BearingSeat)
+            });
+            let has_journal = doc.features.iter().any(|feature| {
+                joint.load_path.contains(&feature.part)
+                    && (feature.semantic_role.contains("journal")
+                        || matches!(feature.kind, archeon_design_ir::FeatureKind::ShaftStep))
+            });
+            let has_retention = doc.features.iter().any(|feature| {
+                joint.load_path.contains(&feature.part)
+                    && (feature.semantic_role.contains("retention")
+                        || feature.semantic_role.contains("retainer"))
+            });
+            let support_features: Vec<_> = doc
+                .features
+                .iter()
+                .filter(|feature| {
+                    joint.load_path.contains(&feature.part)
+                        && (matches!(
+                            feature.kind,
+                            archeon_design_ir::FeatureKind::BearingSeat
+                                | archeon_design_ir::FeatureKind::ShaftStep
+                        ) || feature.semantic_role.contains("journal")
+                            || feature.semantic_role.contains("retention"))
+                })
+                .collect();
+            let coaxial = support_features.iter().all(|feature| {
+                feature
+                    .frame
+                    .local
+                    .axis_in_parent()
+                    .iter()
+                    .zip(joint.axis)
+                    .all(|(a, b)| (a.abs() - b.abs()).abs() < 1e-6)
+            });
+            let bearing_od = bearings.first().and_then(|id| doc.part(id)).and_then(|part| {
+                if let archeon_design_ir::Primitive::Cylinder { radius, .. } =
+                    part.spatial.primitive
+                {
+                    Some(radius * 2.0)
+                } else {
+                    None
+                }
+            });
+            let seat_matches = bearing_od.is_some_and(|od| {
+                support_features.iter().any(|feature| {
+                    matches!(feature.kind, archeon_design_ir::FeatureKind::BearingSeat)
+                        && f64_param(feature, &["diameter_m", "bearing_od_m"])
+                            .is_some_and(|diameter| (diameter - od).abs() <= 0.0006)
+                })
+            });
+            let bearing_id = doc.features.iter().find_map(|feature| {
+                bearings
+                    .iter()
+                    .any(|id| id == feature.part.as_str())
+                    .then(|| f64_param(feature, &["diameter_m", "inner_diameter_m"]))
+                    .flatten()
+            });
+            let journal_matches = bearing_id.is_some_and(|id| {
+                support_features.iter().any(|feature| {
+                    feature.semantic_role.contains("journal")
+                        && f64_param(feature, &["diameter_m"])
+                            .or_else(|| f64_param(feature, &["radius_m"]).map(|radius| radius * 2.0))
+                            .is_some_and(|diameter| (diameter - id).abs() <= 0.0006)
+                })
+            });
+            let status = if bearings.is_empty() {
+                ValidationStatus::Unverified
+            } else if has_seat
+                && has_journal
+                && has_retention
+                && coaxial
+                && seat_matches
+                && journal_matches
+            {
+                ValidationStatus::Assumed
+            } else {
+                ValidationStatus::Warning
+            };
+            contract(
+                "BearingSupportContract",
+                status,
+                Some(joint.id.as_str()),
+                if bearings.is_empty() {
+                    "No bearing support is declared in this joint load path."
+                } else if has_seat
+                    && has_journal
+                    && has_retention
+                    && coaxial
+                    && seat_matches
+                    && journal_matches
+                {
+                    "Seat, journal, and axial-retention semantics exist; fits remain ASSUMED without measured/catalog evidence."
+                } else {
+                    "Bearing support is incomplete: seat, journal, or axial retention is missing."
+                },
+                bearings,
+            )
+        })
+        .collect()
+}
+
+fn fastener_pattern_contract(doc: &DesignDocument) -> Vec<ContractResult> {
+    doc.fastener_groups
+        .iter()
+        .map(|group| {
+            let complete = group.count as usize == group.instance_ids.len() && group.count > 0;
+            contract(
+                "FastenerPatternContract",
+                if complete {
+                    ValidationStatus::Assumed
+                } else {
+                    ValidationStatus::Warning
+                },
+                Some(group.id.as_str()),
+                if complete {
+                    "Declared instance count matches the pattern; preload and strength are not validated."
+                } else {
+                    "Declared fastener count does not match its instances."
+                },
+                group.instance_ids.iter().map(|id| id.0.clone()).collect(),
+            )
+        })
+        .collect()
+}
+
+fn assembly_closure_contract(doc: &DesignDocument) -> ContractResult {
+    let listed: BTreeSet<_> = doc
+        .assemblies
+        .iter()
+        .flat_map(|assembly| assembly.children.iter().map(|id| id.as_str()))
+        .collect();
+    let missing: Vec<_> = doc
+        .parts
+        .iter()
+        .filter(|part| !listed.contains(part.id.as_str()))
+        .map(|part| part.id.0.clone())
+        .collect();
+    contract(
+        "AssemblyClosureContract",
+        if missing.is_empty() {
+            ValidationStatus::Validated
+        } else {
+            ValidationStatus::Warning
+        },
+        Some(doc.project.id.as_str()),
+        if missing.is_empty() {
+            "Every part is listed in an assembly child set."
+        } else {
+            "One or more parts are outside assembly closure."
+        },
+        missing,
+    )
 }
 
 fn push(
@@ -392,23 +755,22 @@ fn shaft_bearing_mismatch(doc: &DesignDocument, out: &mut Vec<Finding>) {
             }
         }
         for fit in &doc.fit_relations {
-            if fit.quantity.contains("journal") || fit.quantity.contains("shaft") {
-                if (fit.a_value_m - fit.b_value_m).abs() > 0.0006
-                    && fit.origin != archeon_design_ir::FitOrigin::Assumed
+            if (fit.quantity.contains("journal") || fit.quantity.contains("shaft"))
+                && (fit.a_value_m - fit.b_value_m).abs() > 0.0006
+                && fit.origin != archeon_design_ir::FitOrigin::Assumed
+            {
+                // labeled mismatch with non-assumed origin
+                if (fit.a.0 == s.id.0 || fit.b.0 == s.id.0)
+                    && (fit.a_value_m - journal).abs() > 0.0006
+                    && (fit.b_value_m - journal).abs() > 0.0006
                 {
-                    // labeled mismatch with non-assumed origin
-                    if (fit.a.0 == s.id.0 || fit.b.0 == s.id.0)
-                        && (fit.a_value_m - journal).abs() > 0.0006
-                        && (fit.b_value_m - journal).abs() > 0.0006
-                    {
-                        push(
-                            out,
-                            Severity::Warning,
-                            "shaft_bearing_mismatch",
-                            Some(fit.id.as_str()),
-                            "fit relation values do not match shaft envelope (heuristic)",
-                        );
-                    }
+                    push(
+                        out,
+                        Severity::Warning,
+                        "shaft_bearing_mismatch",
+                        Some(fit.id.as_str()),
+                        "fit relation values do not match shaft envelope (heuristic)",
+                    );
                 }
             }
         }
@@ -603,6 +965,7 @@ mod tests {
             ports: vec![],
             interfaces: vec![],
             mates: vec![],
+            joints: vec![],
             constraints: vec![],
             functions: vec![],
             flows: vec![],
@@ -630,6 +993,24 @@ mod tests {
         let doc = archeon_design_ir::load_project_dir(&dir).unwrap();
         let r = validate(&doc);
         assert_eq!(r.error_count, 0, "{:?}", r.findings);
+        let shoulder = r
+            .contracts
+            .iter()
+            .find(|result| {
+                result.contract == "BearingSupportContract"
+                    && result.entity.as_deref() == Some("joint.j2")
+            })
+            .expect("shoulder bearing contract");
+        assert_eq!(shoulder.status, ValidationStatus::Assumed);
+        let elbow = r
+            .contracts
+            .iter()
+            .find(|result| {
+                result.contract == "BearingSupportContract"
+                    && result.entity.as_deref() == Some("joint.j3")
+            })
+            .expect("elbow bearing contract");
+        assert_eq!(elbow.status, ValidationStatus::Unverified);
     }
 
     #[test]
@@ -656,6 +1037,7 @@ mod tests {
             kind: FeatureKind::Box,
             semantic_role: "body".into(),
             params: Default::default(),
+            frame: Default::default(),
             provenance: Provenance::generated("t", "t"),
         });
         let r = validate(&doc);

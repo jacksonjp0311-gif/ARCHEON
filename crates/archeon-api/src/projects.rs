@@ -1,6 +1,6 @@
 //! Project discovery, load, and CAD import. Geometry files are attachments to DesignIR.
 use archeon_design_ir::{
-    load_project_dir, CadRef, DesignDocument, EntityId, Part, Primitive, Spatial,
+    load_project_dir, CadRef, DesignDocument, EntityId, GeometryClass, Part, Primitive, Spatial,
 };
 use archeon_provenance::{Provenance, ProvenanceClass};
 use serde::Serialize;
@@ -73,6 +73,9 @@ pub fn resolve_project_dir(repo: &Path, folder_or_id: &str) -> Option<PathBuf> {
 
 /// Attach generated/imported CAD files onto parts without rewriting the JSON seed.
 pub fn attach_cad_files(doc: &mut DesignDocument, dir: &Path) {
+    let manifest = std::fs::read_to_string(dir.join("generated").join("manifest.json"))
+        .ok()
+        .and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok());
     for part in &mut doc.parts {
         let stem = part.id.as_str().replace('.', "_");
         let gen_stl = dir.join("generated").join(format!("{stem}.stl"));
@@ -82,14 +85,32 @@ pub fn attach_cad_files(doc: &mut DesignDocument, dir: &Path) {
         let cad_glb = dir.join("cad").join(format!("{stem}.glb"));
 
         if gen_step.is_file() {
-            part.spatial.cad = Some(CadRef::attached(
+            let mut cad = CadRef::attached(
                 "step",
                 format!("generated/{stem}.step"),
                 gen_stl.is_file().then(|| format!("generated/{stem}.stl")),
                 "GENERATED",
                 "Kernel STEP. Spatial view uses STL tessellation if present. Frame CAD_LOCAL, world Z-UP, units m. Viewer does not rotate to Y-up.",
                 "GENERATED",
-            ));
+            );
+            if let Some(record) = manifest
+                .as_ref()
+                .and_then(|value| value["parts"].as_array())
+                .and_then(|parts| parts.iter().find(|record| record["id"] == part.id.as_str()))
+            {
+                cad.geometry_class = match record["geometry_class"].as_str() {
+                    Some("GENERATED_EXACT") => GeometryClass::GeneratedExact,
+                    Some("GENERATED_PREVIEW") => GeometryClass::GeneratedPreview,
+                    Some("SEMANTIC_ONLY") => GeometryClass::SemanticOnly,
+                    Some("PRIMITIVE_FALLBACK") => GeometryClass::PrimitiveFallback,
+                    _ => cad.geometry_class,
+                };
+                cad.geometry_revision = record["geometry_revision"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string();
+            }
+            part.spatial.cad = Some(cad);
         } else if cad_step.is_file() {
             part.spatial.cad = Some(CadRef::attached(
                 "step",

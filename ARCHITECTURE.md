@@ -1,6 +1,6 @@
 # ARCHEON architecture
 
-Version 0.5.0 — Generative Engineering Fidelity.
+Version 0.6.0 — Executable Mechanical Intelligence.
 
 > Geometry is only one projection of an engineered system.
 
@@ -53,7 +53,7 @@ Live Design sessions, CAD jobs, and variants live on the engineering clock. They
 
 ### 8. Replaceable CAD kernel
 
-All exact geometry goes through `CadKernelAdapter`. v0.5 implements a feature-aware primitive STEP/STL kernel (box, cylinder, tube, preview holes/steps) and an optional build123d/OCCT adapter for Boolean cut, fillet, and chamfer. Three.js primitives are not the generated design path.
+All exact geometry goes through `CadKernelAdapter`. v0.6 consumes explicit `FeatureFrame` origin/RPY/axis in both primitive preview and build123d/OCCT paths. Every part report includes geometry class, applied/unsupported/failed features, bbox, volume, optional density-derived mass, hash, and revision. Three.js primitives are not the generated design path.
 
 See `docs/GENERATIVE_ENGINEERING.md`, `docs/COMPONENT_GENERATORS.md`, `docs/DESIGN_FIDELITY.md`.
 
@@ -109,7 +109,11 @@ Explosion is a graph projection: `progress ∈ [0,1]` × spread preset (`COMPACT
 
 ## Entity model
 
-Stable semantic types: `PROJECT`, `SYSTEM`, `ASSEMBLY`, `PART`, `FEATURE`, `DATUM`, `PORT`, `INTERFACE`, `MATE`, `CONSTRAINT`, `FUNCTION`, `FLOW`, `LOAD`, `MATERIAL`, `REQUIREMENT`, `ANALYSIS`, `EVIDENCE`, `DECISION`, `REVISION`, `TRANSACTION`, `AGENT`, `TOOL`, `VALIDATION`.
+Stable semantic types include `PROJECT`, `SYSTEM`, `ASSEMBLY`, `PART`, `JOINT`, `FEATURE`, `DATUM`, `PORT`, `INTERFACE`, `MATE`, `CONSTRAINT`, `FUNCTION`, `FLOW`, `LOAD`, `MATERIAL`, `REQUIREMENT`, `ANALYSIS`, `EVIDENCE`, `DECISION`, `REVISION`, `TRANSACTION`, `AGENT`, `TOOL`, and `VALIDATION`.
+
+`Joint` is first-class and initially supports `FIXED | REVOLUTE | PRISMATIC`, explicit parent/child frames, axis, limits, drive metadata, rotating group, load path, interfaces, and provenance. This is kinematic semantics, not a dynamics solver.
+
+`schema/design-ir.schema.json` is the canonical transport manifest. `scripts/generate_design_types.mjs` generates the frontend definitions and `npm test`/`npm run build` fail when the generated file drifts.
 
 Each carries:
 
@@ -135,7 +139,7 @@ VALIDATING ──► INVALID ──► REJECTED
               └── REJECTED
 ```
 
-Dry-run applies operations to a cloned document. Only `COMMITTED` replaces canonical state and appends a revision.
+Dry-run applies every operation to a cloned document, validates the graph, calculates a semantic/geometry-affected diff, and rejects unsupported behavior with `UNSUPPORTED_OPERATION`. Only a human-authorized `COMMITTED` transaction persists split DesignIR files and appends a revision.
 
 ---
 
@@ -166,7 +170,9 @@ DesignIR feature graph
         └── reports: bbox, mass properties (ASSUMED density)
 ```
 
-Phase 1 feature support: `box`, `cylinder`, `sketch_rectangle`, `sketch_circle`, `extrude`, `hole` (cylindrical cut on box — primitive kernel), `datum_axis`, basic transform.
+Geometry truth is one of `EXACT_BREP`, `EXACT_BREP_TESSELLATION`, `SOURCE_MESH`, `GENERATED_EXACT`, `GENERATED_PREVIEW`, `SEMANTIC_ONLY`, or `PRIMITIVE_FALLBACK`. Imported STL/glTF/OBJ is never called exact CAD.
+
+Validation contracts currently cover feature frames, joints, interfaces, bearing-support semantics, fastener patterns, and assembly closure. Contract results preserve `VALIDATED | WARNING | ASSUMED | UNVERIFIED | UNSUPPORTED`; graph success cannot promote an assumption to a fact.
 
 Interference check: AABB heuristic is labeled `HEURISTIC`. Exact Boolean interference is performed only when the OCCT/build123d adapter is active.
 

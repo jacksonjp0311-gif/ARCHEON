@@ -1,6 +1,6 @@
 # Design fidelity
 
-v0.5.1 adds an engineering studio lighting rig and semantic theme tokens (`--action-primary` gold for human actions, `--agent` lavender for AI). Physical CAD materials stay realistic; gold/lavender are overlays, not coatings.
+v0.6.0 keeps the engineering studio and semantic theme tokens (`--action-primary` gold for human actions, `--agent` lavender for ARCHEON intelligence). Physical CAD materials stay realistic; gold/lavender are overlays, not coatings.
 
 Fidelity is a **budget**, not a quality claim.
 
@@ -47,6 +47,9 @@ Stored on DesignIR, **not** authored by the primitive kernel:
 
 ## Inspection
 
-- `open the shoulder` — ghost housing/cover, section plane, stack explode along JointAxis
-- `show me the internal stack` — coaxial explode (Motor → Gearbox → Shaft → Bearings → Retainer → Arm interface)
-- `show the load-carrying interfaces` — neighborhood of the load path, not FEA
+- `open <assembly>` — resolve assembly from DesignIR, section and explode its scope
+- `show me the joint` — optional explicit joint-axis overlay
+- `show the load path` — declared semantic load path, not FEA
+- grouped search keeps the selected semantic entity while framing related geometry
+
+Feature frames and joint axes use the same `RIGHT_HANDED / Z_UP / X_FORWARD / METERS` convention in DesignIR, preview geometry, the optional OCCT path, overlays, and validation.

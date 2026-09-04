@@ -17,10 +17,15 @@ def _load_project(project: Path) -> dict:
         ("parts.json", ("parts",)),
         ("assemblies.json", ("assemblies", "systems")),
         ("interfaces.json", ("interfaces", "ports", "mates")),
+        ("joints.json", ("joints",)),
         ("features.json", ("features", "datums", "constraints")),
         ("materials.json", ("materials", "loads", "functions")),
         ("parameters.json", ("parameters",)),
         ("requirements.json", ("requirements",)),
+        ("provenance.json", ("analyses", "evidence", "decisions", "revisions")),
+        ("fasteners.json", ("fastener_groups",)),
+        ("assembly_plan.json", ("assembly_plans",)),
+        ("fits.json", ("fit_relations",)),
     ]:
         p = project / name
         if not p.exists():

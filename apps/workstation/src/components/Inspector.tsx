@@ -1,33 +1,35 @@
 import { useUi } from '../store';
-import { geometryDisplay, type Part, type Requirement } from '@archeon/design-protocol';
+import {
+  geometryDisplay,
+  hasRenderableCad,
+  type Analysis,
+  type Assembly,
+  type Evidence,
+  type Feature,
+  type Interface,
+  type Joint,
+  type Mate,
+  type Material,
+  type Part,
+  type Port,
+  type Requirement
+} from '@archeon/design-protocol';
 import { geometryMode } from '@archeon/scene-engine';
 import { provenanceTone, type ValueTone } from '../services/tone';
-
-interface Assembly {
-  id: string;
-  name: string;
-  parent: string | null;
-  semantic_role: string;
-}
-
-interface Iface {
-  id: string;
-  a: string;
-  b: string;
-  name: string;
-  kind?: string;
-  semantic_role?: string;
-}
 
 interface Props {
   selectedId: string | null;
   part?: Part;
   assemblies: Assembly[];
-  features: { id: string; part: string; kind?: string }[];
-  interfaces: Iface[];
-  ports: { id: string; host: string }[];
+  features: Feature[];
+  interfaces: Interface[];
+  ports: Port[];
   requirements: Requirement[];
-  materials: { id: string; name: string; density_kg_m3: number | null }[];
+  joints: Joint[];
+  analyses: Analysis[];
+  evidence: Evidence[];
+  mates: Mate[];
+  materials: Material[];
   revision: string;
 }
 
@@ -51,6 +53,10 @@ export function Inspector({
   interfaces,
   ports,
   requirements,
+  joints,
+  analyses,
+  evidence,
+  mates,
   materials,
   revision
 }: Props) {
@@ -68,12 +74,95 @@ export function Inspector({
   const assembly = assemblies.find((a) => a.id === selectedId);
   const requirement = requirements.find((r) => r.id === selectedId);
   const iface = interfaces.find((i) => i.id === selectedId);
+  const selectedJoint = joints.find((joint) => joint.id === selectedId);
+  const selectedFeature = features.find((feature) => feature.id === selectedId);
+  const selectedMaterial = materials.find((material) => material.id === selectedId);
+  const selectedAnalysis = analyses.find((analysis) => analysis.id === selectedId);
+  const selectedEvidence = evidence.find((item) => item.id === selectedId);
+  const selectedMate = mates.find((mate) => mate.id === selectedId);
 
-  if (!selectedId || (!part && !assembly && !requirement && !iface)) {
+  if (!selectedId || (!part && !assembly && !requirement && !iface && !selectedJoint && !selectedFeature && !selectedMaterial && !selectedAnalysis && !selectedEvidence && !selectedMate)) {
     return (
       <section className="rail-panel inspector">
         <h2>CAD PART INSPECTOR <button type="button" onClick={clear}>×</button></h2>
         <p className="empty">No active selection.<br />Select geometry or choose an item from the navigator.</p>
+      </section>
+    );
+  }
+
+  if (selectedFeature) {
+    return (
+      <section className="rail-panel inspector">
+        <h2>FEATURE INSPECTOR <button type="button" onClick={clear}>×</button></h2>
+        <Field k="ID" v={selectedFeature.id} />
+        <Field k="KIND" v={selectedFeature.kind} />
+        <Field k="ROLE" v={selectedFeature.semantic_role || '—'} />
+        <Field k="HOST" v={selectedFeature.frame.host ?? selectedFeature.part} />
+        <Field k="DATUM" v={selectedFeature.frame.datum_id ?? 'NONE'} />
+        <Field k="ORIGIN" v={selectedFeature.frame.origin_m.join(', ')} note="meters · part local" />
+        <Field k="RPY" v={selectedFeature.frame.rpy_rad.join(', ')} note="radians" />
+        <Field k="AXIS" v={selectedFeature.frame.axis.join(', ')} note="right-handed · Z-up · X-forward" />
+        <Field k="PROVENANCE" v={selectedFeature.provenance.class} />
+      </section>
+    );
+  }
+
+  if (selectedMate) {
+    return (
+      <section className="rail-panel inspector">
+        <h2>MATE INSPECTOR <button type="button" onClick={clear}>×</button></h2>
+        <Field k="ID" v={selectedMate.id} />
+        <Field k="KIND" v={selectedMate.kind} />
+        <Field k="STATE" v={selectedMate.state} />
+        <Field k="INTERFACE" v={selectedMate.interface} />
+        <Field k="OFFSET" v={`${selectedMate.offset_m} m`} />
+        <Field k="PROVENANCE" v={selectedMate.provenance.class} />
+      </section>
+    );
+  }
+
+  if (selectedMaterial) {
+    return (
+      <section className="rail-panel inspector">
+        <h2>MATERIAL INSPECTOR <button type="button" onClick={clear}>×</button></h2>
+        <Field k="ID" v={selectedMaterial.id} />
+        <Field k="NAME" v={selectedMaterial.name} />
+        <Field k="DENSITY" v={selectedMaterial.density_kg_m3 != null ? `${selectedMaterial.density_kg_m3} kg/m³` : 'UNVERIFIED'} />
+        <Field k="APPEARANCE" v={selectedMaterial.appearance || '—'} />
+        <Field k="NOTES" v={selectedMaterial.notes || '—'} />
+      </section>
+    );
+  }
+
+  if (selectedAnalysis || selectedEvidence) {
+    return (
+      <section className="rail-panel inspector">
+        <h2>{selectedAnalysis ? 'ANALYSIS' : 'EVIDENCE'} INSPECTOR <button type="button" onClick={clear}>×</button></h2>
+        <Field k="ID" v={(selectedAnalysis ?? selectedEvidence)!.id} />
+        <Field k="KIND" v={(selectedAnalysis ?? selectedEvidence)!.kind} />
+        {selectedAnalysis && <Field k="STATUS" v={selectedAnalysis.status || 'UNVERIFIED'} />}
+        <Field k="DETAIL" v={selectedAnalysis?.notes ?? selectedEvidence?.text ?? '—'} />
+        <Field k="PROVENANCE" v={(selectedAnalysis ?? selectedEvidence)!.provenance.class} />
+      </section>
+    );
+  }
+
+  if (selectedJoint) {
+    return (
+      <section className="rail-panel inspector">
+        <h2>JOINT INSPECTOR <button type="button" onClick={clear} title="Deselect">×</button></h2>
+        <Field k="ID" v={selectedJoint.id} />
+        <Field k="NAME" v={selectedJoint.name} />
+        <Field k="TYPE" v={selectedJoint.joint_type} />
+        <Field k="DOF" v={String(selectedJoint.dof)} />
+        <Field k="PARENT" v={selectedJoint.parent} />
+        <Field k="CHILD" v={selectedJoint.child} />
+        <Field k="AXIS" v={selectedJoint.axis.join(', ')} note="right-handed · Z-up · X-forward" />
+        <Field k="LIMITS" v={selectedJoint.limits ? `${selectedJoint.limits.lower}…${selectedJoint.limits.upper} ${selectedJoint.limits.unit}` : 'UNVERIFIED'} />
+        <Field k="ROTATING GROUP" v={selectedJoint.rotating_group.join(', ') || 'NONE'} />
+        <Field k="LOAD PATH" v={selectedJoint.load_path.join(' → ') || 'UNVERIFIED'} />
+        <Field k="INTERFACES" v={selectedJoint.interfaces.join(', ') || 'NONE'} />
+        <Field k="PROVENANCE" v={selectedJoint.provenance.class} />
       </section>
     );
   }
@@ -169,8 +258,11 @@ export function Inspector({
     return pa?.host === part.id || pb?.host === part.id;
   });
   const linkedReqs = requirements.filter((r) => part.provenance.requirement_ids.includes(r.id));
+  const relatedJoints = joints.filter((joint) =>
+    joint.parent === part.parent || joint.child === part.parent || joint.rotating_group.includes(part.id) || joint.load_path.includes(part.id)
+  );
   const parentName = assemblies.find((a) => a.id === part.parent)?.name ?? part.parent ?? '—';
-  const display = geometryDisplay(part.spatial.cad, geometryMode(!!(part.spatial.cad?.preview || part.spatial.cad?.path), debug));
+  const display = geometryDisplay(part.spatial.cad, geometryMode(hasRenderableCad(part.spatial.cad), debug));
 
   return (
     <section className="rail-panel inspector">
@@ -186,8 +278,11 @@ export function Inspector({
       <Field k="ROLE" v={part.semantic_role || '—'} tone="id" />
       <Field k="MATERIAL" v={mat?.name ?? part.material ?? 'UNVERIFIED'} tone="fact" />
       {([
+        ['SUMMARY', 'Summary'],
         ['GEOMETRY', 'Geometry'],
+        ['JOINT', 'Joint'],
         ['CONNECTIONS', 'Connections'],
+        ['FEATURES', 'Features'],
         ['REQUIREMENTS', 'Requirements'],
         ['ANALYSIS', 'Analysis'],
         ['PROVENANCE', 'Provenance'],
@@ -208,7 +303,7 @@ export function Inspector({
                 k="DISPLAY"
                 v={display}
                 note="CAD and primitive are exclusive — never both"
-                tone={display === 'GENERATED MESH' ? 'prov' : 'fact'}
+                tone={display === 'GENERATED PREVIEW' || display === 'SEMANTIC ONLY' ? 'prov' : 'fact'}
               />
               <Field k="CAD FRAME" v={part.spatial.cad?.coordinate_frame ?? 'CAD_LOCAL'} note="viewer does not recenter or Y-up rotate meshes" />
               <Field k="UP AXIS" v={part.spatial.cad?.up_axis ?? 'Z'} note="ARCHEON world is Z-UP" />
@@ -219,8 +314,22 @@ export function Inspector({
               <Field k="MASS" v={mass != null ? `${mass.toFixed(3)} kg` : 'NOT COMPUTED'} note={mass != null ? 'HEURISTIC · density × primitive volume' : 'no density'} />
               <Field k="CENTER OF MASS" v="NOT COMPUTED" />
               <Field k="CAD FORMAT" v={part.spatial.cad?.format?.toUpperCase() ?? 'PRIMITIVE'} />
+              <Field k="GEOMETRY CLASS" v={part.spatial.cad?.geometry_class ?? 'PRIMITIVE_FALLBACK'} />
               <Field k="CAD TRUTH" v={part.spatial.cad?.truth ?? 'GENERATED'} tone={provenanceTone(part.spatial.cad?.truth ?? 'GENERATED')} />
               <Field k="CAD SOURCE" v={part.spatial.cad?.source ?? '—'} tone={provenanceTone(part.spatial.cad?.source ?? '')} />
+            </>
+          )}
+          {inspectOpen[key] && key === 'SUMMARY' && (
+            <>
+              <Field k="ROLE" v={part.semantic_role || '—'} />
+              <Field k="PARENT" v={parentName} />
+              <Field k="STATUS" v={part.provenance.class} />
+            </>
+          )}
+          {inspectOpen[key] && key === 'JOINT' && (
+            <>
+              <Field k="COUNT" v={String(relatedJoints.length)} />
+              <Field k="JOINTS" v={relatedJoints.map((joint) => joint.id).join(', ') || 'NONE'} />
             </>
           )}
           {inspectOpen[key] && key === 'CONNECTIONS' && (
@@ -232,8 +341,14 @@ export function Inspector({
           {inspectOpen[key] && key === 'REQUIREMENTS' && (
             <Field k="LINKED" v={linkedReqs.map((r) => r.id).join(', ') || 'NONE'} tone="id" />
           )}
+          {inspectOpen[key] && key === 'FEATURES' && (
+            <Field k="FEATURES" v={features.filter((feature) => feature.part === part.id).map((feature) => feature.id).join(', ') || 'NONE'} />
+          )}
           {inspectOpen[key] && key === 'ANALYSIS' && (
-            <Field k="VALIDATION" v="GRAPH ONLY" note="not FEA · collision NOT CHECKED" tone="graph" />
+            <>
+              <Field k="VALIDATION" v="GRAPH + CONTRACTS" note="not FEA · collision NOT CHECKED" tone="graph" />
+              <Field k="RECORDS" v={analyses.map((analysis) => `${analysis.kind}:${analysis.status}`).join(', ') || 'NONE'} />
+            </>
           )}
           {inspectOpen[key] && key === 'PROVENANCE' && (
             <>

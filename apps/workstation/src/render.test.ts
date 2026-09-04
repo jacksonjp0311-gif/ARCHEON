@@ -133,12 +133,15 @@ describe('primitive / CAD exclusivity', () => {
     expect(geometryMode(false, both)).toBe('primitive');
   });
 
-  it('labels generated mesh vs exact tessellation vs primitive fallback', () => {
+  it('labels generated preview, source mesh, exact tessellation, and primitive fallback', () => {
     expect(geometryDisplay({ format: 'stl', path: 'generated/a.stl', truth: 'GENERATED', note: '', source: 'GENERATED' }, 'cad')).toBe(
-      'GENERATED MESH'
+      'GENERATED PREVIEW'
     );
-    expect(geometryDisplay({ format: 'step', path: 'cad/a.step', truth: 'SOURCE', note: '', source: 'SOURCE' }, 'cad')).toBe(
-      'EXACT CAD TESSELLATION'
+    expect(geometryDisplay({ format: 'step', path: 'cad/a.step', preview: 'cad/a.stl', truth: 'SOURCE', note: '', source: 'SOURCE' }, 'cad')).toBe(
+      'EXACT BREP TESSELLATION'
+    );
+    expect(geometryDisplay({ format: 'stl', path: 'cad/scan.stl', truth: 'SOURCE', note: '', source: 'SOURCE' }, 'cad')).toBe(
+      'SOURCE MESH'
     );
     expect(geometryDisplay({ format: 'stl', path: 'generated/a.stl', truth: 'GENERATED', note: '' }, 'primitive')).toBe(
       'DESIGNIR PRIMITIVE FALLBACK'

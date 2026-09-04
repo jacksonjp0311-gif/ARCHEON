@@ -1,5 +1,8 @@
 //! Design Transaction Protocol — agents propose, humans commit.
-use archeon_design_ir::{DesignDocument, EntityId, Part, Primitive, Requirement, Spatial};
+use archeon_design_ir::{
+    Analysis, Datum, DesignDocument, EntityId, Feature, FeatureFrame, FeatureKind, Interface,
+    InterfaceKind, Mate, MateKind, Part, Port, Primitive, Requirement, Spatial,
+};
 use archeon_provenance::Provenance;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -190,6 +193,8 @@ pub struct DesignTransaction {
     #[serde(default)]
     pub validation_results: Vec<serde_json::Value>,
     #[serde(default)]
+    pub diff: Option<DesignDiff>,
+    #[serde(default)]
     pub confidence: f32,
     pub status: TxStatus,
     pub user_decision: UserDecision,
@@ -205,6 +210,27 @@ pub enum TxError {
     Unauthorized { agent: String, op: String },
     #[error("COMMIT authority required")]
     CommitRequired,
+    #[error("unsupported operation {operation}: {reason}")]
+    UnsupportedOperation { operation: String, reason: String },
+}
+
+impl TxError {
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::UnsupportedOperation { .. } => "UNSUPPORTED_OPERATION",
+            Self::Unauthorized { .. } | Self::CommitRequired => "UNAUTHORIZED",
+            Self::Illegal { .. } => "ILLEGAL_TRANSITION",
+            Self::Apply(_) => "APPLY_FAILED",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DesignDiff {
+    pub added: Vec<String>,
+    pub removed: Vec<String>,
+    pub modified: Vec<String>,
+    pub geometry_affected: Vec<String>,
 }
 
 pub fn can_transition(from: TxStatus, to: TxStatus) -> bool {
@@ -240,6 +266,7 @@ impl DesignTransaction {
             geometry_hash_before: None,
             geometry_hash_after: None,
             validation_results: vec![],
+            diff: None,
             confidence: 0.5,
             status: TxStatus::Proposed,
             user_decision: UserDecision::Pending,
@@ -299,6 +326,9 @@ fn apply_one(doc: &mut DesignDocument, op: &Operation) -> Result<(), TxError> {
             p.spatial.origin_m = *origin_m;
         }
         Operation::DeletePart { id } => {
+            if doc.part(id).is_none() {
+                return Err(TxError::Apply(format!("unknown part {id}")));
+            }
             doc.parts.retain(|p| p.id.as_str() != id);
         }
         Operation::CreatePart {
@@ -311,6 +341,11 @@ fn apply_one(doc: &mut DesignDocument, op: &Operation) -> Result<(), TxError> {
         } => {
             if doc.part(id).is_some() {
                 return Err(TxError::Apply(format!("duplicate part {id}")));
+            }
+            if let Some(parent) = parent {
+                if !doc.id_set().contains(parent) {
+                    return Err(TxError::Apply(format!("unknown parent {parent}")));
+                }
             }
             doc.parts.push(Part {
                 id: EntityId::new(id.clone()),
@@ -339,6 +374,13 @@ fn apply_one(doc: &mut DesignDocument, op: &Operation) -> Result<(), TxError> {
             });
         }
         Operation::ChangeMaterial { part, material } => {
+            if !doc
+                .materials
+                .iter()
+                .any(|item| item.id.as_str() == material)
+            {
+                return Err(TxError::Apply(format!("unknown material {material}")));
+            }
             let p = doc
                 .part_mut(part)
                 .ok_or_else(|| TxError::Apply(format!("unknown part {part}")))?;
@@ -350,6 +392,9 @@ fn apply_one(doc: &mut DesignDocument, op: &Operation) -> Result<(), TxError> {
             value,
             unit,
         } => {
+            if doc.requirements.iter().any(|item| item.id.as_str() == id) {
+                return Err(TxError::Apply(format!("duplicate requirement {id}")));
+            }
             doc.requirements.push(Requirement {
                 id: EntityId::new(id.clone()),
                 text: text.clone(),
@@ -376,18 +421,202 @@ fn apply_one(doc: &mut DesignDocument, op: &Operation) -> Result<(), TxError> {
                 r.value = *value;
             }
         }
-        Operation::CreatePort { .. }
-        | Operation::CreateInterface { .. }
-        | Operation::CreateMate { .. }
-        | Operation::CreateDatum { .. }
-        | Operation::CreateSketch { .. }
-        | Operation::Extrude { .. }
-        | Operation::RunAnalysis { .. } => {
-            // Recorded on the transaction; graph inserts for these ops are Phase 2.
-            // Dry-run succeeds so DTP can exercise the op names without pretending CAD history exists.
+        Operation::CreatePort { id, host, role } => {
+            ensure_unique(doc, id, "port")?;
+            if !doc.id_set().contains(host) {
+                return Err(TxError::Apply(format!("unknown port host {host}")));
+            }
+            doc.ports.push(Port {
+                id: EntityId::new(id.clone()),
+                host: EntityId::new(host.clone()),
+                role: role.clone(),
+                datum: None,
+                origin_m: [0.0, 0.0, 0.0],
+                provenance: Provenance::generated("transaction", "create_port"),
+            });
+        }
+        Operation::CreateInterface {
+            id,
+            name,
+            a,
+            b,
+            kind,
+        } => {
+            ensure_unique(doc, id, "interface")?;
+            if a == b {
+                return Err(TxError::Apply("interface endpoints must differ".into()));
+            }
+            for endpoint in [a, b] {
+                if !doc.ports.iter().any(|port| port.id.as_str() == endpoint) {
+                    return Err(TxError::Apply(format!(
+                        "unknown interface endpoint {endpoint}"
+                    )));
+                }
+            }
+            let kind = parse_interface_kind(kind)?;
+            doc.interfaces.push(Interface {
+                id: EntityId::new(id.clone()),
+                name: name.clone(),
+                kind,
+                a: EntityId::new(a.clone()),
+                b: EntityId::new(b.clone()),
+                semantic_role: String::new(),
+                provenance: Provenance::generated("transaction", "create_interface"),
+            });
+        }
+        Operation::CreateMate {
+            id,
+            interface,
+            kind,
+        } => {
+            ensure_unique(doc, id, "mate")?;
+            if !doc
+                .interfaces
+                .iter()
+                .any(|item| item.id.as_str() == interface)
+            {
+                return Err(TxError::Apply(format!("unknown interface {interface}")));
+            }
+            let kind = MateKind::parse(kind).ok_or_else(|| TxError::UnsupportedOperation {
+                operation: "create_mate".into(),
+                reason: format!("unknown mate kind {kind}"),
+            })?;
+            doc.mates.push(Mate {
+                id: EntityId::new(id.clone()),
+                interface: EntityId::new(interface.clone()),
+                kind,
+                offset_m: 0.0,
+                state: Default::default(),
+                provenance: Provenance::generated("transaction", "create_mate"),
+            });
+        }
+        Operation::CreateDatum { id, host, kind } => {
+            ensure_unique(doc, id, "datum")?;
+            if !doc.id_set().contains(host) {
+                return Err(TxError::Apply(format!("unknown datum host {host}")));
+            }
+            doc.datums.push(Datum {
+                id: EntityId::new(id.clone()),
+                host: EntityId::new(host.clone()),
+                kind: kind.clone(),
+                origin_m: [0.0, 0.0, 0.0],
+                axis: [0.0, 0.0, 1.0],
+                semantic_role: String::new(),
+                provenance: Provenance::generated("transaction", "create_datum"),
+            });
+        }
+        Operation::CreateSketch { id, part, kind } => {
+            ensure_unique(doc, id, "feature")?;
+            if doc.part(part).is_none() {
+                return Err(TxError::Apply(format!("unknown sketch part {part}")));
+            }
+            let feature_kind = match kind.trim().to_ascii_lowercase().as_str() {
+                "sketch" | "generic" => FeatureKind::Sketch,
+                "rectangle" | "sketch_rectangle" => FeatureKind::SketchRectangle,
+                "circle" | "sketch_circle" => FeatureKind::SketchCircle,
+                _ => {
+                    return Err(TxError::UnsupportedOperation {
+                        operation: "create_sketch".into(),
+                        reason: format!("unknown sketch kind {kind}"),
+                    });
+                }
+            };
+            doc.features.push(Feature {
+                id: EntityId::new(id.clone()),
+                part: EntityId::new(part.clone()),
+                kind: feature_kind,
+                semantic_role: "sketch".into(),
+                params: BTreeMap::new(),
+                frame: FeatureFrame {
+                    host: Some(EntityId::new(part.clone())),
+                    ..Default::default()
+                },
+                provenance: Provenance::generated("transaction", "create_sketch"),
+            });
+        }
+        Operation::Extrude { id, part, depth_m } => {
+            ensure_unique(doc, id, "feature")?;
+            if doc.part(part).is_none() {
+                return Err(TxError::Apply(format!("unknown extrude part {part}")));
+            }
+            if !depth_m.is_finite() || *depth_m <= 0.0 {
+                return Err(TxError::Apply("extrude depth must be positive".into()));
+            }
+            let mut params = BTreeMap::new();
+            params.insert("depth_m".into(), serde_json::json!(depth_m));
+            doc.features.push(Feature {
+                id: EntityId::new(id.clone()),
+                part: EntityId::new(part.clone()),
+                kind: FeatureKind::Extrude,
+                semantic_role: "additive".into(),
+                params,
+                frame: FeatureFrame {
+                    host: Some(EntityId::new(part.clone())),
+                    ..Default::default()
+                },
+                provenance: Provenance::generated("transaction", "extrude"),
+            });
+        }
+        Operation::RunAnalysis { kind } => {
+            let normalized = kind.trim().to_ascii_lowercase();
+            let (status, notes) = match normalized.as_str() {
+                "reach" | "kinematic_reach" => {
+                    let reach = doc
+                        .derived_reach_m()
+                        .ok_or_else(|| TxError::Apply("reach parameters are incomplete".into()))?;
+                    (
+                        "DERIVED",
+                        format!("Derived serial-link reach: {reach:.6} m"),
+                    )
+                }
+                "dof" | "joint_dof" => {
+                    let dof: u32 = doc.joints.iter().map(|joint| u32::from(joint.dof())).sum();
+                    ("DERIVED", format!("Declared mechanism DOF: {dof}"))
+                }
+                _ => {
+                    return Err(TxError::UnsupportedOperation {
+                        operation: "run_analysis".into(),
+                        reason: format!("analysis adapter {kind} is unavailable"),
+                    });
+                }
+            };
+            let slug: String = normalized
+                .chars()
+                .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+                .collect();
+            let id = format!("analysis.{slug}.{}", doc.analyses.len() + 1);
+            doc.analyses.push(Analysis {
+                id: EntityId::new(id),
+                kind: normalized,
+                status: status.into(),
+                notes,
+                provenance: Provenance::generated("analysis-engineer", "run_analysis"),
+            });
         }
     }
     Ok(())
+}
+
+fn ensure_unique(doc: &DesignDocument, id: &str, entity: &str) -> Result<(), TxError> {
+    if doc.id_set().contains(id) {
+        return Err(TxError::Apply(format!("duplicate {entity} {id}")));
+    }
+    Ok(())
+}
+
+fn parse_interface_kind(value: &str) -> Result<InterfaceKind, TxError> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "mechanical" => Ok(InterfaceKind::Mechanical),
+        "electrical" => Ok(InterfaceKind::Electrical),
+        "thermal" => Ok(InterfaceKind::Thermal),
+        "fluid" => Ok(InterfaceKind::Fluid),
+        "structural" => Ok(InterfaceKind::Structural),
+        "logical" => Ok(InterfaceKind::Logical),
+        _ => Err(TxError::UnsupportedOperation {
+            operation: "create_interface".into(),
+            reason: format!("unknown interface kind {value}"),
+        }),
+    }
 }
 
 fn sync_geometry_from_parameters(doc: &mut DesignDocument, name: &str) {
@@ -464,7 +693,107 @@ fn relayout_arm(doc: &mut DesignDocument) {
 pub fn dry_run(doc: &DesignDocument, tx: &DesignTransaction) -> Result<DesignDocument, TxError> {
     let mut clone = doc.clone();
     apply_operations(&mut clone, &tx.operations)?;
+    let report = archeon_validation::validate(&clone);
+    if !report.ok() {
+        let messages = report
+            .findings
+            .iter()
+            .filter(|finding| {
+                matches!(
+                    finding.severity,
+                    archeon_validation::Severity::Error | archeon_validation::Severity::Fatal
+                )
+            })
+            .map(|finding| format!("{}: {}", finding.code, finding.message))
+            .collect::<Vec<_>>()
+            .join("; ");
+        return Err(TxError::Apply(format!(
+            "preview graph validation failed: {messages}"
+        )));
+    }
     Ok(clone)
+}
+
+pub fn dry_run_with_diff(
+    doc: &DesignDocument,
+    tx: &DesignTransaction,
+) -> Result<(DesignDocument, DesignDiff), TxError> {
+    let preview = dry_run(doc, tx)?;
+    let diff = diff_documents(doc, &preview);
+    Ok((preview, diff))
+}
+
+pub fn diff_documents(before: &DesignDocument, after: &DesignDocument) -> DesignDiff {
+    let before = entity_map(before);
+    let after = entity_map(after);
+    let mut diff = DesignDiff::default();
+    for id in after.keys() {
+        match before.get(id) {
+            None => diff.added.push(id.clone()),
+            Some(value) if value != &after[id] => diff.modified.push(id.clone()),
+            _ => {}
+        }
+    }
+    for id in before.keys() {
+        if !after.contains_key(id) {
+            diff.removed.push(id.clone());
+        }
+    }
+    diff.geometry_affected = diff
+        .added
+        .iter()
+        .chain(&diff.removed)
+        .chain(&diff.modified)
+        .filter(|id| id.starts_with("part.") || id.starts_with("feat.") || id.starts_with("datum."))
+        .cloned()
+        .collect();
+    diff.geometry_affected.sort();
+    diff.geometry_affected.dedup();
+    diff
+}
+
+fn entity_map(doc: &DesignDocument) -> BTreeMap<String, serde_json::Value> {
+    let mut out = BTreeMap::new();
+    let mut insert = |id: &str, value: serde_json::Value| {
+        out.insert(id.to_string(), value);
+    };
+    insert(
+        doc.project.id.as_str(),
+        serde_json::to_value(&doc.project).unwrap_or_default(),
+    );
+    macro_rules! entities {
+        ($items:expr) => {
+            for item in $items {
+                insert(
+                    item.id.as_str(),
+                    serde_json::to_value(item).unwrap_or_default(),
+                );
+            }
+        };
+    }
+    entities!(&doc.systems);
+    entities!(&doc.assemblies);
+    entities!(&doc.parts);
+    entities!(&doc.features);
+    entities!(&doc.datums);
+    entities!(&doc.ports);
+    entities!(&doc.interfaces);
+    entities!(&doc.mates);
+    entities!(&doc.joints);
+    entities!(&doc.constraints);
+    entities!(&doc.functions);
+    entities!(&doc.flows);
+    entities!(&doc.loads);
+    entities!(&doc.materials);
+    entities!(&doc.requirements);
+    entities!(&doc.analyses);
+    entities!(&doc.evidence);
+    entities!(&doc.decisions);
+    entities!(&doc.fastener_groups);
+    entities!(&doc.assembly_plans);
+    entities!(&doc.fit_relations);
+    entities!(&doc.component_library);
+    out
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -543,6 +872,7 @@ mod tests {
             ports: vec![],
             interfaces: vec![],
             mates: vec![],
+            joints: vec![],
             constraints: vec![],
             functions: vec![],
             flows: vec![],
@@ -571,5 +901,104 @@ mod tests {
         )
         .unwrap_err();
         assert!(matches!(err, TxError::Apply(_)));
+    }
+
+    #[test]
+    fn every_advertised_graph_operation_mutates_design_ir() {
+        let dir =
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../projects/archeon-arm");
+        let doc = archeon_design_ir::load_project_dir(&dir).expect("arm seed");
+        let tx = DesignTransaction::propose(
+            "operator",
+            "exercise executable DTP",
+            "regression",
+            vec![
+                Operation::CreatePort {
+                    id: "port.test.a".into(),
+                    host: "part.elbow.housing".into(),
+                    role: "test_a".into(),
+                },
+                Operation::CreatePort {
+                    id: "port.test.b".into(),
+                    host: "part.forearm.tube".into(),
+                    role: "test_b".into(),
+                },
+                Operation::CreateInterface {
+                    id: "iface.test".into(),
+                    name: "Test interface".into(),
+                    a: "port.test.a".into(),
+                    b: "port.test.b".into(),
+                    kind: "mechanical".into(),
+                },
+                Operation::CreateMate {
+                    id: "mate.test".into(),
+                    interface: "iface.test".into(),
+                    kind: "revolute".into(),
+                },
+                Operation::CreateDatum {
+                    id: "datum.test".into(),
+                    host: "part.elbow.housing".into(),
+                    kind: "axis".into(),
+                },
+                Operation::CreateSketch {
+                    id: "feat.test.sketch".into(),
+                    part: "part.elbow.housing".into(),
+                    kind: "circle".into(),
+                },
+                Operation::Extrude {
+                    id: "feat.test.extrude".into(),
+                    part: "part.elbow.housing".into(),
+                    depth_m: 0.01,
+                },
+                Operation::RunAnalysis { kind: "dof".into() },
+            ],
+        );
+        let (preview, diff) = dry_run_with_diff(&doc, &tx).expect("real operations");
+        assert!(preview
+            .ports
+            .iter()
+            .any(|item| item.id.as_str() == "port.test.a"));
+        assert!(preview
+            .interfaces
+            .iter()
+            .any(|item| item.id.as_str() == "iface.test"));
+        assert!(preview
+            .mates
+            .iter()
+            .any(|item| item.id.as_str() == "mate.test"));
+        assert!(preview
+            .datums
+            .iter()
+            .any(|item| item.id.as_str() == "datum.test"));
+        assert!(preview
+            .features
+            .iter()
+            .any(|item| item.id.as_str() == "feat.test.sketch"));
+        assert!(preview
+            .features
+            .iter()
+            .any(|item| item.id.as_str() == "feat.test.extrude"));
+        assert!(preview.analyses.iter().any(|item| item.kind == "dof"));
+        assert!(diff.added.contains(&"iface.test".into()));
+        assert!(diff.geometry_affected.contains(&"feat.test.extrude".into()));
+    }
+
+    #[test]
+    fn unsupported_operations_fail_with_typed_code() {
+        let dir =
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../projects/archeon-arm");
+        let doc = archeon_design_ir::load_project_dir(&dir).expect("arm seed");
+        let tx = DesignTransaction::propose(
+            "cad-designer",
+            "unsupported sketch",
+            "regression",
+            vec![Operation::CreateSketch {
+                id: "feat.test.unknown".into(),
+                part: "part.elbow.housing".into(),
+                kind: "spline_surface".into(),
+            }],
+        );
+        let error = dry_run(&doc, &tx).expect_err("must fail closed");
+        assert_eq!(error.code(), "UNSUPPORTED_OPERATION");
     }
 }

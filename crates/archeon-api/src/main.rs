@@ -4,15 +4,17 @@ mod live;
 mod projects;
 
 use archeon_agents::{
-    authorize_commit, authorize_tx, critic_notes,
+    authorize_commit, authorize_tx, critic_notes, execute_tool,
     memory::{LocalMemoryProvider, MemoryProvider},
-    parse_command_ctx, provider, roster, AgentCard, OperatorContext, ViewCommand,
+    parse_command_ctx, provider, roster, AgentCard, EngineeringToolCall, OperatorContext,
+    ViewCommand,
 };
 use archeon_assembly::{explode_document, ExplosionStrategy};
-use archeon_design_ir::{load_project_dir, DesignDocument, Revision};
+use archeon_design_ir::{load_project_dir, save_project_dir, DesignDocument, Revision};
 use archeon_live::{pick_heuristic_best, three_length_variants, tracked_deltas, LiveDesignSession};
 use archeon_transactions::{
-    apply_operations, dry_run, DesignTransaction, Ledger, TxStatus, UserDecision,
+    apply_operations, dry_run, dry_run_with_diff, DesignTransaction, Ledger, TxError, TxStatus,
+    UserDecision,
 };
 use archeon_validation::validate;
 use axum::{
@@ -149,6 +151,7 @@ async fn main() {
         .route("/api/requirements", get(requirements))
         .route("/api/transactions", get(transactions))
         .route("/api/agents", get(agents))
+        .route("/api/agents/tool", post(agent_tool))
         .route("/api/validation", get(validation_now))
         .route("/api/memory/status", get(memory_status))
         .route("/api/cad/status", get(cad_status))
@@ -357,6 +360,48 @@ async fn agents_run(State(st): State<AppState>, Json(body): Json<ChatIn>) -> Jso
     handle_chat(st, body).await
 }
 
+async fn agent_tool(
+    State(st): State<AppState>,
+    Json(call): Json<EngineeringToolCall>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let doc = st.0.doc.lock().unwrap().clone();
+    let mut outcome = execute_tool(call, &doc).map_err(|message| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": { "code": "INVALID_TOOL_ARGUMENT", "message": message } })),
+        )
+    })?;
+    if let Some(mut tx) = outcome.transaction.take() {
+        authorize_tx(&tx.agent_id, &tx).map_err(tx_error_response)?;
+        let (preview, diff) = dry_run_with_diff(&doc, &tx).map_err(tx_error_response)?;
+        tx.geometry_hash_before = Some(doc.design_hash());
+        tx.geometry_hash_after = Some(preview.design_hash());
+        tx.diff = Some(diff);
+        let report = validate(&preview);
+        tx.validation_results = vec![serde_json::to_value(&report).unwrap_or_default()];
+        let _ = tx.transition(TxStatus::Validating);
+        let _ = tx.transition(if report.ok() {
+            TxStatus::Valid
+        } else {
+            TxStatus::Invalid
+        });
+        st.0.ledger.lock().unwrap().push(tx.clone());
+        *st.0.proposal.lock().unwrap() = Some(ProposalState {
+            tx: tx.clone(),
+            preview,
+        });
+        let cad_job = tx
+            .diff
+            .as_ref()
+            .is_some_and(|diff| !diff.geometry_affected.is_empty())
+            .then(|| live::spawn_cad_job(st.clone(), Some(tx.transaction_id.clone())));
+        return Ok(Json(
+            json!({ "outcome": outcome, "transaction": tx, "cad_job": cad_job }),
+        ));
+    }
+    Ok(Json(json!({ "outcome": outcome })))
+}
+
 async fn handle_chat(st: AppState, body: ChatIn) -> Json<Value> {
     let app = st.0.clone();
     log_line(
@@ -497,10 +542,11 @@ async fn handle_chat(st: AppState, body: ChatIn) -> Json<Value> {
 
     if let Some(mut tx) = parsed.tx {
         match authorize_tx(&tx.agent_id, &tx) {
-            Ok(()) => match dry_run(&doc, &tx) {
-                Ok(preview) => {
+            Ok(()) => match dry_run_with_diff(&doc, &tx) {
+                Ok((preview, diff)) => {
                     tx.geometry_hash_before = Some(doc.design_hash());
                     tx.geometry_hash_after = Some(preview.design_hash());
+                    tx.diff = Some(diff);
                     let report = validate(&preview);
                     tx.validation_results =
                         vec![serde_json::to_value(&report).unwrap_or(json!({}))];
@@ -625,14 +671,15 @@ struct ProposeIn {
 async fn propose(
     State(st): State<AppState>,
     Json(body): Json<ProposeIn>,
-) -> Result<Json<Value>, (StatusCode, String)> {
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
     let mut tx =
         DesignTransaction::propose(&body.agent_id, &body.intent, &body.reason, body.operations);
-    authorize_tx(&body.agent_id, &tx).map_err(|e| (StatusCode::FORBIDDEN, e.to_string()))?;
+    authorize_tx(&body.agent_id, &tx).map_err(tx_error_response)?;
     let doc = st.0.doc.lock().unwrap().clone();
-    let preview = dry_run(&doc, &tx).map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+    let (preview, diff) = dry_run_with_diff(&doc, &tx).map_err(tx_error_response)?;
     tx.geometry_hash_before = Some(doc.design_hash());
     tx.geometry_hash_after = Some(preview.design_hash());
+    tx.diff = Some(diff);
     let report = validate(&preview);
     tx.validation_results = vec![serde_json::to_value(&report).unwrap_or(json!({}))];
     let _ = tx.transition(TxStatus::Validating);
@@ -647,7 +694,24 @@ async fn propose(
         tx: tx.clone(),
         preview,
     });
-    Ok(Json(json!({ "transaction": tx })))
+    let cad_job = tx
+        .diff
+        .as_ref()
+        .is_some_and(|diff| !diff.geometry_affected.is_empty())
+        .then(|| live::spawn_cad_job(st.clone(), Some(tx.transaction_id.clone())));
+    Ok(Json(json!({ "transaction": tx, "cad_job": cad_job })))
+}
+
+fn tx_error_response(error: TxError) -> (StatusCode, Json<Value>) {
+    let status = match error {
+        TxError::Unauthorized { .. } | TxError::CommitRequired => StatusCode::FORBIDDEN,
+        TxError::UnsupportedOperation { .. } => StatusCode::UNPROCESSABLE_ENTITY,
+        TxError::Illegal { .. } | TxError::Apply(_) => StatusCode::BAD_REQUEST,
+    };
+    (
+        status,
+        Json(json!({ "error": { "code": error.code(), "message": error.to_string() } })),
+    )
 }
 
 #[derive(Deserialize)]
@@ -708,22 +772,20 @@ fn commit_inner(app: &App, id: &str, agent: &str) -> Json<Value> {
     if p.tx.status != TxStatus::Valid && p.tx.status != TxStatus::Approved {
         return Json(json!({"error": format!("cannot commit from {:?}", p.tx.status)}));
     }
-    let _ = p.tx.transition(TxStatus::Approved);
-    let _ = p.tx.transition(TxStatus::Committed);
-    p.tx.user_decision = UserDecision::Approve;
-    let mut doc = app.doc.lock().unwrap();
-    if let Err(e) = apply_operations(&mut doc, &p.tx.operations) {
+    let canonical = app.doc.lock().unwrap().clone();
+    let mut next_doc = canonical;
+    if let Err(e) = apply_operations(&mut next_doc, &p.tx.operations) {
         return Json(json!({"error": e.to_string()}));
     }
-    let rev = next_revision(&doc.project.revision_id);
-    let parent = doc.project.revision_id.clone();
+    let rev = next_revision(&next_doc.project.revision_id);
+    let parent = next_doc.project.revision_id.clone();
     let tx_id = p.tx.transaction_id.clone();
     let agent_name = p.tx.agent_id.clone();
     let message = p.tx.intent.clone();
     let geom = p.tx.geometry_hash_after.clone();
-    doc.project.revision_id = rev.clone();
-    let hash = doc.design_hash();
-    doc.revisions.push(Revision {
+    next_doc.project.revision_id = rev.clone();
+    let hash = next_doc.design_hash();
+    next_doc.revisions.push(Revision {
         id: rev.clone(),
         parent_revision: Some(parent),
         transaction_id: Some(tx_id),
@@ -734,6 +796,14 @@ fn commit_inner(app: &App, id: &str, agent: &str) -> Json<Value> {
         geometry_hash: geom,
         design_hash: Some(hash.clone()),
     });
+    let project_dir = app.project_dir.lock().unwrap().clone();
+    if let Err(error) = save_project_dir(&next_doc, &project_dir) {
+        return Json(json!({"error": {"code": "PERSIST_FAILED", "message": error.to_string()}}));
+    }
+    let _ = p.tx.transition(TxStatus::Approved);
+    let _ = p.tx.transition(TxStatus::Committed);
+    p.tx.user_decision = UserDecision::Approve;
+    *app.doc.lock().unwrap() = next_doc;
     log_line(
         app,
         "transaction.commit",
@@ -969,12 +1039,19 @@ async fn cad_import(
     } else {
         projects::create_imported_part(&mut doc, &safe, &rel, format, bbox, preview)
     };
+    let geometry_class = doc
+        .part(&part_id)
+        .and_then(|part| part.spatial.cad.as_ref())
+        .map(|cad| cad.geometry_class);
+    save_project_dir(&doc, &dir)
+        .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
     log_line(&st.0, "cad.import", &format!("{rel} -> {part_id}"));
     Ok(Json(json!({
         "ok": true,
         "part_id": part_id,
         "path": rel,
         "format": format,
+        "geometry_class": geometry_class,
         "bbox_m": bbox,
         "note": if format == "step" {
             "STEP stored as exact CAD. Spatial view uses envelope until a tessellation exists."

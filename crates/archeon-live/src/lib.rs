@@ -558,6 +558,7 @@ mod tests {
             ports: vec![],
             interfaces: vec![],
             mates: vec![],
+            joints: vec![],
             constraints: vec![],
             functions: vec![],
             flows: vec![],

@@ -16,6 +16,7 @@ export const OVERLAYS = [
   'NONE',
   'INTERFACES',
   'CONSTRAINTS',
+  'DATUMS',
   'REQUIREMENTS',
   'PROVENANCE',
   'EXPLODE_LINES',
@@ -89,6 +90,7 @@ export function primaryOverlayName(state: OverlayState): Overlay {
   if (state.explodeTrails) return 'EXPLODE_LINES';
   if (state.interfaces) return 'INTERFACES';
   if (state.constraints) return 'CONSTRAINTS';
+  if (state.datums) return 'DATUMS';
   if (state.provenance) return 'PROVENANCE';
   if (state.agentDiff) return 'AGENT_DIFF';
   if (state.analysis) return 'ANALYSIS';

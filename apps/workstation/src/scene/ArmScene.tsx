@@ -22,7 +22,7 @@ import {
   worldPortFromLocal
 } from '@archeon/scene-engine';
 import { useUi } from '../store';
-import { localInterfaceGraph, type Part } from '@archeon/design-protocol';
+import { localInterfaceGraph, type Feature, type Joint, type Part } from '@archeon/design-protocol';
 import type { RenderDebug } from '../store';
 
 const GOLD = '#D6A33A';
@@ -419,10 +419,10 @@ function CameraRig() {
     if (fitting.current <= 0) return;
     const k = 1 - Math.exp(-dt * 6.5);
     camera.position.lerp(goal.current.p, k);
-    const controls = state.controls as { target: THREE.Vector3; update: () => void } | undefined;
+    const controls = state.controls as unknown as { target?: THREE.Vector3; update?: () => void } | null;
     if (controls?.target) {
       controls.target.lerp(goal.current.c, k);
-      controls.update();
+      controls.update?.();
     }
     fitting.current -= dt * 1.8;
     if (camera.position.distanceTo(goal.current.p) < 0.012) fitting.current = 0;
@@ -434,6 +434,8 @@ export function ArmScene({
   parts,
   ports,
   interfaces,
+  joints,
+  features,
   assemblies,
   proposalParts,
   variantSets = []
@@ -441,6 +443,8 @@ export function ArmScene({
   parts: Part[];
   ports: { id: string; origin_m: [number, number, number]; host: string }[];
   interfaces: { id: string; a: string; b: string }[];
+  joints: Joint[];
+  features: Feature[];
   assemblies: { id: string; parent: string | null }[];
   proposalParts: Part[] | null;
   variantSets?: { id: string; parts: Part[] }[];
@@ -825,9 +829,49 @@ export function ArmScene({
               </mesh>
             );
           })}
+      {showDatums &&
+        joints
+          .filter((joint) => joint.id === selected)
+          .map((joint) => {
+            const end: [number, number, number] = [
+              joint.origin_m[0] + joint.axis[0] * 0.16,
+              joint.origin_m[1] + joint.axis[1] * 0.16,
+              joint.origin_m[2] + joint.axis[2] * 0.16
+            ];
+            return (
+              <group key={`joint-axis-${joint.id}`}>
+                <Line points={[joint.origin_m, end]} color={LAVENDER_HI} lineWidth={2.2} />
+                <mesh position={joint.origin_m}>
+                  <sphereGeometry args={[0.008, 12, 12]} />
+                  <meshBasicMaterial color={LAVENDER} />
+                </mesh>
+              </group>
+            );
+          })}
+      {selected &&
+        features
+          .filter((feature) => feature.id === selected)
+          .map((feature) => {
+            const host = world.find((entry) => entry.part.id === feature.part);
+            if (!host) return null;
+            const origin = new THREE.Vector3(...feature.frame.origin_m)
+              .applyEuler(new THREE.Euler(...host.part.spatial.rpy_rad, 'XYZ'))
+              .add(new THREE.Vector3(...host.pos));
+            const axis = new THREE.Vector3(...feature.frame.axis)
+              .applyEuler(new THREE.Euler(...feature.frame.rpy_rad, 'XYZ'))
+              .applyEuler(new THREE.Euler(...host.part.spatial.rpy_rad, 'XYZ'))
+              .normalize();
+            const end = origin.clone().addScaledVector(axis, 0.1);
+            return (
+              <Line
+                key={`feature-frame-${feature.id}`}
+                points={[origin.toArray(), end.toArray()]}
+                color={LAVENDER_HI}
+                lineWidth={1.8}
+              />
+            );
+          })}
       <OrbitControls makeDefault target={[0.4, 0, 0.15]} enableDamping={false} />
     </Canvas>
   );
 }
-
-

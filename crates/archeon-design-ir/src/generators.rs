@@ -3,7 +3,7 @@
 //! Output is DesignIR fragments (features, ports, envelope, provenance) — not Three.js meshes.
 //! Geometry is produced later by the CAD worker from those fragments.
 
-use crate::entities::{Feature, FeatureKind, Port};
+use crate::entities::{Feature, FeatureFrame, FeatureKind, Port};
 use crate::ids::EntityId;
 use archeon_provenance::Provenance;
 use serde::{Deserialize, Serialize};
@@ -58,6 +58,10 @@ fn feat(
         kind,
         semantic_role: role.into(),
         params,
+        frame: FeatureFrame {
+            host: Some(EntityId::new(part)),
+            ..Default::default()
+        },
         provenance: pv("cad-designer", reason),
     }
 }

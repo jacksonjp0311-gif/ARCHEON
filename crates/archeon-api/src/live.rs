@@ -1,5 +1,6 @@
 //! Live Design HTTP + CAD jobs + SSE. Events describe state; they never commit DesignIR.
 use super::{cad, log_line, projects, App, AppState};
+use archeon_design_ir::save_project_dir;
 use archeon_live::{
     three_length_variants, CadJob, CadJobStatus, EngineeringEvent, LiveDesignSession, Variant,
 };
@@ -46,6 +47,14 @@ pub fn emit_kind(app: &App, kind: &str, payload: Value) {
 }
 
 pub fn spawn_cad_job(st: AppState, transaction_id: Option<String>) -> CadJob {
+    let preview = transaction_id.as_ref().and_then(|id| {
+        st.0.proposal.lock().ok().and_then(|proposal| {
+            proposal
+                .as_ref()
+                .filter(|p| &p.tx.transaction_id == id)
+                .map(|p| p.preview.clone())
+        })
+    });
     let job = CadJob::queued(transaction_id.clone());
     st.0.live
         .jobs
@@ -74,11 +83,35 @@ pub fn spawn_cad_job(st: AppState, transaction_id: Option<String>) -> CadJob {
             json!({ "id": job_id, "status": "RUNNING" }),
         );
         let dir = st.0.project_dir.lock().unwrap().clone();
-        let result = cad::regenerate(&st.0.root, &dir).await;
+        let regen_dir =
+            if let (Some(tx), Some(preview)) = (transaction_id.as_ref(), preview.as_ref()) {
+                let preview_dir = dir
+                    .join(".preview")
+                    .join(tx.replace(|c: char| !c.is_ascii_alphanumeric() && c != '.', "_"));
+                if let Err(error) = std::fs::create_dir_all(&preview_dir)
+                    .and_then(|_| save_project_dir(preview, &preview_dir))
+                {
+                    if let Some(j) = st.0.live.jobs.lock().unwrap().get_mut(&job_id) {
+                        j.fail(error.to_string());
+                    }
+                    emit_kind(
+                        &st.0,
+                        "CAD_JOB_FAILED",
+                        json!({ "id": job_id, "error": error.to_string() }),
+                    );
+                    return;
+                }
+                preview_dir
+            } else {
+                dir.clone()
+            };
+        let result = cad::regenerate(&st.0.root, &regen_dir).await;
         match result {
             Ok(v) => {
-                if let Ok(mut doc) = st.0.doc.lock() {
-                    projects::attach_cad_files(&mut doc, &dir);
+                if transaction_id.is_none() {
+                    if let Ok(mut doc) = st.0.doc.lock() {
+                        projects::attach_cad_files(&mut doc, &dir);
+                    }
                 }
                 *st.0.live.geom_rev.lock().unwrap() += 1;
                 if let Some(j) = st.0.live.jobs.lock().unwrap().get_mut(&job_id) {

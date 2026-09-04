@@ -39,7 +39,7 @@ fn parse<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T, LoadError> {
 pub fn load_project_dir(dir: &Path) -> Result<DesignDocument, LoadError> {
     let project: Project = parse(&dir.join("project.json"))?;
     let mut doc = DesignDocument {
-        schema_version: "0.1.0".into(),
+        schema_version: "0.6.0".into(),
         project,
         systems: vec![],
         assemblies: vec![],
@@ -49,6 +49,7 @@ pub fn load_project_dir(dir: &Path) -> Result<DesignDocument, LoadError> {
         ports: vec![],
         interfaces: vec![],
         mates: vec![],
+        joints: vec![],
         constraints: vec![],
         functions: vec![],
         flows: vec![],
@@ -87,11 +88,43 @@ pub fn load_project_dir(dir: &Path) -> Result<DesignDocument, LoadError> {
         doc.ports = take_array(&v, "ports").unwrap_or_default();
         doc.mates = take_array(&v, "mates").unwrap_or_default();
     }
+    if dir.join("joints.json").exists() {
+        let v = read_json(&dir.join("joints.json"))?;
+        doc.joints = take_array(&v, "joints")?;
+        for joint in &mut doc.joints {
+            joint.dof = match joint.joint_type {
+                JointType::Fixed => 0,
+                JointType::Revolute | JointType::Prismatic => 1,
+            };
+        }
+    }
     if dir.join("features.json").exists() {
         let v = read_json(&dir.join("features.json"))?;
         doc.features = take_array(&v, "features")?;
         doc.datums = take_array(&v, "datums").unwrap_or_default();
         doc.constraints = take_array(&v, "constraints").unwrap_or_default();
+        // Legacy project files predate FeatureFrame. Normalize them at the
+        // canonical loading boundary so every runtime consumer sees an
+        // explicit host and engineering axis.
+        for feature in &mut doc.features {
+            if feature.frame.host.is_none() {
+                feature.frame.host = Some(feature.part.clone());
+            }
+            if feature.frame.datum_id.is_none() {
+                feature.frame.datum_id = doc
+                    .parts
+                    .iter()
+                    .find(|part| part.id == feature.part)
+                    .and_then(|part| part.spatial.parent_axis.clone());
+            }
+            if let Some(datum_id) = &feature.frame.datum_id {
+                if let Some(datum) = doc.datums.iter().find(|datum| &datum.id == datum_id) {
+                    if feature.frame.local.axis == [0.0, 0.0, 1.0] {
+                        feature.frame.local.axis = datum.axis;
+                    }
+                }
+            }
+        }
     }
     if dir.join("materials.json").exists() {
         let v = read_json(&dir.join("materials.json"))?;

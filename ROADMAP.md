@@ -2,6 +2,22 @@
 
 Status language: **shipped**, **partial**, **not started**. Nothing here is a claim that a robot or CAD kernel is production-qualified.
 
+## v0.6.0 — Executable Mechanical Intelligence — shipped in this tree
+
+- Real DTP execution for ports, interfaces, mates, datums, sketches, extrudes, and bounded analyses; typed unsupported errors
+- Canonical transport schema with generated TypeScript and drift checks
+- Explicit right-handed, Z-up, X-forward meter `FeatureFrame`
+- First-class fixed/revolute/prismatic joints and generic mechanism graph queries
+- Typed mate/constraint vocabulary and declared/derived/solved/validated state
+- Elbow benchmark driven by the same semantic resolution and graph tools as shoulder inspection
+- Explicit seven-class geometry truth model
+- CAD feature accounting, orientation, hashes, revisions, and honest fallback reports
+- Typed validation contracts preserving facts versus assumptions
+- Progressive Inspector, grouped semantic search, optional joint/feature-frame overlays
+- Three-clock realtime view behavior preserved; human COMMIT remains the sole canonical write authority
+
+Partial: build123d feature depth depends on the optional runtime; geometric solving, dynamics, FEA, trajectory collision, catalog intelligence, and manufacturing qualification remain unsupported.
+
 ## Phase 0 — Architecture foundation — shipped in this tree
 
 - DesignIR types and canonical JSON

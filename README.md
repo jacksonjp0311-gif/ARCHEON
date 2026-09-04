@@ -5,12 +5,12 @@
 <h1 align="center">ARCHEON</h1>
 
 <p align="center">
-  <strong>Agentic Spatial Engineering OS</strong><br />
-  From intent to engineered reality.
+  <strong>v0.6.0 — Executable Mechanical Intelligence</strong><br />
+  Governed mechanism reasoning over DesignIR.
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.5.0-D9A441?style=for-the-badge&labelColor=050505" alt="0.5.0" />
+  <img src="https://img.shields.io/badge/version-0.6.0-D9A441?style=for-the-badge&labelColor=050505" alt="0.6.0" />
   <img src="https://img.shields.io/badge/license-MIT-ff981b?style=for-the-badge&labelColor=050b12" alt="MIT" />
   <img src="https://img.shields.io/badge/kernel-DesignIR-6ce391?style=for-the-badge&labelColor=050b12" alt="DesignIR" />
   <img src="https://img.shields.io/badge/CAD-STEP%20%2B%20STL-8ec8de?style=for-the-badge&labelColor=050b12" alt="CAD" />
@@ -33,7 +33,9 @@ off-the-shelf bearings, and a parts budget below $2,000.
 
 …and get a semantic assembly, interfaces, parametric features, exact solids, critique, visual diffs, and a human commit gate.
 
-This repository is **v0.5 Generative Engineering Fidelity**: assemblies are interface-first, parametric, and kernel-authored (STEP/STL). Three.js primitives are a viewport fallback, not the design path. DesignIR, DTP, and human COMMIT remain the law. It does **not** claim a production robot, FEA, manufacturer catalogs, or ISO fit classes.
+This repository is **ARCHEON v0.6.0 — Executable Mechanical Intelligence**. First-class joints, typed mates, explicit feature frames, graph-query tools, validation contracts, and real DTP dry-runs allow the same deterministic runtime to inspect the arm’s shoulder and elbow. Three.js primitives remain a viewport fallback. Agents can READ and PROPOSE; only a human can COMMIT, and committed DesignIR is persisted to the project files.
+
+It does **not** claim a full geometric constraint solver, dynamics, FEA, trajectory collision, manufacturer catalogs, CAM, production qualification, or ISO fit validation.
 
 ---
 
@@ -105,6 +107,12 @@ Agents refer to **semantic topology** (`Part: ShoulderHousing / Feature: Bearing
 | Live Design sessions + async CAD jobs | Live |
 | Scene command bus + Ctrl+K palette | Live |
 | Design Transaction Protocol + human COMMIT | Live |
+| Real CreatePort/Interface/Mate/Datum/Sketch/Extrude/RunAnalysis dry-runs | Live |
+| First-class FIXED/REVOLUTE/PRISMATIC joints | Live |
+| Generic assembly/joint/interface/load-path graph tools | Live |
+| FeatureFrame shared by preview, OCCT path, overlay, and validation | Live |
+| Generated TypeScript transport schema with drift check | Live |
+| Typed engineering validation contracts | Live; graph/semantic scope |
 | Local agent commands (no API key required) | Live |
 | Project load (`projects/<name>/`) | Live |
 | CAD import (STL, STEP, glTF, OBJ) | Live |
@@ -117,9 +125,10 @@ Agents refer to **semantic topology** (`Part: ShoulderHousing / Feature: Bearing
 | Artifact | Truth class |
 |---|---|
 | Workstation box/cylinder | DesignIR spatial envelope |
-| Imported STL / glTF | **Visualization mesh**, not BREP |
-| Imported STEP | **Exact file stored**; preview is tessellation if present |
-| Kernel STEP (boxes/cylinders) | Exact B-rep for those primitives |
+| Imported STL / glTF | `SOURCE_MESH`, never BREP |
+| Imported STEP | `EXACT_BREP`; displayed preview is `EXACT_BREP_TESSELLATION` |
+| Kernel STEP (supported complete feature set) | `GENERATED_EXACT` |
+| Incomplete primitive feature projection | `GENERATED_PREVIEW` or `PRIMITIVE_FALLBACK` |
 | Mass | Volume × handbook density → **ASSUMED** |
 | Collision | Not checked unless an OCCT Boolean actually ran |
 
@@ -147,11 +156,15 @@ Local commands (no key):
 
 ```text
 give me the shoulder
+give me the elbow
+what rotates here?
+show me the joint
+show the load path
+make the forearm 50 mm longer
 break it apart
 show interfaces
 show me what this connects to
 where is the weakest assumption
-try a larger bearing
 clear selection
 explode assembly
 isolate shoulder

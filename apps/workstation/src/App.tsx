@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { type ViewMode } from '@archeon/spatial-grammar';
-import { neighborhoodOf, type Part, type Requirement } from '@archeon/design-protocol';
+import { neighborhoodOf, type DesignDocument, type Part } from '@archeon/design-protocol';
 import { resolveExplodeContext, type SpreadPreset } from '@archeon/scene-engine';
 import { ArmScene } from './scene/ArmScene';
 import { AgentHud } from './components/AgentHud';
@@ -17,24 +17,14 @@ import { ProjectBrowser } from './components/ProjectBrowser';
 import { RadialMenu } from './components/RadialMenu';
 import { ViewNav } from './components/ViewNav';
 import { Workbench } from './components/Workbench';
-import type { PaletteItem } from './services/palette';
+import { semanticCatalog, type PaletteItem } from './services/palette';
 import type { ContextKind } from './services/palette';
 import { fromWorkstationMode, HUMAN_MODES, loadHuds, toWorkstationMode } from './services/hudManager';
 import { getJson, postJson } from './api';
 import { useUi } from './store';
 import { ARCHEON_PRODUCT, ARCHEON_VERSION } from './version';
 
-interface DesignDoc {
-  project: { id: string; name: string; revision_id: string; branch: string; kernel: string };
-  parts: Part[];
-  assemblies: { id: string; name: string; parent: string | null; semantic_role: string }[];
-  features: { id: string; part: string; kind: string; semantic_role: string }[];
-  interfaces: { id: string; name: string; kind: string; a: string; b: string; semantic_role: string }[];
-  ports: { id: string; host: string; role: string; origin_m: [number, number, number] }[];
-  requirements: Requirement[];
-  materials: { id: string; name: string; density_kg_m3: number | null; notes: string }[];
-  parameters: Record<string, { name: string; value: number; unit: string }>;
-}
+type DesignDoc = DesignDocument;
 
 interface ProjectMeta {
   project: DesignDoc['project'];
@@ -91,7 +81,7 @@ export default function App() {
   const [val, setVal] = useState<{ findings?: { severity: string; code: string; entity?: string; message: string }[]; error_count?: number } | null>(null);
   const [ledger, setLedger] = useState<{ items: { transaction_id: string; status: string; intent: string; agent_id: string }[] }>({ items: [] });
   const [chat, setChat] = useState<{ who: string; text: string }[]>([
-    { who: 'SYSTEM', text: 'ARCHEON Phase 1. Geometry on screen is a DesignIR spatial projection. Exact BREP lives in the CAD worker.' }
+    { who: 'SYSTEM', text: 'ARCHEON v0.6.0 Executable Mechanical Intelligence. Geometry is one DesignIR projection; exact BREP lives in the CAD worker.' }
   ]);
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
@@ -232,35 +222,34 @@ export default function App() {
         ui.setOverlay('PROVENANCE');
         ui.setHudOpen(true);
       }
-      if (v.kind === 'open_shoulder' || v.kind === 'ghost_housing') {
-        ui.setGhostRoles(['shoulder_housing', 'service_cover']);
-        ui.setSectionOn(true);
-        ui.setSectionAxis('y');
-        ui.setSelected('asm.shoulder');
+      if (v.kind === 'show_joint' && v.id) {
+        ui.setSelected(v.id);
+        ui.setOverlay('DATUMS');
         ui.setHudOpen(true);
       }
+      if (v.kind === 'show_load_path' && v.id && design) {
+        const scopeId = v.id;
+        const joint = design.joints.find((candidate) =>
+          candidate.id === scopeId || candidate.parent === scopeId || candidate.child === scopeId || candidate.rotating_group.includes(scopeId)
+        );
+        ui.setNeighborhood(joint?.load_path ?? []);
+        ui.setGhostOthers(true);
+        ui.setOverlay('INTERFACES');
+      }
       if (v.kind === 'explode_stack') {
-        const scope = v.id || 'asm.shoulder';
-        ui.setStrategy('STACK');
-        ui.dispatch({ op: 'explode_entity', entity_id: scope, factor: v.factor ?? 0.9 });
+        const scope = v.id || ui.selectedId;
+        if (scope) {
+          ui.setStrategy('STACK');
+          ui.dispatch({ op: 'explode_entity', entity_id: scope, factor: v.factor ?? 0.9 });
+        }
       }
       if (v.kind === 'cutaway') {
         ui.setSectionOn(v.enabled !== false);
         ui.setView('CUTAWAY');
       }
-      if (v.kind === 'isolate_internals') {
-        ui.setGhostRoles(['shoulder_housing', 'service_cover']);
-        ui.setIsolate('asm.shoulder');
-      }
       if (v.kind === 'show_load_paths') {
         ui.setOverlay('INTERFACES');
-        ui.setNeighborhood(
-          (design?.parts ?? [])
-            .filter((p) =>
-              ['drive_shaft', 'bearing', 'shoulder_housing', 'shoulder_base', 'upper_arm_mount'].includes(p.semantic_role)
-            )
-            .map((p) => p.id)
-        );
+        ui.setNeighborhood([...(design?.joints ?? []).flatMap((joint) => joint.load_path)]);
         ui.setGhostOthers(true);
       }
       if (v.kind === 'restore_display') {
@@ -403,13 +392,7 @@ export default function App() {
   const activity = (meta?.logs ?? []).slice(-12);
 
   const paletteCatalog: PaletteItem[] = [
-    ...(doc?.parts.map((p) => ({ id: p.id, label: p.name, kind: 'PART' as const })) ?? []),
-    ...(doc?.assemblies.map((a) => ({ id: a.id, label: a.name, kind: 'ASSEMBLY' as const })) ?? []),
-    ...(doc?.requirements.map((r) => ({ id: r.id, label: r.id, kind: 'REQUIREMENT' as const })) ?? []),
-    ...(doc?.interfaces.map((i) => ({ id: i.id, label: i.name, kind: 'INTERFACE' as const })) ?? []),
-    ...(doc?.features.map((f) => ({ id: f.id, label: f.id, kind: 'FEATURE' as const, hint: f.kind })) ?? []),
-    ...(doc?.interfaces.filter((i) => i.kind === 'mechanical').map((i) => ({ id: i.id, label: i.name, kind: 'JOINT' as const })) ?? []),
-    { id: 'an.reach', label: 'Reach (link-sum)', kind: 'ANALYSIS' as const, hint: 'DERIVED · not FEA' },
+    ...(doc ? semanticCatalog(doc) : []),
     { id: 'cmd.explode', label: 'explode', kind: 'COMMAND', hint: 'explode selected' },
     { id: 'cmd.restore', label: 'restore display', kind: 'COMMAND' },
     { id: 'cmd.home', label: 'home view', kind: 'COMMAND' },
@@ -467,11 +450,20 @@ export default function App() {
     } else if (item.kind === 'AGENT') {
       ui.setHudOpen(true);
     } else {
-      ui.dispatch({ op: 'focus_entity', entity_id: item.id, ghost_others: true });
+      if (item.focusId) ui.setFocusId(item.focusId);
+      ui.setSelected(item.id);
+      if (item.kind === 'FEATURE' || item.kind === 'JOINT') ui.setOverlay('DATUMS');
     }
   }
 
   const healthy = connected && (val?.error_count ?? 0) === 0;
+  const geometrySummary = Object.entries(
+    (doc?.parts ?? []).reduce<Record<string, number>>((counts, part) => {
+      const key = part.spatial.cad?.geometry_class ?? 'PRIMITIVE_FALLBACK';
+      counts[key] = (counts[key] ?? 0) + 1;
+      return counts;
+    }, {})
+  ).map(([kind, count]) => `${kind} ${count}`).join(' · ');
   const humanMode = fromWorkstationMode(mode);
 
   return (
@@ -531,6 +523,8 @@ export default function App() {
             parts={doc.parts}
             ports={doc.ports}
             interfaces={doc.interfaces}
+            joints={doc.joints}
+            features={doc.features}
             assemblies={doc.assemblies}
             proposalParts={preview?.parts ?? null}
             variantSets={variants.map((v) => ({ id: v.id, parts: v.preview_parts ?? [] }))}
@@ -551,7 +545,7 @@ export default function App() {
         <ContextMenu kind={contextKind} onAction={onContextAction} />
         {doc && (
           <FloatingHud id="project" title="PROJECT BROWSER">
-            <ProjectBrowser parts={doc.parts} assemblies={doc.assemblies} features={doc.features} interfaces={doc.interfaces} requirements={doc.requirements} />
+            <ProjectBrowser document={doc} />
           </FloatingHud>
         )}
         <FloatingHud id="inspector" title="INSPECTOR">
@@ -563,6 +557,10 @@ export default function App() {
             interfaces={doc?.interfaces ?? []}
             ports={doc?.ports ?? []}
             requirements={doc?.requirements ?? []}
+            joints={doc?.joints ?? []}
+            analyses={doc?.analyses ?? []}
+            evidence={doc?.evidence ?? []}
+            mates={doc?.mates ?? []}
             materials={doc?.materials ?? []}
             revision={doc?.project.revision_id ?? 'rev.0001'}
           />
@@ -579,6 +577,7 @@ export default function App() {
             errorCount={val?.error_count}
             provider={meta?.provider ? `${meta.provider.id} / ${meta.provider.model}` : undefined}
             cadNote={cad?.note}
+            geometrySummary={geometrySummary}
           />
           <div className="insp-actions">
             <label className="top-btn">IMPORT CAD

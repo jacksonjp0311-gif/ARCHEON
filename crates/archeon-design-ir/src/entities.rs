@@ -105,6 +105,9 @@ pub struct CadRef {
     /// Provenance of the CAD file itself (SOURCE imported, GENERATED kernel).
     #[serde(default)]
     pub truth: String,
+    /// Explicit fidelity of the referenced geometry artifact.
+    #[serde(default)]
+    pub geometry_class: GeometryClass,
     #[serde(default)]
     pub note: String,
     /// Mesh is authored in this frame. CAD_LOCAL = origin at the solid's local origin (not recentered in the viewer).
@@ -153,22 +156,46 @@ impl CadRef {
         note: impl Into<String>,
         source: impl Into<String>,
     ) -> Self {
+        let format = format.into();
+        let source = source.into();
+        let geometry_class = match (format.as_str(), source.to_ascii_uppercase().as_str()) {
+            ("step" | "stp", "SOURCE") => GeometryClass::ExactBrep,
+            ("step" | "stp", "GENERATED") => GeometryClass::GeneratedExact,
+            ("stl" | "glb" | "gltf" | "obj", "SOURCE") => GeometryClass::SourceMesh,
+            ("stl" | "glb" | "gltf" | "obj", "GENERATED") => GeometryClass::GeneratedPreview,
+            _ => GeometryClass::SemanticOnly,
+        };
         Self {
-            format: format.into(),
+            format,
             path: path.into(),
             preview,
             truth: truth.into(),
+            geometry_class,
             note: note.into(),
             coordinate_frame: cad_local_frame(),
             local_origin: [0.0, 0.0, 0.0],
             units: meters_unit(),
             geometry_revision: String::new(),
-            source: source.into(),
+            source,
             up_axis: z_up_axis(),
             handedness: right_handed(),
             forward_axis: x_forward(),
         }
     }
+}
+
+/// Fidelity of a geometry artifact. This is independent from entity provenance.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum GeometryClass {
+    ExactBrep,
+    ExactBrepTessellation,
+    SourceMesh,
+    GeneratedExact,
+    GeneratedPreview,
+    SemanticOnly,
+    #[default]
+    PrimitiveFallback,
 }
 
 fn one() -> u32 {
@@ -249,7 +276,62 @@ pub struct Feature {
     pub semantic_role: String,
     #[serde(default)]
     pub params: BTreeMap<String, serde_json::Value>,
+    #[serde(default)]
+    pub frame: FeatureFrame,
     pub provenance: Provenance,
+}
+
+/// A local engineering frame in ARCHEON's right-handed Z-up, X-forward world.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LocalFrame {
+    #[serde(default)]
+    pub origin_m: [f64; 3],
+    #[serde(default)]
+    pub rpy_rad: [f64; 3],
+    #[serde(default = "unit_z")]
+    pub axis: [f64; 3],
+}
+
+impl Default for LocalFrame {
+    fn default() -> Self {
+        Self {
+            origin_m: [0.0, 0.0, 0.0],
+            rpy_rad: [0.0, 0.0, 0.0],
+            axis: unit_z(),
+        }
+    }
+}
+
+impl LocalFrame {
+    /// Axis after intrinsic roll/pitch/yaw, using Rz(yaw)·Ry(pitch)·Rx(roll).
+    pub fn axis_in_parent(&self) -> [f64; 3] {
+        let [roll, pitch, yaw] = self.rpy_rad;
+        let (cr, sr) = (roll.cos(), roll.sin());
+        let (cp, sp) = (pitch.cos(), pitch.sin());
+        let (cy, sy) = (yaw.cos(), yaw.sin());
+        let [x, y, z] = self.axis;
+        let raw = [
+            cy * cp * x + (cy * sp * sr - sy * cr) * y + (cy * sp * cr + sy * sr) * z,
+            sy * cp * x + (sy * sp * sr + cy * cr) * y + (sy * sp * cr - cy * sr) * z,
+            -sp * x + cp * sr * y + cp * cr * z,
+        ];
+        let magnitude = raw.iter().map(|value| value * value).sum::<f64>().sqrt();
+        if magnitude <= f64::EPSILON {
+            return [0.0, 0.0, 0.0];
+        }
+        raw.map(|value| value / magnitude)
+    }
+}
+
+/// Feature placement relative to its host part and, optionally, a semantic datum.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct FeatureFrame {
+    #[serde(default)]
+    pub host: Option<EntityId>,
+    #[serde(default)]
+    pub datum_id: Option<EntityId>,
+    #[serde(flatten)]
+    pub local: LocalFrame,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -370,22 +452,182 @@ pub struct Interface {
 pub struct Mate {
     pub id: EntityId,
     pub interface: EntityId,
-    pub kind: String,
+    pub kind: MateKind,
     #[serde(default)]
     pub offset_m: f64,
+    #[serde(default)]
+    pub state: ConstraintState,
     pub provenance: Provenance,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum MateKind {
+    #[serde(alias = "coincident")]
+    Coincident,
+    #[serde(alias = "concentric")]
+    Concentric,
+    #[serde(alias = "distance")]
+    Distance,
+    #[serde(alias = "angle")]
+    Angle,
+    #[serde(alias = "fixed")]
+    Fixed,
+    #[serde(alias = "revolute")]
+    Revolute,
+    #[serde(alias = "prismatic")]
+    Prismatic,
+    #[serde(alias = "planar")]
+    Planar,
+    #[serde(alias = "axial")]
+    Axial,
+    #[serde(alias = "fastened")]
+    Fastened,
+    #[serde(alias = "bearing_support")]
+    BearingSupport,
+}
+
+impl MateKind {
+    pub fn parse(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "coincident" => Some(Self::Coincident),
+            "concentric" => Some(Self::Concentric),
+            "distance" => Some(Self::Distance),
+            "angle" => Some(Self::Angle),
+            "fixed" => Some(Self::Fixed),
+            "revolute" => Some(Self::Revolute),
+            "prismatic" => Some(Self::Prismatic),
+            "planar" => Some(Self::Planar),
+            "axial" => Some(Self::Axial),
+            "fastened" => Some(Self::Fastened),
+            "bearing_support" => Some(Self::BearingSupport),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ConstraintState {
+    #[default]
+    Declared,
+    Derived,
+    Solved,
+    Validated,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ConstraintKind {
+    #[serde(alias = "coincident")]
+    Coincident,
+    #[serde(alias = "concentric", alias = "coaxial")]
+    Concentric,
+    #[serde(alias = "distance", alias = "dimensional")]
+    Distance,
+    #[serde(alias = "angle")]
+    Angle,
+    #[serde(alias = "fixed")]
+    Fixed,
+    #[serde(alias = "revolute")]
+    Revolute,
+    #[serde(alias = "prismatic")]
+    Prismatic,
+    #[serde(alias = "planar")]
+    Planar,
+    #[serde(alias = "axial")]
+    Axial,
+    #[serde(alias = "fastened")]
+    Fastened,
+    #[serde(alias = "bearing_support")]
+    BearingSupport,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConstraintEntity {
     pub id: EntityId,
-    pub kind: String,
+    pub kind: ConstraintKind,
     pub entities: Vec<EntityId>,
     #[serde(default)]
     pub value: Option<f64>,
     #[serde(default)]
     pub unit: Option<String>,
+    #[serde(default)]
+    pub state: ConstraintState,
     pub provenance: Provenance,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum JointType {
+    Fixed,
+    Revolute,
+    Prismatic,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JointLimits {
+    pub lower: f64,
+    pub upper: f64,
+    pub unit: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JointDrive {
+    #[serde(default)]
+    pub kind: String,
+    #[serde(default)]
+    pub actuator: Option<EntityId>,
+    #[serde(default)]
+    pub ratio: Option<f64>,
+}
+
+/// First-class mechanical relationship between two semantic hosts.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Joint {
+    pub id: EntityId,
+    pub name: String,
+    pub parent: EntityId,
+    pub child: EntityId,
+    pub joint_type: JointType,
+    #[serde(default)]
+    pub dof: u8,
+    #[serde(default)]
+    pub parent_frame: LocalFrame,
+    #[serde(default)]
+    pub child_frame: LocalFrame,
+    #[serde(default = "unit_z")]
+    pub axis: [f64; 3],
+    #[serde(default)]
+    pub origin_m: [f64; 3],
+    #[serde(default)]
+    pub limits: Option<JointLimits>,
+    #[serde(default)]
+    pub position: Option<f64>,
+    #[serde(default)]
+    pub velocity: Option<f64>,
+    #[serde(default)]
+    pub drive: Option<JointDrive>,
+    #[serde(default)]
+    pub interfaces: Vec<EntityId>,
+    #[serde(default)]
+    pub rotating_group: Vec<EntityId>,
+    #[serde(default)]
+    pub load_path: Vec<EntityId>,
+    #[serde(default)]
+    pub load_role: String,
+    #[serde(default)]
+    pub service_role: String,
+    pub provenance: Provenance,
+}
+
+impl Joint {
+    pub fn dof(&self) -> u8 {
+        match self.joint_type {
+            JointType::Fixed => 0,
+            JointType::Revolute | JointType::Prismatic => 1,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1,51 +1,13 @@
-export type ProvenanceClass =
-  | 'SOURCE'
-  | 'DERIVED'
-  | 'GENERATED'
-  | 'SIMULATED'
-  | 'VALIDATED'
-  | 'MEASURED'
-  | 'ASSUMED'
-  | 'UNVERIFIED'
-  | 'USER_LOCKED';
-
-export interface Provenance {
-  class: ProvenanceClass;
-  created_by: string;
-  reason: string;
-  requirement_ids: string[];
-  agent_id: string | null;
-  tools: string[];
-  evidence_ids: string[];
-  revision_id: string;
-  user_approved: boolean;
-}
-
-export type Primitive =
-  | { kind: 'box'; sx: number; sy: number; sz: number }
-  | { kind: 'cylinder'; radius: number; height: number };
-
-export interface CadRef {
-  format: string;
-  path: string;
-  preview?: string | null;
-  truth: string;
-  note: string;
-  /** Mesh vertices live in this frame. CAD_LOCAL = solid local origin, not viewer-recentered. */
-  coordinate_frame?: string;
-  local_origin?: [number, number, number];
-  units?: string;
-  geometry_revision?: string;
-  source?: string;
-  /** Declared source axes. Default ARCHEON engineering: Z up, X forward, right-handed. Never inferred by rotating the mesh. */
-  up_axis?: string;
-  handedness?: string;
-  forward_axis?: string;
-}
+export * from './generated';
+import type { CadRef } from './generated';
 
 export type GeometryDisplay =
-  | 'EXACT CAD TESSELLATION'
-  | 'GENERATED MESH'
+  | 'EXACT BREP'
+  | 'EXACT BREP TESSELLATION'
+  | 'SOURCE MESH'
+  | 'GENERATED EXACT'
+  | 'GENERATED PREVIEW'
+  | 'SEMANTIC ONLY'
   | 'DESIGNIR PRIMITIVE FALLBACK';
 
 /** What the viewport should claim for a part. Drawn mode wins over metadata. */
@@ -54,48 +16,30 @@ export function geometryDisplay(
   drawn: 'cad' | 'primitive' | 'hidden' = 'cad'
 ): GeometryDisplay {
   if (drawn !== 'cad' || !cad) return 'DESIGNIR PRIMITIVE FALLBACK';
-  const src = (cad.source || cad.truth || '').toUpperCase();
-  if (src === 'GENERATED') return 'GENERATED MESH';
-  return 'EXACT CAD TESSELLATION';
+  const cls = cad.geometry_class || (() => {
+    const format = cad.format.toLowerCase();
+    const source = (cad.source || cad.truth || '').toUpperCase();
+    if (source === 'SOURCE' && ['stl', 'glb', 'gltf', 'obj'].includes(format)) return 'SOURCE_MESH';
+    if (source === 'SOURCE' && ['step', 'stp'].includes(format)) return 'EXACT_BREP_TESSELLATION';
+    if (source === 'GENERATED') return 'GENERATED_PREVIEW';
+    return 'PRIMITIVE_FALLBACK';
+  })();
+  if (cls === 'EXACT_BREP' && cad.preview) return 'EXACT BREP TESSELLATION';
+  if (cls === 'GENERATED_EXACT' && cad.preview) return 'GENERATED PREVIEW';
+  const labels: Record<string, GeometryDisplay> = {
+    EXACT_BREP: 'EXACT BREP',
+    EXACT_BREP_TESSELLATION: 'EXACT BREP TESSELLATION',
+    SOURCE_MESH: 'SOURCE MESH',
+    GENERATED_EXACT: 'GENERATED EXACT',
+    GENERATED_PREVIEW: 'GENERATED PREVIEW',
+    SEMANTIC_ONLY: 'SEMANTIC ONLY',
+    PRIMITIVE_FALLBACK: 'DESIGNIR PRIMITIVE FALLBACK'
+  };
+  return labels[cls] ?? 'DESIGNIR PRIMITIVE FALLBACK';
 }
 
-export interface Spatial {
-  origin_m: [number, number, number];
-  rpy_rad: [number, number, number];
-  primitive: Primitive;
-  assembly_stage: number;
-  explosion_vector: [number, number, number];
-  explosion_distance_m: number;
-  radial_group: string | null;
-  parent_axis: string | null;
-  service_path: [number, number, number][];
-  cad?: CadRef | null;
-}
-
-export interface Part {
-  id: string;
-  name: string;
-  parent: string | null;
-  system: string | null;
-  material: string | null;
-  semantic_role: string;
-  qty: number;
-  catalog_ref: string | null;
-  spatial: Spatial;
-  provenance: Provenance;
-}
-
-export interface Requirement {
-  id: string;
-  text: string;
-  quantity: string | null;
-  operator: string | null;
-  value: number | null;
-  unit: string | null;
-  acceptance: string;
-  satisfied: boolean | null;
-  evidence: string[];
-  provenance: Provenance;
+export function hasRenderableCad(cad: CadRef | null | undefined): boolean {
+  return !!cad && (!!cad.preview || cad.format.toLowerCase() === 'stl');
 }
 
 export const LOCAL_COMMANDS = [

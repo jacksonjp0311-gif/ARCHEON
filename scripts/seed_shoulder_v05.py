@@ -538,7 +538,24 @@ def main() -> None:
             "provenance": pv("components", "Thread reference only. Helix BREP not generated.", cls="ASSUMED"),
         },
     ]
+    # FeatureFrame is canonical in v0.6.0. Seed every authored feature with an
+    # explicit host and engineering frame; datum axes remain Z-up by default
+    # unless the part declares a parent joint axis.
+    part_by_id = {p["id"]: p for p in keep + shoulder}
+    for feature in features:
+        parent_axis = (part_by_id.get(feature["part"], {}).get("spatial") or {}).get("parent_axis")
+        feature["frame"] = {
+            "host": feature["part"],
+            "datum_id": parent_axis,
+            "origin_m": [0.0, 0.0, 0.0],
+            "rpy_rad": [0.0, 0.0, 0.0],
+            "axis": [0.0, 0.0, 1.0],
+        }
     datums = json.loads((ARM / "features.json").read_text(encoding="utf-8"))["datums"]
+    datum_axes = {datum["id"]: datum.get("axis", [0.0, 0.0, 1.0]) for datum in datums}
+    for feature in features:
+        if feature["frame"]["datum_id"] in datum_axes:
+            feature["frame"]["axis"] = datum_axes[feature["frame"]["datum_id"]]
     constraints = json.loads((ARM / "features.json").read_text(encoding="utf-8"))["constraints"]
     (ARM / "features.json").write_text(
         json.dumps({"datums": datums, "features": features, "constraints": constraints}, indent=2)
@@ -1172,7 +1189,7 @@ def main() -> None:
 
     proj = json.loads((ARM / "project.json").read_text(encoding="utf-8"))
     proj["description"] = (
-        "Six-axis benchtop arm. v0.5 ENGINEERING shoulder: interface-first bearing-supported pitch joint. "
+        "Six-axis benchtop arm benchmark for ARCHEON v0.6.0 executable mechanical intelligence. "
         "Not a production robot."
     )
     proj["revision_id"] = "rev.0002"

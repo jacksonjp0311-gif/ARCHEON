@@ -189,5 +189,66 @@ def write_box_with_y_hole_stl(
         f.write("endsolid archeon_box_hole\n")
 
 
+def write_box_with_axis_hole_stl(
+    path: str,
+    sx: float,
+    sy: float,
+    sz: float,
+    hole_r: float,
+    axis: tuple[float, float, float] = (0.0, 0.0, 1.0),
+    origin: tuple[float, float, float] = (0.0, 0.0, 0.0),
+    segments: int = 28,
+) -> None:
+    """PREVIEW hole wall using the explicit FeatureFrame axis and origin.
+
+    The outer envelope remains a box. This is deliberately not called a
+    Boolean BREP; the exact cut is delegated to the OCCT adapter.
+    """
+    ax, ay, az = axis
+    mag = math.sqrt(ax * ax + ay * ay + az * az)
+    if mag <= 1e-12:
+        raise ValueError("feature axis must be non-zero")
+    w = (ax / mag, ay / mag, az / mag)
+    helper = (1.0, 0.0, 0.0) if abs(w[0]) < 0.9 else (0.0, 1.0, 0.0)
+    ux = helper[1] * w[2] - helper[2] * w[1]
+    uy = helper[2] * w[0] - helper[0] * w[2]
+    uz = helper[0] * w[1] - helper[1] * w[0]
+    um = math.sqrt(ux * ux + uy * uy + uz * uz)
+    u = (ux / um, uy / um, uz / um)
+    v = (
+        w[1] * u[2] - w[2] * u[1],
+        w[2] * u[0] - w[0] * u[2],
+        w[0] * u[1] - w[1] * u[0],
+    )
+    length = abs(w[0]) * sx + abs(w[1]) * sy + abs(w[2]) * sz
+    half = length * 0.6
+
+    def ring(offset: float):
+        points = []
+        for i in range(segments):
+            angle = 2 * math.pi * i / segments
+            radial = tuple(
+                hole_r * (u[j] * math.cos(angle) + v[j] * math.sin(angle)) for j in range(3)
+            )
+            points.append(tuple(origin[j] + w[j] * offset + radial[j] for j in range(3)))
+        return points
+
+    # Start with the normal box mesh, then append the oriented inner wall.
+    write_box_stl(path, sx, sy, sz)
+    original = Path(path).read_text(encoding="ascii").splitlines()
+    if original and original[-1].startswith("endsolid"):
+        original.pop()
+    r0, r1 = ring(-half), ring(half)
+    with open(path, "w", encoding="ascii") as f:
+        f.write("\n".join(original) + "\n")
+        for i in range(segments):
+            j = (i + 1) % segments
+            angle = 2 * math.pi * i / segments
+            normal = tuple(-(u[k] * math.cos(angle) + v[k] * math.sin(angle)) for k in range(3))
+            _tri(f, normal, r0[i], r0[j], r1[j])
+            _tri(f, normal, r0[i], r1[j], r1[i])
+        f.write("endsolid archeon_box_axis_hole\n")
+
+
 def write_fastener_stl(path: str, shank_r: float, shank_h: float, head_r: float, head_h: float) -> None:
     write_stepped_shaft_stl(path, [(head_r, head_h), (shank_r, shank_h)])

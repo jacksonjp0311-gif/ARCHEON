@@ -6,6 +6,7 @@ use archeon_transactions::{Authority, DesignTransaction, Operation, TxError};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
+pub mod graph;
 pub mod memory;
 pub mod provider;
 
@@ -182,6 +183,177 @@ pub struct ToolSpec {
     pub authority: Authority,
 }
 
+/// Structured calls accepted from an external model. The deterministic runtime
+/// resolves these into read results, bounded view commands, or PROPOSED DTP.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "tool", rename_all = "snake_case")]
+pub enum EngineeringToolCall {
+    InspectAssembly {
+        id: String,
+    },
+    InspectJoint {
+        id: String,
+    },
+    InspectLoadPath {
+        id: String,
+    },
+    InspectConnections {
+        id: String,
+    },
+    ExplodeScope {
+        id: String,
+        strategy: ExplosionStrategy,
+        factor: f64,
+    },
+    FocusEntity {
+        id: String,
+    },
+    ProposeDimensionChange {
+        parameter: String,
+        value: f64,
+        unit: String,
+    },
+    ProposeFeature {
+        part: String,
+        feature_kind: String,
+    },
+    ValidateDesign {
+        transaction_id: Option<String>,
+    },
+    CompareVariants {
+        parameter: String,
+        values: Vec<f64>,
+    },
+    RegenerateGeometry {
+        scope: Option<String>,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolOutcome {
+    pub views: Vec<ViewCommand>,
+    pub transaction: Option<DesignTransaction>,
+    pub facts: Vec<String>,
+    pub action: Option<String>,
+}
+
+pub fn execute_tool(
+    call: EngineeringToolCall,
+    doc: &DesignDocument,
+) -> Result<ToolOutcome, String> {
+    let mut out = ToolOutcome {
+        views: vec![],
+        transaction: None,
+        facts: vec![],
+        action: None,
+    };
+    match call {
+        EngineeringToolCall::InspectAssembly { id } => {
+            if !doc
+                .assemblies
+                .iter()
+                .any(|assembly| assembly.id.as_str() == id)
+            {
+                return Err(format!("unknown assembly {id}"));
+            }
+            out.facts = graph::get_child_parts(doc, &id);
+        }
+        EngineeringToolCall::InspectJoint { id } => {
+            let joint = graph::joint_for_context(doc, &id)
+                .ok_or_else(|| format!("no joint in context {id}"))?;
+            out.facts = vec![
+                joint.id.0.clone(),
+                format!("DOF={}", joint.dof()),
+                format!("axis={:?}", joint.axis),
+            ];
+            out.views.push(ViewCommand::ShowJoint {
+                id: joint.id.0.clone(),
+            });
+        }
+        EngineeringToolCall::InspectLoadPath { id } => {
+            out.facts = graph::get_load_path(doc, &id);
+            out.views.push(ViewCommand::ShowLoadPath { id });
+        }
+        EngineeringToolCall::InspectConnections { id } => {
+            out.facts = graph::get_interface_neighbors(doc, &id);
+            out.views.push(ViewCommand::Neighborhood { id });
+        }
+        EngineeringToolCall::ExplodeScope {
+            id,
+            strategy: _,
+            factor,
+        } => out.views.push(ViewCommand::ExplodeContext {
+            id: Some(id),
+            factor: factor.clamp(0.0, 1.5),
+        }),
+        EngineeringToolCall::FocusEntity { id } => {
+            if !doc.id_set().contains(&id) {
+                return Err(format!("unknown entity {id}"));
+            }
+            out.views.push(ViewCommand::Select { id: id.clone() });
+            out.views.push(ViewCommand::Focus { id });
+        }
+        EngineeringToolCall::ProposeDimensionChange {
+            parameter,
+            value,
+            unit,
+        } => {
+            if !doc.parameters.contains_key(&parameter) {
+                return Err(format!("unknown parameter {parameter}"));
+            }
+            let summary = format!("Set {parameter} to {value} {unit}");
+            out.transaction = Some(DesignTransaction::propose(
+                "cad-designer",
+                &summary,
+                "Structured tool request; proposal only.",
+                vec![Operation::ChangeParameter {
+                    name: parameter,
+                    value,
+                    unit: Some(unit),
+                }],
+            ));
+        }
+        EngineeringToolCall::ProposeFeature { part, feature_kind } => {
+            if doc.part(&part).is_none() {
+                return Err(format!("unknown part {part}"));
+            }
+            let summary = format!("Create {feature_kind} on {part}");
+            out.transaction = Some(DesignTransaction::propose(
+                "cad-designer",
+                &summary,
+                "Structured feature proposal.",
+                vec![Operation::CreateSketch {
+                    id: format!("feat.proposed.{}", part.replace('.', "_")),
+                    part,
+                    kind: feature_kind,
+                }],
+            ));
+        }
+        EngineeringToolCall::ValidateDesign { transaction_id } => {
+            out.action = Some("validate".into());
+            if let Some(id) = transaction_id {
+                out.facts.push(id);
+            }
+        }
+        EngineeringToolCall::CompareVariants { parameter, values } => {
+            if !doc.parameters.contains_key(&parameter) || values.is_empty() {
+                return Err("variant parameter/values are invalid".into());
+            }
+            out.views.push(ViewCommand::CompareVariants {
+                mode: "SPREAD".into(),
+            });
+            out.facts = values.iter().map(|v| format!("{parameter}={v}")).collect();
+        }
+        EngineeringToolCall::RegenerateGeometry { scope } => {
+            out.action = Some("regenerate_geometry".into());
+            if let Some(scope) = scope {
+                out.facts.push(scope);
+            }
+        }
+    }
+    Ok(out)
+}
+
 pub fn tool_registry() -> Vec<ToolSpec> {
     let r = |name: &str, description: &str, side_effects: &str, authority: Authority| ToolSpec {
         name: name.into(),
@@ -258,6 +430,66 @@ pub fn tool_registry() -> Vec<ToolSpec> {
             "view only",
             Authority::Read,
         ),
+        r(
+            "inspect_assembly",
+            "Read assembly membership",
+            "none",
+            Authority::Read,
+        ),
+        r(
+            "inspect_joint",
+            "Read joint DOF, frames, limits, and groups",
+            "view overlay only",
+            Authority::Read,
+        ),
+        r(
+            "inspect_load_path",
+            "Read a declared semantic load path",
+            "view overlay only",
+            Authority::Read,
+        ),
+        r(
+            "inspect_connections",
+            "Read the local interface graph",
+            "view overlay only",
+            Authority::Read,
+        ),
+        r(
+            "explode_scope",
+            "Explode a bounded semantic scope",
+            "view only",
+            Authority::Read,
+        ),
+        r(
+            "focus_entity",
+            "Frame a semantic entity",
+            "view only",
+            Authority::Read,
+        ),
+        r(
+            "propose_dimension_change",
+            "Create a parameter-change transaction",
+            "creates PROPOSED tx",
+            Authority::Propose,
+        ),
+        r(
+            "propose_feature",
+            "Create a feature transaction",
+            "creates PROPOSED tx",
+            Authority::Propose,
+        ),
+        r(
+            "validate_design",
+            "Run graph and contract validation",
+            "none",
+            Authority::Validate,
+        ),
+        r(
+            "compare_variants",
+            "Compare bounded parameter previews",
+            "view only",
+            Authority::Read,
+        ),
     ]
 }
 
@@ -302,16 +534,19 @@ pub enum ViewCommand {
         factor: f64,
     },
     OpenHud,
-    OpenShoulder,
     ExplodeStack {
         id: Option<String>,
     },
     Cutaway {
         enabled: bool,
     },
-    GhostHousing,
-    IsolateInternals,
     ShowLoadPaths,
+    ShowLoadPath {
+        id: String,
+    },
+    ShowJoint {
+        id: String,
+    },
     RestoreDisplay,
     PreviousView,
     HomeView,
@@ -337,7 +572,7 @@ pub enum ViewCommand {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Intent {
     View(ViewCommand),
-    Propose(DesignTransaction),
+    Propose(Box<DesignTransaction>),
     Validate { transaction_id: Option<String> },
     Commit { transaction_id: String },
     Reject { transaction_id: String },
@@ -423,6 +658,64 @@ pub fn parse_command_ctx(text: &str, doc: &DesignDocument, ctx: &OperatorContext
     let ctx_id = ctx.selected_id.clone().or(ctx.focused_id.clone());
     let resolved = resolve_entity_ctx(&lower, doc, ctx);
 
+    // Mechanism-agnostic inspection commands route through first-class graph
+    // entities. Names are resolved from DesignIR, never from product aliases.
+    if lower.starts_with("open ") || lower.starts_with("open the ") {
+        if let Some(id) = resolved.clone() {
+            views.push(ViewCommand::Select { id: id.clone() });
+            views.push(ViewCommand::Focus { id: id.clone() });
+            views.push(ViewCommand::Cutaway { enabled: true });
+            views.push(ViewCommand::ExplodeStack {
+                id: Some(id.clone()),
+            });
+            views.push(ViewCommand::OpenHud);
+            notes.push(format!(
+                "Opened {} from its DesignIR assembly context. View only.",
+                human_name(doc, &id)
+            ));
+        }
+    }
+    if lower.contains("what rotates") || (lower.contains("show") && lower.contains("joint")) {
+        if let Some(id) = resolved.clone().or(ctx_id.clone()) {
+            if let Some(joint) = graph::joint_for_context(doc, &id) {
+                views.push(ViewCommand::ShowJoint {
+                    id: joint.id.0.clone(),
+                });
+                notes.push(format!(
+                    "{}: {:?}, DOF {}, axis {:?}; rotating group: {}.",
+                    joint.name,
+                    joint.joint_type,
+                    joint.dof(),
+                    joint.axis,
+                    graph::get_rotating_group(doc, &id).join(", ")
+                ));
+            } else {
+                notes.push(format!("No first-class joint is declared for {id}."));
+            }
+        }
+    }
+    if lower.contains("bearing support") {
+        if let Some(id) = resolved.clone().or(ctx_id.clone()) {
+            let support: Vec<_> = graph::get_load_path(doc, &id)
+                .into_iter()
+                .filter(|candidate| {
+                    doc.part(candidate).is_some_and(|part| {
+                        part.component_class.as_deref() == Some("bearing")
+                            || part.semantic_role.contains("bearing")
+                    })
+                })
+                .collect();
+            if support.is_empty() {
+                notes.push(format!("Bearing support is UNVERIFIED for {id}; none is declared in its joint load path."));
+            } else {
+                support
+                    .into_iter()
+                    .for_each(|id| views.push(ViewCommand::Track { id }));
+                notes.push("Declared bearing-support entities highlighted; fit remains subject to validation contracts.".into());
+            }
+        }
+    }
+
     if lower.contains("clear selection") || lower == "deselect" {
         views.push(ViewCommand::ClearSelection);
         notes.push("Spatial Director: selection cleared. Tracker unchanged.".into());
@@ -469,6 +762,7 @@ pub fn parse_command_ctx(text: &str, doc: &DesignDocument, ctx: &OperatorContext
     }
     if lower.contains("break it apart")
         || lower.contains("break apart")
+        || (lower.contains("break") && lower.contains("assembly") && lower.contains("apart"))
         || lower.contains("explode this")
     {
         let factor = extract_percent(&lower).unwrap_or(0.85);
@@ -476,6 +770,7 @@ pub fn parse_command_ctx(text: &str, doc: &DesignDocument, ctx: &OperatorContext
         notes.push("Spatial Director: explode selected assembly context only.".into());
     }
     if lower.contains("what this connects")
+        || lower.contains("what does this connect")
         || lower.contains("what connects")
         || lower.contains("connected to")
         || lower.contains("show connections")
@@ -519,33 +814,6 @@ pub fn parse_command_ctx(text: &str, doc: &DesignDocument, ctx: &OperatorContext
                 views.push(ViewCommand::Track { id });
             }
             notes.push("Item Tracker: watch list updated. Deselect does not untrack.".into());
-        }
-    }
-    if lower.contains("larger bearing") || lower.contains("bigger bearing") {
-        if let Some(shaft) = doc.part("part.shoulder.shaft") {
-            if let archeon_design_ir::Primitive::Cylinder { radius, .. } = shaft.spatial.primitive {
-                let next = radius * 1.15;
-                let mut proposed = DesignTransaction::propose(
-                    "cad-designer",
-                    &format!("Larger bearing journal: radius {radius:.4} m → {next:.4} m"),
-                    "Catalog adapter is not connected. This is a geometric journal change, not a purchased PN.",
-                    vec![Operation::ChangeDimension {
-                        part: "part.shoulder.shaft".into(),
-                        field: "radius".into(),
-                        value: next,
-                    }],
-                );
-                proposed.requirements = vec!["req.bearings".into()];
-                proposed.confidence = 0.4;
-                tx = Some(proposed);
-                views.push(ViewCommand::SetMode {
-                    mode: "AGENT_PROPOSAL".into(),
-                });
-                views.push(ViewCommand::OpenHud);
-                notes.push(
-                    "Components: proposed journal scale. Not a vendor bearing. DTP only.".into(),
-                );
-            }
         }
     }
     if lower.contains("reset view") || lower == "reset" {
@@ -598,180 +866,24 @@ pub fn parse_command_ctx(text: &str, doc: &DesignDocument, ctx: &OperatorContext
         });
         views.push(ViewCommand::Cutaway { enabled: true });
     }
-    if lower.contains("open the shoulder")
-        || lower.contains("open shoulder")
-        || lower.contains("show internals")
-        || lower.contains("show me the internal")
-        || lower.contains("internal stack")
-    {
-        views.push(ViewCommand::OpenShoulder);
-        views.push(ViewCommand::Select {
-            id: "asm.shoulder".into(),
-        });
-        views.push(ViewCommand::GhostHousing);
-        views.push(ViewCommand::Cutaway { enabled: true });
-        views.push(ViewCommand::ExplodeStack {
-            id: Some("asm.shoulder".into()),
-        });
-        views.push(ViewCommand::OpenHud);
-        notes.push("Spatial Director: housing ghosted, section on, stack exploded along JointAxis (datum.j2). View only.".into());
-        card = Some(ReplyCard {
-            kind: "spatial".into(),
-            title: "Shoulder internals".into(),
-            happened: "Cover/housing ghosted. Bearing/shaft stack framed along the joint axis."
-                .into(),
-            why: "Operator asked to inspect the coaxial stack.".into(),
-            changed: "View only. DesignIR unchanged.".into(),
-            attention: "Cutaway is a clipping plane, not a sectioned BREP.".into(),
-            actions: vec![
-                ReplyAction {
-                    id: "restore".into(),
-                    label: "ASSEMBLE".into(),
-                },
-                ReplyAction {
-                    id: "interfaces".into(),
-                    label: "LOAD PATH".into(),
-                },
-            ],
-        });
-    }
-    if lower.contains("explode the gearbox") || lower.contains("explode gearbox") {
-        views.push(ViewCommand::Select {
-            id: "part.shoulder.gearbox".into(),
-        });
-        views.push(ViewCommand::ExplodeStack {
-            id: Some("asm.shoulder".into()),
-        });
-        notes.push("Spatial Director: gearbox is an ENVELOPE. Stack explode shows motor→gearbox→shaft along JointAxis. Internal gears are not modeled.".into());
-    }
     if lower.contains("load-carrying")
         || lower.contains("load carrying")
         || lower.contains("show the load")
+        || lower.contains("show load path")
     {
-        views.push(ViewCommand::ShowLoadPaths);
+        let scope = resolved.clone().or(ctx_id.clone());
+        if let Some(id) = scope {
+            views.push(ViewCommand::ShowLoadPath { id: id.clone() });
+            notes.push(format!(
+                "Declared DesignIR load path: {}. This is not FEA.",
+                graph::get_load_path(doc, &id).join(" → ")
+            ));
+        } else {
+            views.push(ViewCommand::ShowLoadPaths);
+            notes.push("All declared load paths shown. This is not FEA.".into());
+        }
         views.push(ViewCommand::Show {
             layer: "interfaces".into(),
-        });
-        views.push(ViewCommand::Select {
-            id: "asm.shoulder".into(),
-        });
-        notes.push("Assembly Designer: load path is the plan graph (mount→shaft→bearings→housing→base). Not FEA.".into());
-    }
-    if lower.contains("add service") || lower.contains("service access") {
-        views.push(ViewCommand::Select {
-            id: "part.shoulder.cover".into(),
-        });
-        views.push(ViewCommand::Focus {
-            id: "part.shoulder.cover".into(),
-        });
-        notes.push("Service cover already exists at ENGINEERING fidelity. Remove/add cover is a DTP change.".into());
-    }
-    if lower.contains("remove cover") {
-        views.push(ViewCommand::Select {
-            id: "part.shoulder.cover".into(),
-        });
-        views.push(ViewCommand::GhostHousing);
-        notes.push("CAD Designer cannot DeletePart. Cover is selected and ghosted. An operator-authorized transaction is required to remove it from DesignIR.".into());
-    }
-    if lower.contains("add mounting bolts") || lower.contains("add the bolts") {
-        views.push(ViewCommand::Select {
-            id: "fastener.shoulder.base".into(),
-        });
-        notes.push("FastenerGroup fastener.shoulder.base already instances four GENERIC_SHCS_M5. DETAILED would add washers/nuts.".into());
-    }
-    if lower.contains("add the actual bearing")
-        || lower.contains("bearing arrangement")
-        || lower.contains("design the housing around")
-    {
-        views.push(ViewCommand::Select {
-            id: "asm.shoulder".into(),
-        });
-        views.push(ViewCommand::ExplodeStack {
-            id: Some("asm.shoulder".into()),
-        });
-        views.push(ViewCommand::OpenHud);
-        notes.push("Components: GENERIC_6204 pair is already the ENGINEERING bearing arrangement. Housing seats DERIVED from OD. Not a catalog PN.".into());
-        action = Some("generative_inspect".into());
-    }
-    if lower.contains("redesign the shoulder")
-        || lower.contains("detailed manufacturable")
-        || lower.contains("design a shoulder")
-        || lower.contains("design a motor-driven shoulder")
-        || (lower.contains("make it detailed") && lower.contains("shoulder"))
-        || lower.contains("make this manufacturable")
-        || lower.contains("make it detailed")
-    {
-        views.push(ViewCommand::Select {
-            id: "asm.shoulder".into(),
-        });
-        views.push(ViewCommand::OpenHud);
-        views.push(ViewCommand::SetMode {
-            mode: "AGENT_PROPOSAL".into(),
-        });
-        action = Some("generative_inspect".into());
-        notes.push("ARCHITECT: subsystem is asm.shoulder (pitch joint on datum.j2).".into());
-        notes.push("ASSEMBLY DESIGNER: plan.shoulder — motor, gearbox, shaft, bearing pair, housing, mount, cover, fasteners.".into());
-        notes.push("COMPONENTS: GENERIC_6204_BEARING PARAMETRIC_REFERENCE 20/47/14 mm.".into());
-        notes.push(
-            "CAD DESIGNER: housing/shaft/seats already authored. Exact CAD via kernel regenerate."
-                .into(),
-        );
-        notes.push("CONSTRAINT ENGINEER: journal=ID and seat=OD are DERIVED. Fit class ASSUMED — not ISO 286.".into());
-        notes.push("DFM REVIEWER: through-holes STANDARD_REFERENCE analog. No CAM.".into());
-        notes.push(
-            "CRITIC: gearbox internals absent; motor is an envelope; catalog not connected.".into(),
-        );
-        notes.push(
-            "VISUAL DIRECTOR: waiting for operator to OPEN THE SHOULDER / EXPLODE STACK.".into(),
-        );
-        notes.push(
-            "No agent mutated canonical DesignIR. COMMIT still required for any proposal.".into(),
-        );
-        card = Some(ReplyCard {
-            kind: "proposal".into(),
-            title: "SHOULDER DESIGN".into(),
-            happened: "Inspected requirements, assembly plan, GENERIC bearing pair, and housing/shaft interfaces.".into(),
-            why: "Generative engineering pipeline. Geometry follows interfaces.".into(),
-            changed: "Canonical already holds the ENGINEERING assembly. A DETAILED fidelity bump is proposed only if you APPROVE.".into(),
-            attention: "No FEA. No manufacturer PN. No silent tolerances.".into(),
-            actions: vec![
-                ReplyAction {
-                    id: "explode".into(),
-                    label: "OPEN STACK".into(),
-                },
-                ReplyAction {
-                    id: "validate".into(),
-                    label: "VALIDATE".into(),
-                },
-                ReplyAction {
-                    id: "reject".into(),
-                    label: "KEEP ENGINEERING".into(),
-                },
-            ],
-        });
-        if lower.contains("detailed") || lower.contains("manufacturable") {
-            let mut proposed = DesignTransaction::propose(
-                "cad-designer",
-                "Raise shoulder fidelity ENGINEERING → DETAILED (parameter only)",
-                "DETAILED would add washers/nuts and encoder body. This transaction only records the fidelity parameter. Part spawn is a follow-up COMMIT. Canonical geometry unchanged until then.",
-                vec![Operation::ChangeParameter {
-                    name: "design.fidelity".into(),
-                    value: 3.0,
-                    unit: Some("enum".into()),
-                }],
-            );
-            proposed.requirements = vec!["req.service".into(), "req.bearings".into()];
-            proposed.confidence = 0.5;
-            tx = Some(proposed);
-        }
-    }
-    if lower.contains("change bearing")
-        || lower.contains("larger bearing")
-        || lower.contains("bigger bearing")
-    {
-        // handled below for journal; also select the real bearing
-        views.push(ViewCommand::Select {
-            id: "part.shoulder.bearing.a".into(),
         });
     }
     if lower.contains("simplify") || lower.contains("reduce part count") {
@@ -793,35 +905,6 @@ pub fn parse_command_ctx(text: &str, doc: &DesignDocument, ctx: &OperatorContext
             proposed.confidence = 0.45;
             tx = Some(proposed);
         }
-    }
-    if lower.contains("increase serviceability") {
-        views.push(ViewCommand::Select {
-            id: "part.shoulder.cover".into(),
-        });
-        views.push(ViewCommand::SetMode {
-            mode: "SERVICE".into(),
-        });
-        notes.push("Service cover and cable passage already exist. Increasing serviceability further is a DFM proposal, not an automatic remodel.".into());
-    }
-    if lower.contains("try three housing") {
-        action = Some("variants".into());
-        notes.push("Three PREVIEW housing envelopes (wall ± variation via upper_arm unused). Housing wall is ASSUMED; variants are parameter previews, not independent CAD kernels.".into());
-    }
-    if lower.contains("design a bearing-supported") || lower.contains("rotating shaft") {
-        views.push(ViewCommand::ExplodeStack {
-            id: Some("asm.shoulder".into()),
-        });
-        action = Some("generative_inspect".into());
-        notes.push("Benchmark A: the shoulder shaft+bearing pair is the rotating-shaft example. GENERIC_6204, DERIVED journal/seat.".into());
-    }
-    if lower.contains("electronics enclosure") || lower.contains("removable lid") {
-        notes.push("Benchmark C: ServiceCoverGenerator + box envelope. Not a full electronics project in this tree. Use the generator; do not invent a second product.".into());
-    }
-    if lower.contains("structural bracket") && lower.contains("bolt") {
-        notes.push("Benchmark D: BracketGenerator four-bolt pattern. Shoulder encoder mount is the in-tree instance.".into());
-        views.push(ViewCommand::Select {
-            id: "part.shoulder.encoder_mount".into(),
-        });
     }
     if lower.contains("service pose")
         || lower.contains("service view")
@@ -900,6 +983,7 @@ pub fn parse_command_ctx(text: &str, doc: &DesignDocument, ctx: &OperatorContext
         notes.push("Dry-run a smaller envelope. Canonical DesignIR unchanged.".into());
     }
     if lower.contains("show me what changed")
+        || lower.contains("show me what changes")
         || lower.contains("show what changed")
         || lower.contains("show the change")
     {
@@ -962,18 +1046,26 @@ pub fn parse_command_ctx(text: &str, doc: &DesignDocument, ctx: &OperatorContext
         && !lower.contains("increase upper")
     {
         let delta = extract_mm(&lower).unwrap_or(50.0);
+        let parameter = length_parameter_for(doc, resolved.as_deref().or(ctx_id.as_deref()))
+            .or_else(|| {
+                doc.parameters
+                    .keys()
+                    .find(|key| key.ends_with(".length"))
+                    .cloned()
+            })
+            .unwrap_or_else(|| "length".into());
         let current = doc
             .parameters
-            .get("upper_arm.length")
+            .get(&parameter)
             .map(|p| p.value)
             .unwrap_or(400.0);
         let next = current + delta;
         let mut proposed = DesignTransaction::propose(
             "cad-designer",
-            &format!("Upper arm length {current} mm → {next} mm"),
+            &format!("{parameter} {current} mm → {next} mm"),
             "Operator length request. Parameter change only. Collision NOT CHECKED. FEA not run.",
             vec![Operation::ChangeParameter {
-                name: "upper_arm.length".into(),
+                name: parameter.clone(),
                 value: next,
                 unit: Some("mm".into()),
             }],
@@ -988,7 +1080,7 @@ pub fn parse_command_ctx(text: &str, doc: &DesignDocument, ctx: &OperatorContext
         notes.push(format!("CAD Designer: proposed {current} → {next} mm. PREVIEW envelope until CAD job completes."));
         card = Some(ReplyCard {
             kind: "proposal".into(),
-            title: "Upper Arm Length".into(),
+            title: parameter.clone(),
             happened: format!("{current} → {next} mm"),
             why: "Operator requested a longer reach envelope.".into(),
             changed: "DesignIR preview only. Canonical untouched.".into(),
@@ -1041,7 +1133,7 @@ pub fn parse_command_ctx(text: &str, doc: &DesignDocument, ctx: &OperatorContext
         });
     }
 
-    if lower.contains("validate proposal") || lower == "validate" {
+    if lower.contains("validate proposal") || lower == "validate" || lower == "validate it" {
         action = Some("validate".into());
         notes.push("Constraint Engineer + Critic: graph validation requested.".into());
     }
@@ -1092,8 +1184,8 @@ fn extract_percent(s: &str) -> Option<f64> {
 
 fn extract_mm(s: &str) -> Option<f64> {
     let tokens: Vec<&str> = s.split_whitespace().collect();
-    for i in 0..tokens.len() {
-        if let Ok(n) = tokens[i].parse::<f64>() {
+    for token in tokens {
+        if let Ok(n) = token.parse::<f64>() {
             return Some(n);
         }
     }
@@ -1118,26 +1210,9 @@ fn weakest_assumption(doc: &DesignDocument) -> String {
             )
         })
         .map(|p| p.id.0.clone())
-        .unwrap_or_else(|| "part.shoulder.shaft".into())
+        .or_else(|| doc.all_ids().into_iter().next().map(|id| id.0))
+        .unwrap_or_else(|| doc.project.id.0.clone())
 }
-
-const ENTITY_ALIASES: &[(&str, &str)] = &[
-    ("upper arm", "asm.upper_arm"),
-    ("end effector", "part.ee.adapter"),
-    ("forearm", "asm.forearm"),
-    ("bearing", "part.shoulder.bearing.a"),
-    ("shaft", "part.shoulder.shaft"),
-    ("gearbox", "part.shoulder.gearbox"),
-    ("housing", "part.shoulder.housing"),
-    ("cover", "part.shoulder.cover"),
-    ("motor", "part.shoulder.motor"),
-    ("shoulder", "asm.shoulder"),
-    ("elbow", "asm.elbow"),
-    ("wrist", "asm.wrist"),
-    ("effector", "part.ee.adapter"),
-    ("column", "part.base.column"),
-    ("base", "asm.base"),
-];
 
 fn resolve_entity(s: &str, doc: &DesignDocument) -> Option<String> {
     resolve_all(s, doc).into_iter().next()
@@ -1174,29 +1249,79 @@ fn human_name(doc: &DesignDocument, id: &str) -> String {
     if let Some(a) = doc.assemblies.iter().find(|a| a.id.as_str() == id) {
         return a.name.clone();
     }
+    if let Some(joint) = doc.joint(id) {
+        return joint.name.clone();
+    }
     id.to_string()
 }
 
 fn resolve_all(s: &str, doc: &DesignDocument) -> Vec<String> {
     let mut hits = Vec::new();
-    for (k, id) in ENTITY_ALIASES {
-        if s.contains(k) && !hits.iter().any(|h| h == id) {
-            hits.push((*id).to_string());
+    let mut consider = |id: &str, name: &str, role: &str| {
+        let name = name.to_lowercase();
+        let role = role.replace('_', " ").to_lowercase();
+        let id_tokens = id.replace(['.', '_'], " ").to_lowercase();
+        if ((!name.is_empty() && s.contains(&name))
+            || (!role.is_empty() && s.contains(&role))
+            || id_tokens
+                .split_whitespace()
+                .any(|token| token.len() > 2 && s.split_whitespace().any(|word| word == token)))
+            && !hits.iter().any(|hit| hit == id)
+        {
+            hits.push(id.to_owned());
         }
+    };
+    for assembly in &doc.assemblies {
+        consider(
+            assembly.id.as_str(),
+            &assembly.name,
+            &assembly.semantic_role,
+        );
     }
-    for p in &doc.parts {
-        let name = p.name.to_lowercase();
-        if !name.is_empty() && s.contains(&name) && !hits.iter().any(|h| h == &p.id.0) {
-            hits.push(p.id.0.clone());
-        }
+    for part in &doc.parts {
+        consider(part.id.as_str(), &part.name, &part.semantic_role);
     }
-    for a in &doc.assemblies {
-        let name = a.name.to_lowercase();
-        if !name.is_empty() && s.contains(&name) && !hits.iter().any(|h| h == &a.id.0) {
-            hits.push(a.id.0.clone());
-        }
+    for joint in &doc.joints {
+        consider(joint.id.as_str(), &joint.name, &joint.load_role);
+    }
+    for feature in &doc.features {
+        consider(
+            feature.id.as_str(),
+            &feature.semantic_role,
+            &feature.semantic_role,
+        );
     }
     hits
+}
+
+fn length_parameter_for(doc: &DesignDocument, context: Option<&str>) -> Option<String> {
+    let context = context?;
+    let mut terms = vec![context.replace("asm.", "").replace("part.", "")];
+    if let Some(assembly) = doc
+        .assemblies
+        .iter()
+        .find(|assembly| assembly.id.as_str() == context)
+    {
+        terms.push(assembly.name.to_lowercase().replace(' ', "_"));
+        terms.push(assembly.semantic_role.to_lowercase());
+    }
+    if let Some(part) = doc.part(context) {
+        terms.push(part.name.to_lowercase().replace(' ', "_"));
+        terms.push(part.semantic_role.to_lowercase());
+        if let Some(parent) = &part.parent {
+            terms.push(parent.0.replace("asm.", ""));
+        }
+    }
+    doc.parameters
+        .keys()
+        .find(|key| {
+            key.ends_with(".length")
+                && terms.iter().any(|term| {
+                    let stem = key.trim_end_matches(".length");
+                    term.contains(stem) || stem.contains(term)
+                })
+        })
+        .cloned()
 }
 
 pub fn critic_notes(doc: &DesignDocument) -> Vec<String> {
@@ -1225,49 +1350,10 @@ pub fn critic_notes(doc: &DesignDocument) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use archeon_design_ir::{EntityId, Project};
-    use archeon_provenance::Provenance;
-
     fn doc() -> DesignDocument {
-        DesignDocument {
-            schema_version: "0.1.0".into(),
-            project: Project {
-                id: EntityId::new("project.x"),
-                name: "x".into(),
-                description: String::new(),
-                revision_id: "rev.0001".into(),
-                branch: "main".into(),
-                kernel: "primitive".into(),
-                domain: "robotics".into(),
-                fidelity: Default::default(),
-                provenance: Provenance::generated("t", "t"),
-            },
-            systems: vec![],
-            assemblies: vec![],
-            parts: vec![],
-            features: vec![],
-            datums: vec![],
-            ports: vec![],
-            interfaces: vec![],
-            mates: vec![],
-            constraints: vec![],
-            functions: vec![],
-            flows: vec![],
-            loads: vec![],
-            materials: vec![],
-            requirements: vec![],
-            analyses: vec![],
-            evidence: vec![],
-            decisions: vec![],
-            revisions: vec![],
-            parameters: Default::default(),
-            assembly_sequence: vec![],
-            fastener_groups: vec![],
-            assembly_plans: vec![],
-            fit_relations: vec![],
-            component_library: vec![],
-            detail_budget: vec![],
-        }
+        let dir =
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../projects/archeon-arm");
+        archeon_design_ir::load_project_dir(&dir).unwrap()
     }
 
     #[test]
@@ -1294,7 +1380,7 @@ mod tests {
         let p = parse_command("open the shoulder", &doc());
         assert!(p.views.iter().any(|v| matches!(
             v,
-            ViewCommand::OpenShoulder | ViewCommand::ExplodeStack { .. }
+            ViewCommand::ExplodeStack { id: Some(id) } if id == "asm.shoulder"
         )));
         assert!(p
             .views
@@ -1382,5 +1468,49 @@ mod tests {
     fn three_versions_action() {
         let p = parse_command("try three versions", &doc());
         assert_eq!(p.action.as_deref(), Some("variants"));
+    }
+
+    #[test]
+    fn elbow_generalization_benchmark_uses_generic_graph() {
+        let doc = doc();
+        let elbow = OperatorContext {
+            selected_id: Some("asm.elbow".into()),
+            focused_id: Some("asm.elbow".into()),
+            tracked_ids: vec![],
+        };
+        for command in [
+            "give me the elbow",
+            "open the elbow",
+            "what rotates here?",
+            "show me the joint",
+            "show the bearing support",
+            "show the load path",
+            "break this assembly apart",
+            "what does this connect to?",
+            "what is the weakest assumption?",
+            "show me what changes",
+            "validate it",
+            "put it back together",
+        ] {
+            let parsed = parse_command_ctx(command, &doc, &elbow);
+            assert!(
+                !parsed.views.is_empty() || parsed.action.is_some() || !parsed.notes.is_empty(),
+                "command was not handled: {command}"
+            );
+            assert!(
+                !parsed
+                    .notes
+                    .iter()
+                    .any(|note| note.contains("No local engineering command")),
+                "generic parser missed: {command}"
+            );
+        }
+        let longer = parse_command_ctx("make the forearm 50 mm longer", &doc, &elbow);
+        let tx = longer.tx.expect("forearm proposal");
+        assert!(matches!(
+            tx.operations.first(),
+            Some(Operation::ChangeParameter { name, value, .. })
+                if name == "forearm.length" && (*value - 380.0).abs() < 1e-9
+        ));
     }
 }

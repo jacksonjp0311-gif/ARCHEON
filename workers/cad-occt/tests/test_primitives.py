@@ -7,6 +7,7 @@ sys.path.insert(0, str(ROOT))
 from archeon_cad.step_writer import write_box_step, write_cylinder_step  # noqa: E402
 from archeon_cad.stl_writer import write_box_stl, write_cylinder_stl  # noqa: E402
 from archeon_cad.kernel import PrimitiveKernelAdapter  # noqa: E402
+from archeon_cad.kernel import _feature_frame  # noqa: E402
 
 
 def test_box_step_is_brep(tmp_path: Path):
@@ -99,7 +100,7 @@ def test_kernel_applies_bearing_seat_as_tube(tmp_path: Path):
     out = tmp_path / "gen"
     result = PrimitiveKernelAdapter().regenerate(doc, out)
     rec = result["parts"][0]
-    assert "tube" in rec["applied_features"]
+    assert "feat.demo.bore" in rec["applied_features"]
     assert rec["exact"] is True
     assert Path(rec["step"]).exists()
 
@@ -122,3 +123,53 @@ def test_kernel_regenerate_from_minimal_doc(tmp_path: Path):
     assert Path(result["parts"][0]["step"]).exists()
     assert result["parts"][0]["mass_class"] == "ASSUMED"
     assert result["interference"]["checked"] is False
+
+
+def test_feature_frame_is_explicit_and_normalized():
+    frame = _feature_frame(
+        {
+            "id": "feat.demo",
+            "part": "part.demo",
+            "frame": {
+                "host": "part.demo",
+                "origin_m": [0.01, 0.02, 0.03],
+                "rpy_rad": [0, 0, 0],
+                "axis": [0, 2, 0],
+            },
+        }
+    )
+    assert frame["axis"] == (0.0, 1.0, 0.0)
+    assert frame["origin_m"] == (0.01, 0.02, 0.03)
+    assert frame["coordinate_system"] == "RIGHT_HANDED_Z_UP_X_FORWARD_METERS"
+
+
+def test_feature_frame_rpy_rotates_axis_consistently():
+    import math
+
+    frame = _feature_frame(
+        {
+            "id": "feat.rotated",
+            "part": "part.demo",
+            "frame": {"rpy_rad": [math.pi / 2, 0, 0], "axis": [0, 0, 1]},
+        }
+    )
+    assert abs(frame["axis"][0]) < 1e-12
+    assert abs(frame["axis"][1] + 1.0) < 1e-12
+    assert abs(frame["axis"][2]) < 1e-12
+
+
+def test_geometry_truth_and_report_fields(tmp_path: Path):
+    doc = {
+        "project": {"revision_id": "rev.test"},
+        "parts": [
+            {
+                "id": "part.demo.box",
+                "spatial": {"primitive": {"kind": "box", "sx": 0.1, "sy": 0.2, "sz": 0.3}},
+            }
+        ],
+    }
+    rec = PrimitiveKernelAdapter().regenerate(doc, tmp_path / "gen")["parts"][0]
+    assert rec["geometry_class"] == "GENERATED_EXACT"
+    assert rec["geometry_revision"] == "rev.test"
+    assert len(rec["geometry_hash"]) == 64
+    assert rec["unsupported_features"] == []

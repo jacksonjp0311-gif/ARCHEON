@@ -1,13 +1,13 @@
 {
   "name": "archeon-workstation",
   "private": true,
-  "version": "0.5.4",
+  "version": "0.6.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5174",
-    "build": "vite build",
+    "build": "node ../../scripts/generate_design_types.mjs --check && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4174",
-    "test": "vitest run"
+    "test": "node ../../scripts/generate_design_types.mjs --check && vitest run"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.2.5",

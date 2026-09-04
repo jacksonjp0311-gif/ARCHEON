@@ -227,7 +227,7 @@ export function recursiveExplosionOffsets(
     const stageK = depth <= 1 ? majorK : subK;
     const kids = descendants.get(asmId) ?? [];
     const c = centroidOf(kids.length ? kids : parts.filter((p) => p.parentId === asmId));
-    const parentKids = a.parent ? descendants.get(a.parent) ?? [] : parts;
+    const parentKids = a?.parent ? descendants.get(a.parent) ?? [] : parts;
     const pc = parentKids.length ? centroidOf(parentKids) : worldC;
     let dir = sub3(c, pc);
     if (len3(dir) < 1e-6) {
