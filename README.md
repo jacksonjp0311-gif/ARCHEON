@@ -5,12 +5,12 @@
 <h1 align="center">ARCHEON</h1>
 
 <p align="center">
-  <strong>v0.6.0 — Executable Mechanical Intelligence</strong><br />
+  <strong>v0.6.1 — Human-first mechanical intelligence</strong><br />
   Governed mechanism reasoning over DesignIR.
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.6.0-D9A441?style=for-the-badge&labelColor=050505" alt="0.6.0" />
+  <img src="https://img.shields.io/badge/version-0.6.1-D9A441?style=for-the-badge&labelColor=050505" alt="0.6.1" />
   <img src="https://img.shields.io/badge/license-MIT-ff981b?style=for-the-badge&labelColor=050b12" alt="MIT" />
   <img src="https://img.shields.io/badge/kernel-DesignIR-6ce391?style=for-the-badge&labelColor=050b12" alt="DesignIR" />
   <img src="https://img.shields.io/badge/CAD-STEP%20%2B%20STL-8ec8de?style=for-the-badge&labelColor=050b12" alt="CAD" />

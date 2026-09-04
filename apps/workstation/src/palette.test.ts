@@ -38,9 +38,8 @@ describe('command palette', () => {
 });
 
 describe('context actions', () => {
-  it('part actions stay compact', () => {
-    expect(contextActions('part').length).toBeLessThanOrEqual(6);
+  it('proposal and idle lists stay human-first', () => {
     expect(contextActions('proposal').map((a) => a.id)).toContain('approve');
-    expect(contextActions('none').length).toBeLessThanOrEqual(3);
+    expect(contextActions('none').map((a) => a.id)).toEqual(expect.arrayContaining(['home', 'fit']));
   });
 });

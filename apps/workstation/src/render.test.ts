@@ -5,6 +5,9 @@ import {
   geometryMode,
   getRenderedEntityBounds,
   overlayVisible,
+  resolveExplosionClearance,
+  aabbsOverlap,
+  translateAabb,
   sanitizeEdgeSegments,
   validateAabb
 } from '@archeon/scene-engine';
@@ -177,5 +180,54 @@ describe('camera fit using rendered bounds', () => {
     };
     const size = fitSizeFromRendered([good, bad]);
     expect(size[0]).toBeCloseTo(0.2);
+  });
+});
+
+describe('adaptive explosion clearance', () => {
+  it('separates aligned overlapping solids using rendered geometry plus a buffer', () => {
+    const box = { min: [-0.05, -0.05, -0.05] as [number, number, number], max: [0.05, 0.05, 0.05] as [number, number, number] };
+    const result = resolveExplosionClearance([
+      { id: 'core', bounds: box, offset: [0, 0, 0], direction: [1, 0, 0], assemblyStage: 1 },
+      { id: 'cover', bounds: box, offset: [0.02, 0, 0], direction: [1, 0, 0], assemblyStage: 2 }
+    ]);
+    const core = translateAabb(box, result.offsets.core);
+    const cover = translateAabb(box, result.offsets.cover);
+    expect(aabbsOverlap(core, cover, 0.005)).toBe(false);
+    expect(result.offsets.cover[1]).toBeCloseTo(0);
+    expect(result.offsets.cover[2]).toBeCloseTo(0);
+    expect(result.unresolvedPairs).toBe(0);
+  });
+
+  it('adapts spacing across a row of differently sized solids', () => {
+    const result = resolveExplosionClearance([
+      {
+        id: 'housing',
+        bounds: { min: [-0.08, -0.06, -0.05], max: [0.08, 0.06, 0.05] },
+        offset: [0, 0, 0],
+        direction: [1, 0, 0],
+        assemblyStage: 1
+      },
+      {
+        id: 'bearing',
+        bounds: { min: [-0.025, -0.025, -0.01], max: [0.025, 0.025, 0.01] },
+        offset: [0.03, 0, 0],
+        direction: [1, 0, 0],
+        assemblyStage: 2
+      },
+      {
+        id: 'retainer',
+        bounds: { min: [-0.03, -0.03, -0.005], max: [0.03, 0.03, 0.005] },
+        offset: [0.05, 0, 0],
+        direction: [1, 0, 0],
+        assemblyStage: 3
+      }
+    ], 1.15);
+    const housing = translateAabb({ min: [-0.08, -0.06, -0.05], max: [0.08, 0.06, 0.05] }, result.offsets.housing);
+    const bearing = translateAabb({ min: [-0.025, -0.025, -0.01], max: [0.025, 0.025, 0.01] }, result.offsets.bearing);
+    const retainer = translateAabb({ min: [-0.03, -0.03, -0.005], max: [0.03, 0.03, 0.005] }, result.offsets.retainer);
+    expect(aabbsOverlap(housing, bearing)).toBe(false);
+    expect(aabbsOverlap(housing, retainer)).toBe(false);
+    expect(aabbsOverlap(bearing, retainer)).toBe(false);
+    expect(result.unresolvedPairs).toBe(0);
   });
 });

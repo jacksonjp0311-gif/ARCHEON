@@ -1,17 +1,16 @@
-import { contextActions, type ContextKind } from '../services/palette';
+import type { ContextAction } from '../services/context';
 
 interface Props {
-  kind: ContextKind;
   name?: string;
+  actions: ContextAction[];
   onAction: (id: string) => void;
 }
 
-export function ContextRibbon({ kind, name, onAction }: Props) {
-  const actions = contextActions(kind);
+export function ContextRibbon({ name, actions, onAction }: Props) {
   return (
     <div className="context-ribbon">
       <div className="context-ribbon__who">
-        <span>{kind === 'none' ? 'NO SELECTION' : name ?? kind.toUpperCase()}</span>
+        <span>{name ?? 'NO SELECTION'}</span>
       </div>
       <div className="context-ribbon__acts">
         {actions.map((a) => (

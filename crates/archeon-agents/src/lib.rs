@@ -102,7 +102,7 @@ pub fn roster() -> Vec<AgentCard> {
             "Standard hardware catalog abstraction. No vendor API.",
             &["change_material"],
             &[Authority::Read, Authority::Propose],
-            &["list_parts"],
+            &["list_parts", "search_engineering_library"],
         ),
         card(
             "bom",
@@ -134,7 +134,7 @@ pub fn roster() -> Vec<AgentCard> {
             "What may be remembered. Cannot mutate DesignIR.",
             &[],
             &[Authority::Read],
-            &["read_requirement"],
+            &["read_requirement", "search_engineering_library"],
         ),
         card(
             "operator",
@@ -227,6 +227,15 @@ pub enum EngineeringToolCall {
     RegenerateGeometry {
         scope: Option<String>,
     },
+    SearchEngineeringLibrary {
+        query: String,
+        #[serde(default = "default_library_limit")]
+        limit: usize,
+    },
+}
+
+fn default_library_limit() -> usize {
+    12
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -349,6 +358,40 @@ pub fn execute_tool(
             if let Some(scope) = scope {
                 out.facts.push(scope);
             }
+        }
+        EngineeringToolCall::SearchEngineeringLibrary { query, limit } => {
+            let q = query.trim().to_ascii_lowercase();
+            if q.is_empty() {
+                return Err("library query cannot be empty".into());
+            }
+            let mut facts = doc
+                .component_library
+                .iter()
+                .filter_map(|item| {
+                    let text = format!(
+                        "{} {} {} {}",
+                        item.id, item.class, item.designation, item.note
+                    );
+                    text.to_ascii_lowercase().contains(&q).then(|| {
+                        format!(
+                            "COMPONENT {} · {} · {} · truth={} · params={:?}",
+                            item.id, item.class, item.designation, item.truth, item.params
+                        )
+                    })
+                })
+                .collect::<Vec<_>>();
+            facts.extend(doc.materials.iter().filter_map(|item| {
+                let text = format!("{} {} {}", item.id, item.name, item.notes);
+                text.to_ascii_lowercase().contains(&q).then(|| {
+                    format!(
+                        "MATERIAL {} · {} · density={:?} kg/m3 · {}",
+                        item.id, item.name, item.density_kg_m3, item.notes
+                    )
+                })
+            }));
+            facts.truncate(limit.clamp(1, 50));
+            out.facts = facts;
+            out.action = Some("library_search".into());
         }
     }
     Ok(out)

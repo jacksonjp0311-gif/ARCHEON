@@ -1,16 +1,15 @@
-import { contextActions, type ContextKind } from '../services/palette';
 import { useUi } from '../store';
+import type { ContextAction } from '../services/context';
 
 interface Props {
-  kind: ContextKind;
+  actions: ContextAction[];
   onAction: (id: string) => void;
 }
 
-export function ContextMenu({ kind, onAction }: Props) {
+export function ContextMenu({ actions, onAction }: Props) {
   const menu = useUi((s) => s.contextMenu);
   const setMenu = useUi((s) => s.setContextMenu);
   if (!menu) return null;
-  const actions = contextActions(kind === 'none' ? 'part' : kind);
   return (
     <div
       className="ctx-menu"

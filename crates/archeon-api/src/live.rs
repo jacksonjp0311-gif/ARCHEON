@@ -1,9 +1,12 @@
 //! Live Design HTTP + CAD jobs + SSE. Events describe state; they never commit DesignIR.
-use super::{cad, log_line, projects, App, AppState};
+use super::{cad, log_line, projects, App, AppState, ProposalState};
+use archeon_agents::authorize_tx;
 use archeon_design_ir::save_project_dir;
 use archeon_live::{
     three_length_variants, CadJob, CadJobStatus, EngineeringEvent, LiveDesignSession, Variant,
 };
+use archeon_transactions::{dry_run_with_diff, DesignTransaction, TxStatus};
+use archeon_validation::validate;
 use axum::{
     extract::{Path, State},
     response::sse::{Event, KeepAlive, Sse},
@@ -203,6 +206,11 @@ pub async fn variants_list(State(st): State<AppState>) -> Json<Value> {
             "label": v.label,
             "status": v.status,
             "metrics": v.metrics,
+            "changed_interfaces": v.changed_interfaces,
+            "changed_features": v.changed_features,
+            "assumptions": v.assumptions,
+            "unsupported_checks": v.unsupported_checks,
+            "approval_action": v.approval_action,
             "base_revision": v.base_revision,
             "preview_parts": v.preview.parts
         })).collect::<Vec<_>>()
@@ -212,6 +220,73 @@ pub async fn variants_list(State(st): State<AppState>) -> Json<Value> {
 pub async fn variant_get(State(st): State<AppState>, Path(id): Path<String>) -> Json<Value> {
     let vars = st.0.live.variants.lock().unwrap();
     Json(json!(vars.iter().find(|v| v.id.eq_ignore_ascii_case(&id))))
+}
+
+pub async fn variant_propose(
+    State(st): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<Value>, (axum::http::StatusCode, Json<Value>)> {
+    let variant =
+        st.0.live
+            .variants
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|variant| variant.id.eq_ignore_ascii_case(&id))
+            .cloned()
+            .ok_or_else(|| {
+                (
+                    axum::http::StatusCode::NOT_FOUND,
+                    Json(json!({ "error": "unknown variant" })),
+                )
+            })?;
+    let canonical = st.0.doc.lock().unwrap().clone();
+    let mut tx = DesignTransaction::propose(
+        "cad-designer",
+        &format!("Adopt reviewed variant {}", variant.label),
+        "Human-selected variant converted into a reviewable DTP proposal. Canonical DesignIR remains unchanged until operator commit.",
+        variant.dtp_operations.clone(),
+    );
+    authorize_tx(&tx.agent_id, &tx).map_err(|error| {
+        (
+            axum::http::StatusCode::FORBIDDEN,
+            Json(json!({ "error": error.to_string() })),
+        )
+    })?;
+    let (preview, diff) = dry_run_with_diff(&canonical, &tx).map_err(|error| {
+        (
+            axum::http::StatusCode::BAD_REQUEST,
+            Json(json!({ "error": error.to_string() })),
+        )
+    })?;
+    tx.geometry_hash_before = Some(canonical.design_hash());
+    tx.geometry_hash_after = Some(preview.design_hash());
+    tx.diff = Some(diff);
+    let report = validate(&preview);
+    tx.validation_results = vec![serde_json::to_value(&report).unwrap_or_default()];
+    let _ = tx.transition(TxStatus::Validating);
+    let _ = tx.transition(if report.ok() {
+        TxStatus::Valid
+    } else {
+        TxStatus::Invalid
+    });
+    st.0.ledger.lock().unwrap().push(tx.clone());
+    *st.0.proposal.lock().unwrap() = Some(ProposalState {
+        tx: tx.clone(),
+        preview: preview.clone(),
+    });
+    emit_kind(
+        &st.0,
+        "PROPOSAL_UPDATED",
+        json!({ "variant": variant.id, "transaction_id": tx.transaction_id }),
+    );
+    Ok(Json(json!({
+        "proposal": tx,
+        "preview_parts": preview.parts,
+        "validation": report,
+        "human_commit_required": true,
+        "note": "Variant is now a proposal, not a commit. Use the existing APPROVE action to persist a revision."
+    })))
 }
 
 #[derive(Deserialize)]
@@ -230,9 +305,12 @@ pub async fn variants_create(
         Ok(v) => {
             *st.0.live.variants.lock().unwrap() = v.clone();
             emit_kind(&st.0, "PROPOSAL_UPDATED", json!({ "variants": v.len() }));
-            Json(
-                json!({ "variants": v.iter().map(|x| json!({"id": x.id, "metrics": x.metrics, "status": x.status})).collect::<Vec<_>>(), "note": "PREVIEW envelopes. Canonical DesignIR unchanged." }),
-            )
+            Json(json!({ "variants": v.iter().map(|x| json!({
+                    "id": x.id, "metrics": x.metrics, "status": x.status,
+                    "changed_interfaces": x.changed_interfaces, "changed_features": x.changed_features,
+                    "assumptions": x.assumptions, "unsupported_checks": x.unsupported_checks,
+                    "approval_action": x.approval_action
+                })).collect::<Vec<_>>(), "note": "PREVIEW envelopes. Canonical DesignIR unchanged." }))
         }
         Err(e) => Json(json!({ "error": e })),
     }

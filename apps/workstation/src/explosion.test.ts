@@ -74,6 +74,34 @@ describe('hierarchicalOffsets SYSTEM', () => {
     const dz = off.a[2] - off.b[2];
     expect(Math.hypot(dx, dy, dz)).toBeGreaterThan(0.05);
   });
+
+  it('SEQUENCE follows reverse install order without coarse assembly drift', () => {
+    const early: SpatialPart = {
+      ...part,
+      id: 'base',
+      parentId: 'asm.base',
+      origin_m: [0, 0, 0],
+      explosion_vector: [0, 0, -1],
+      assembly_stage: 1
+    };
+    const late: SpatialPart = {
+      ...part,
+      id: 'cover',
+      parentId: 'asm.cover',
+      origin_m: [0.4, 0, 0],
+      explosion_vector: [0, 0, 1],
+      assembly_stage: 9
+    };
+    const off = hierarchicalOffsets([early, late], 'SEQUENCE', 0.25, 'ENGINEERING', [
+      { id: 'asm.arm', parent: null },
+      { id: 'asm.base', parent: 'asm.arm' },
+      { id: 'asm.cover', parent: 'asm.arm' }
+    ]);
+    expect(off.base).toEqual([0, 0, 0]);
+    expect(off.cover[0]).toBeCloseTo(0);
+    expect(off.cover[1]).toBeCloseTo(0);
+    expect(off.cover[2]).toBeGreaterThan(0.05);
+  });
 });
 
 describe('scene command bus', () => {
@@ -145,6 +173,14 @@ describe('scene command bus', () => {
     expect(s.explosion).toBe(0);
     expect(s.spatial).toBe('ASSEMBLED');
   });
+
+  it('retracting explosion does not request a camera fit', () => {
+    const exploded = applySceneCommand(emptyScene(), { op: 'explode_system', factor: 0.7 });
+    const retracted = applySceneCommand({ ...exploded, fitRequest: 'none' }, { op: 'set_explosion', progress: 0 });
+    expect(retracted.explosion).toBe(0);
+    expect(retracted.spatial).toBe('ASSEMBLED');
+    expect(retracted.fitRequest).toBe('none');
+  });
 });
 
 describe('explode scope', () => {
@@ -179,6 +215,21 @@ describe('explode scope', () => {
     const off = hierarchicalOffsets(spatial, 'SYSTEM', 1, 'ENGINEERING', assemblies, 'asm.shoulder');
     expect(off['part.base.plate']).toEqual([0, 0, 0]);
     expect(Math.hypot(...off['part.shoulder.housing'])).toBeGreaterThan(0.01);
+  });
+
+  it('pins the selected assembly frame during a scoped explode', () => {
+    const spatial: SpatialPart[] = parts.map((p, i) => ({
+      id: p.id,
+      origin_m: [i * 0.2, 0, 0] as [number, number, number],
+      explosion_vector: [1, 0, 0] as [number, number, number],
+      explosion_distance_m: 0.2,
+      assembly_stage: i + 1,
+      parentId: p.parent
+    }));
+    const off = hierarchicalOffsets(spatial, 'SYSTEM', 0.4, 'ENGINEERING', assemblies, 'asm.shoulder');
+    expect(off['part.shoulder.housing']).toEqual([0, 0, 0]);
+    expect(off['part.shoulder.shaft']).toEqual([0, 0, 0]);
+    expect(off['part.base.plate']).toEqual([0, 0, 0]);
   });
 
   it('child offset includes parent assembly offset', () => {
@@ -264,4 +315,3 @@ describe('final transform and bounds', () => {
     ).toBe('part_exploded');
   });
 });
-

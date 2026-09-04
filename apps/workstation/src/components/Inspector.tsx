@@ -14,12 +14,13 @@ import {
   type Port,
   type Requirement
 } from '@archeon/design-protocol';
-import { geometryMode } from '@archeon/scene-engine';
+import { geometryMode, sweepJointMotion } from '@archeon/scene-engine';
 import { provenanceTone, type ValueTone } from '../services/tone';
 
 interface Props {
   selectedId: string | null;
   part?: Part;
+  parts: Part[];
   assemblies: Assembly[];
   features: Feature[];
   interfaces: Interface[];
@@ -48,6 +49,7 @@ function Field({ k, v, note, tone }: { k: string; v: string; note?: string; tone
 export function Inspector({
   selectedId,
   part,
+  parts,
   assemblies,
   features,
   interfaces,
@@ -70,6 +72,8 @@ export function Inspector({
   const inspectOpen = useUi((s) => s.inspectOpen);
   const toggleInspect = useUi((s) => s.toggleInspect);
   const debug = useUi((s) => s.renderDebug);
+  const jointPositions = useUi((s) => s.jointPositions);
+  const setJointPosition = useUi((s) => s.setJointPosition);
 
   const assembly = assemblies.find((a) => a.id === selectedId);
   const requirement = requirements.find((r) => r.id === selectedId);
@@ -148,6 +152,12 @@ export function Inspector({
   }
 
   if (selectedJoint) {
+    const value = jointPositions[selectedJoint.id] ?? selectedJoint.position ?? 0;
+    const revolute = selectedJoint.joint_type === 'REVOLUTE';
+    const lower = selectedJoint.limits?.lower ?? (revolute ? -Math.PI : -0.1);
+    const upper = selectedJoint.limits?.upper ?? (revolute ? Math.PI : 0.1);
+    const otherJointPositions = Object.fromEntries(Object.entries(jointPositions).filter(([id]) => id !== selectedJoint.id));
+    const sweep = sweepJointMotion(parts, assemblies, joints, selectedJoint.id, value, 32, otherJointPositions);
     return (
       <section className="rail-panel inspector">
         <h2>JOINT INSPECTOR <button type="button" onClick={clear} title="Deselect">×</button></h2>
@@ -159,10 +169,41 @@ export function Inspector({
         <Field k="CHILD" v={selectedJoint.child} />
         <Field k="AXIS" v={selectedJoint.axis.join(', ')} note="right-handed · Z-up · X-forward" />
         <Field k="LIMITS" v={selectedJoint.limits ? `${selectedJoint.limits.lower}…${selectedJoint.limits.upper} ${selectedJoint.limits.unit}` : 'UNVERIFIED'} />
+        <label className="insp-row joint-control">
+          <span>POSITION</span>
+          <input
+            type="range"
+            min={lower}
+            max={upper}
+            step={revolute ? 0.008726646 : 0.001}
+            value={value}
+            disabled={selectedJoint.joint_type === 'FIXED'}
+            onChange={(event) => setJointPosition(selectedJoint.id, Number(event.target.value))}
+          />
+          <b>{revolute ? `${(value * 180 / Math.PI).toFixed(1)}°` : `${(value * 1000).toFixed(1)} mm`}</b>
+        </label>
+        <Field
+          k="MOTION SWEEP"
+          v={sweep.collisions.length ? `${sweep.collisions.length} POTENTIAL COLLISION${sweep.collisions.length === 1 ? '' : 'S'}` : 'CLEAR IN BROAD PHASE'}
+          note="UNVERIFIED · sampled world-AABB; exact mesh/BREP narrow phase pending"
+        />
+        {sweep.collisions.slice(0, 4).map((hit) => (
+          <Field
+            key={`${hit.a}-${hit.b}`}
+            k="INTERFERENCE"
+            v={`${hit.a} ↔ ${hit.b}`}
+            note={`at ${revolute ? `${(hit.at * 180 / Math.PI).toFixed(1)}°` : `${(hit.at * 1000).toFixed(1)} mm`}`}
+          />
+        ))}
         <Field k="ROTATING GROUP" v={selectedJoint.rotating_group.join(', ') || 'NONE'} />
         <Field k="LOAD PATH" v={selectedJoint.load_path.join(' → ') || 'UNVERIFIED'} />
         <Field k="INTERFACES" v={selectedJoint.interfaces.join(', ') || 'NONE'} />
         <Field k="PROVENANCE" v={selectedJoint.provenance.class} />
+        <div className="insp-actions">
+          {selectedJoint.id === 'joint.j3' && <button type="button" onClick={() => setJointPosition(selectedJoint.id, 75 * Math.PI / 180)}>POSE 75°</button>}
+          <button type="button" onClick={() => setJointPosition(selectedJoint.id, 0)}>ZERO</button>
+          <button type="button" onClick={() => useUi.getState().setOverlay('DATUMS')}>AXIS + ENVELOPE</button>
+        </div>
       </section>
     );
   }

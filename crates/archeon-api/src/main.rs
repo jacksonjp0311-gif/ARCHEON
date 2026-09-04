@@ -157,7 +157,10 @@ async fn main() {
         .route("/api/cad/status", get(cad_status))
         .route("/api/cad/import", post(cad_import))
         .route("/api/projects", get(list_projects))
+        .route("/api/projects/create", post(create_project))
         .route("/api/projects/load", post(load_project))
+        .route("/api/library", get(engineering_library))
+        .route("/api/library/save-part", post(save_part_to_library))
         .route("/api/media/{*rest}", get(media))
         .route("/api/commands", post(commands))
         .route("/api/transactions/propose", post(propose))
@@ -176,6 +179,7 @@ async fn main() {
         .route("/api/variants", get(live::variants_list))
         .route("/api/variants/create", post(live::variants_create))
         .route("/api/variants/{id}", get(live::variant_get))
+        .route("/api/variants/{id}/propose", post(live::variant_propose))
         .route("/api/events/stream", get(live::events_stream))
         .route("/api/memory/remember", post(memory_remember))
         .route("/api/memory/query", post(memory_query))
@@ -240,7 +244,7 @@ async fn health(State(st): State<AppState>) -> Json<Value> {
         "revision": doc.project.revision_id,
         "kernel": doc.project.kernel,
         "provider": provider::info(),
-        "phase": "1.2-live-design"
+        "phase": "v0.7-spatial-engineering-vertical-slice"
     }))
 }
 
@@ -440,7 +444,12 @@ async fn handle_chat(st: AppState, body: ChatIn) -> Json<Value> {
                     "views": parsed.views,
                     "notes": parsed.notes,
                     "card": parsed.card,
-                    "variants": v.iter().map(|x| json!({"id": x.id, "metrics": x.metrics, "status": x.status, "preview_parts": x.preview.parts})).collect::<Vec<_>>(),
+                    "variants": v.iter().map(|x| json!({
+                        "id": x.id, "metrics": x.metrics, "status": x.status,
+                        "preview_parts": x.preview.parts, "changed_interfaces": x.changed_interfaces,
+                        "changed_features": x.changed_features, "assumptions": x.assumptions,
+                        "unsupported_checks": x.unsupported_checks, "approval_action": x.approval_action
+                    })).collect::<Vec<_>>(),
                     "provider": "local-dtp"
                 }));
             }
@@ -877,6 +886,110 @@ async fn list_projects(State(st): State<AppState>) -> Json<Value> {
     Json(json!({
         "projects": projects::list_projects(&st.0.root),
         "current": current.file_name().and_then(|s| s.to_str())
+    }))
+}
+
+async fn create_project(
+    State(st): State<AppState>,
+    Json(body): Json<projects::CreateProjectIn>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let context = st.0.doc.lock().unwrap().clone();
+    let (dir, doc) = projects::create_project(&st.0.root, &body, &context).map_err(|error| {
+        let status = if error.kind() == std::io::ErrorKind::AlreadyExists {
+            StatusCode::CONFLICT
+        } else {
+            StatusCode::BAD_REQUEST
+        };
+        (status, error.to_string())
+    })?;
+    log_line(&st.0, "project.create", dir.display().to_string().as_str());
+    *st.0.doc.lock().unwrap() = doc;
+    *st.0.project_dir.lock().unwrap() = dir.clone();
+    *st.0.proposal.lock().unwrap() = None;
+    *st.0.ledger.lock().unwrap() = Default::default();
+    *st.0.live.session.lock().unwrap() = None;
+    *st.0.live.variants.lock().unwrap() = vec![];
+    Ok(Json(json!({
+        "ok": true,
+        "folder": dir.file_name().and_then(|value| value.to_str()),
+        "project": st.0.doc.lock().unwrap().project,
+        "hash": st.0.doc.lock().unwrap().design_hash(),
+        "inherited_context": {
+            "components": context.component_library.len(),
+            "materials": context.materials.len(),
+            "note": "Reusable references were inherited; geometry and engineering conclusions were not copied."
+        }
+    })))
+}
+
+#[derive(Deserialize)]
+struct SavePartContextIn {
+    part_id: String,
+}
+
+async fn save_part_to_library(
+    State(st): State<AppState>,
+    Json(body): Json<SavePartContextIn>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let doc = st.0.doc.lock().unwrap().clone();
+    let project_dir = st.0.project_dir.lock().unwrap().clone();
+    let path = projects::save_refined_part_context(&st.0.root, &project_dir, &doc, &body.part_id)
+        .map_err(|error| {
+        let status = if error.kind() == std::io::ErrorKind::NotFound {
+            StatusCode::NOT_FOUND
+        } else {
+            StatusCode::INTERNAL_SERVER_ERROR
+        };
+        (status, error.to_string())
+    })?;
+    let relative = path
+        .strip_prefix(&st.0.root)
+        .unwrap_or(&path)
+        .display()
+        .to_string();
+    let _ = st.0.memory.remember(
+        "refined_part_context",
+        &format!("{} from {} revision {} is available at {}. Treat as revision-linked context and revalidate before reuse.", body.part_id, doc.project.id, doc.project.revision_id, relative),
+    );
+    log_line(&st.0, "library.save_part", &body.part_id);
+    Ok(Json(json!({
+        "ok": true,
+        "part_id": body.part_id,
+        "path": relative,
+        "truth": "REVISION_LINKED_CONTEXT",
+        "note": "Saved for agent retrieval. Revalidation is required before reuse in another project."
+    })))
+}
+
+async fn engineering_library(State(st): State<AppState>) -> Json<Value> {
+    let doc = st.0.doc.lock().unwrap();
+    let catalog = std::fs::read_to_string(st.0.root.join("library").join("catalog.json"))
+        .ok()
+        .and_then(|raw| serde_json::from_str::<Value>(&raw).ok())
+        .unwrap_or_else(|| json!({ "patterns": [] }));
+    let root = st.0.root.join("library").join("refined-parts");
+    let mut refined = Vec::new();
+    if let Ok(parts) = std::fs::read_dir(root) {
+        for part_dir in parts.flatten().filter(|entry| entry.path().is_dir()) {
+            if let Ok(entries) = std::fs::read_dir(part_dir.path()) {
+                for entry in entries.flatten().filter(|entry| {
+                    entry.path().extension().and_then(|v| v.to_str()) == Some("json")
+                }) {
+                    if let Ok(raw) = std::fs::read_to_string(entry.path()) {
+                        if let Ok(value) = serde_json::from_str::<Value>(&raw) {
+                            refined.push(value);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Json(json!({
+        "components": doc.component_library,
+        "materials": doc.materials,
+        "patterns": catalog["patterns"],
+        "refined_parts": refined,
+        "policy": "Library entries are context and candidate patterns, never authority. Instantiate through a DTP proposal and revalidate."
     }))
 }
 

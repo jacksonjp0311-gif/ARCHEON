@@ -194,10 +194,34 @@ export {
   overlayVisible,
   fitSizeFromRendered,
   aabbSize,
-  aabbCenter
+  aabbCenter,
+  translateAabb,
+  aabbsOverlap,
+  resolveExplosionClearance
 } from './bounds';
-export type { LocalAabb, RenderedBounds } from './bounds';
+export type { ExplodedBody, ExplosionClearanceResult, LocalAabb, RenderedBounds } from './bounds';
 export { BOUNDS_MAX_M, BOUNDS_MIN_M, CENTER_MAX_M } from './bounds';
+
+export {
+  multiplyQuaternion,
+  quaternionFromAxisAngle,
+  quaternionFromRpy,
+  rotateByQuaternion,
+  rpyFromQuaternion,
+  solveKinematics,
+  sweepJointMotion
+} from './kinematics';
+export type {
+  JointWorldFrame,
+  KinematicAssembly,
+  KinematicJoint,
+  KinematicPart,
+  KinematicSolution,
+  MotionCollision,
+  MotionSweepResult,
+  PartPose,
+  Quaternion
+} from './kinematics';
 
 export {
   ARCHEON_WORLD_FRAME,
@@ -434,4 +458,3 @@ export function nudgeSpread(current: SpreadPreset, dir: 1 | -1): SpreadPreset {
   const i = SPREAD_ORDER.indexOf(current);
   return SPREAD_ORDER[Math.min(SPREAD_ORDER.length - 1, Math.max(0, i + dir))];
 }
-

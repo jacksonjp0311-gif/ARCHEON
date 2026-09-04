@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { type ViewMode } from '@archeon/spatial-grammar';
 import { neighborhoodOf, type DesignDocument, type Part } from '@archeon/design-protocol';
 import { resolveExplodeContext, type SpreadPreset } from '@archeon/scene-engine';
@@ -8,17 +8,32 @@ import { Breadcrumbs } from './components/Breadcrumbs';
 import { CommandPalette } from './components/CommandPalette';
 import { ContextMenu } from './components/ContextMenu';
 import { EngineeringRail } from './components/EngineeringRail';
+import { EngineeringLibrary } from './components/EngineeringLibrary';
 import { FloatingHud } from './components/FloatingHud';
 import { HealthHud } from './components/HealthHud';
 import { Inspector } from './components/Inspector';
 import { ItemTracker } from './components/ItemTracker';
 import { ObjectHud } from './components/ObjectHud';
 import { ProjectBrowser } from './components/ProjectBrowser';
+import { PartWorkbench } from './components/PartWorkbench';
 import { RadialMenu } from './components/RadialMenu';
 import { ViewNav } from './components/ViewNav';
 import { Workbench } from './components/Workbench';
 import { semanticCatalog, type PaletteItem } from './services/palette';
-import type { ContextKind } from './services/palette';
+import {
+  ancestorIds,
+  classifyEntity,
+  componentStack,
+  contextActionsFor,
+  declaredLoadPath,
+  fastenerHosts,
+  jointFor,
+  openTargets,
+  primaryActions,
+  reasoningSummary,
+  rotatingGroup,
+  serviceSequence
+} from './services/context';
 import { fromWorkstationMode, HUMAN_MODES, loadHuds, toWorkstationMode } from './services/hudManager';
 import { getJson, postJson } from './api';
 import { useUi } from './store';
@@ -59,7 +74,7 @@ interface ChatOut {
   steps?: { n: number; name: string; status: string; note?: string | null }[];
   session?: { session_id: string; status: string; operations?: ChatOut['steps'] };
   cad_job?: { id: string; status: string };
-  variants?: { id: string; status: string; metrics?: { reach_m?: number | null }; preview_parts?: Part[] }[];
+  variants?: { id: string; status: string; metrics?: { reach_m?: number | null; mass_kg?: number | null; mass_status?: string; clearance_m?: number | null; clearance_status?: string; note?: string }; preview_parts?: Part[]; assumptions?: string[]; unsupported_checks?: string[]; changed_interfaces?: string[]; changed_features?: string[] }[];
   best?: string;
   preview_parts?: Part[];
 }
@@ -81,7 +96,7 @@ export default function App() {
   const [val, setVal] = useState<{ findings?: { severity: string; code: string; entity?: string; message: string }[]; error_count?: number } | null>(null);
   const [ledger, setLedger] = useState<{ items: { transaction_id: string; status: string; intent: string; agent_id: string }[] }>({ items: [] });
   const [chat, setChat] = useState<{ who: string; text: string }[]>([
-    { who: 'SYSTEM', text: 'ARCHEON v0.6.0 Executable Mechanical Intelligence. Geometry is one DesignIR projection; exact BREP lives in the CAD worker.' }
+    { who: 'SYSTEM', text: 'ARCHEON spatial-engineering runtime. Geometry is one DesignIR projection; evidence status and human commit remain authoritative.' }
   ]);
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
@@ -93,8 +108,12 @@ export default function App() {
   const [steps, setSteps] = useState<ChatOut['steps']>([]);
   const [variants, setVariants] = useState<NonNullable<ChatOut['variants']>>([]);
   const [cadStatus, setCadStatus] = useState<string | null>(null);
+  const [newProjectOpen, setNewProjectOpen] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [newProjectTemplate, setNewProjectTemplate] = useState('blank');
 
   const selectedId = useUi((s) => s.selectedId);
+  const partWorkbenchOpen = useUi((s) => s.partWorkbenchOpen);
   const spatial = useUi((s) => s.spatial);
   const view = useUi((s) => s.view);
   const explosion = useUi((s) => s.explosion);
@@ -103,6 +122,7 @@ export default function App() {
   const overlays = useUi((s) => s.overlays);
   const connected = useUi((s) => s.connected);
   const workbenchOpen = useUi((s) => s.workbenchOpen);
+  const railExpanded = useUi((s) => s.railExpanded);
   const huds = useUi((s) => s.huds);
 
   async function refresh() {
@@ -147,6 +167,11 @@ export default function App() {
     const loaded = loadHuds();
     useUi.setState({ huds: loaded, hudOpen: loaded.agent.open });
   }, []);
+
+  useEffect(() => {
+    if (!doc || !selectedId) return;
+    useUi.getState().revealEntity(selectedId, ancestorIds(selectedId, doc.parts, doc.assemblies));
+  }, [selectedId, doc]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -359,6 +384,49 @@ export default function App() {
     }
   }
 
+  async function createProject() {
+    const name = newProjectName.trim();
+    if (!name || busy) return;
+    setBusy(true);
+    try {
+      await postJson('/api/projects/create', {
+        name,
+        template: newProjectTemplate,
+        description: `Adaptive spatial engineering workspace for ${name}`
+      });
+      useUi.getState().clearProjectSelection();
+      setNewProjectOpen(false);
+      setNewProjectName('');
+      await refresh();
+      setChat((c) => [...c, { who: 'SYSTEM', text: `Created ${name}. Shared component and material context is available to agents; design geometry starts clean.` }]);
+    } catch (e) {
+      setChat((c) => [...c, { who: 'ERROR', text: String(e) }]);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveSelectedPartToLibrary() {
+    if (!selected) return;
+    await postJson('/api/library/save-part', { part_id: selected.id });
+    setChat((c) => [...c, { who: 'SYSTEM', text: `${selected.name} saved as revision-linked engineering context in the shared part library.` }]);
+  }
+
+  async function proposeVariant(id: string) {
+    setBusy(true);
+    try {
+      const out = await postJson<{ preview_parts?: Part[] }>(`/api/variants/${encodeURIComponent(id)}/propose`, {});
+      if (out.preview_parts && doc) setPreview({ ...doc, parts: out.preview_parts });
+      useUi.getState().setAgentTab('PROPOSAL');
+      useUi.getState().setHudOpen(true);
+      await refresh();
+    } catch (e) {
+      setChat((c) => [...c, { who: 'ERROR', text: String(e) }]);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function decide(kind: 'commit' | 'reject') {
     const id = meta?.proposal?.transaction.transaction_id;
     if (!id) return;
@@ -370,18 +438,13 @@ export default function App() {
   const selectedAsm = doc?.assemblies.find((a) => a.id === selectedId);
   const selectedReq = doc?.requirements.find((r) => r.id === selectedId);
   const selectedIface = doc?.interfaces.find((i) => i.id === selectedId);
-  const contextKind: ContextKind = meta?.proposal
-    ? 'proposal'
-    : selected
-      ? 'part'
-      : selectedAsm
-        ? 'assembly'
-        : selectedReq
-          ? 'requirement'
-          : selectedIface
-            ? 'interface'
-            : 'none';
-  const contextName = selected?.name ?? selectedAsm?.name ?? selectedReq?.id ?? selectedIface?.name;
+  const entityCtx = useMemo(
+    () => classifyEntity(selectedId, doc ?? null, !!meta?.proposal && !selectedId),
+    [selectedId, doc, meta?.proposal]
+  );
+  const contextActions = useMemo(() => contextActionsFor(entityCtx, doc ?? null), [entityCtx, doc]);
+  const contextName = entityCtx.name || selected?.name || selectedAsm?.name || selectedReq?.id || selectedIface?.name;
+  const reason = useMemo(() => (entityCtx.kind === 'none' ? null : reasoningSummary(entityCtx, doc ?? null)), [entityCtx, doc]);
   const reachMm = meta?.reach_m != null ? Math.round(meta.reach_m * 1000) : '—';
   const propReach = meta?.proposal?.reach_m != null ? Math.round(meta.proposal.reach_m * 1000) : null;
   const proposalIds = [
@@ -423,6 +486,7 @@ export default function App() {
     else if (id === 'reject') void decide('reject');
     else if (id === 'restore') ui.dispatch({ op: 'restore_display' });
     else if (id.startsWith('variant:')) ui.dispatch({ op: 'select_variant', id: id.slice(8) });
+    else if (id.startsWith('propose_variant:')) void proposeVariant(id.slice('propose_variant:'.length));
     else if (id === 'measure') ui.openHud('measure');
     else if (id === 'section') {
       ui.setSectionOn(true);
@@ -433,6 +497,48 @@ export default function App() {
       if (sid) setMsg('what is this');
     }
     else if (id === 'more') ui.openHud('inspector');
+    else if (id === 'open' && sid && doc) {
+      const shells = openTargets(doc, sid);
+      ui.setMechanical({ openId: sid, ghostRoles: ['housing', 'cover', 'shell'], ghostOthers: false });
+      ui.setSectionOn(true);
+      const scope = selected?.parent ?? selectedAsm?.id ?? sid;
+      ui.dispatch({ op: 'focus_entity', entity_id: scope, ghost_others: false });
+      if (shells.length) ui.setNeighborhood(doc.parts.filter((p) => p.parent === scope && !shells.includes(p.id)).map((p) => p.id));
+    }
+    else if (id === 'show-stack' && sid && doc) {
+      const stack = componentStack(doc, sid);
+      ui.setMechanical({ stackIds: stack, neighborhoodIds: stack, ghostOthers: true, ghostRoles: [] });
+      ui.dispatch({ op: 'focus_entity', entity_id: sid, ghost_others: true });
+    }
+    else if (id === 'show-load' && sid && doc) {
+      const path = declaredLoadPath(doc, sid);
+      ui.setMechanical({ loadPathIds: path, neighborhoodIds: path, ghostOthers: true });
+      ui.dispatch({ op: 'show_overlay', overlay: 'INTERFACES' });
+    }
+    else if (id === 'show-axis' && sid && doc) {
+      const joint = jointFor(doc, sid);
+      ui.setMechanical({ axisJointId: joint?.id ?? sid, neighborhoodIds: rotatingGroup(doc, sid) });
+      ui.dispatch({ op: 'show_overlay', overlay: 'DATUMS' });
+    }
+    else if (id === 'show-motion' && sid && doc) {
+      const group = rotatingGroup(doc, sid);
+      ui.setMechanical({ neighborhoodIds: group, ghostOthers: true, axisJointId: jointFor(doc, sid)?.id ?? null });
+    }
+    else if (id === 'service' && sid && doc) {
+      const seq = serviceSequence(doc, sid);
+      ui.setMechanical({ serviceIds: seq, neighborhoodIds: seq, ghostOthers: true });
+      ui.setSpatial('SERVICE');
+    }
+    else if (id === 'show-fasteners' && sid && doc) {
+      const ids = fastenerHosts(doc, sid);
+      ui.setMechanical({ neighborhoodIds: ids, ghostOthers: true });
+    }
+    else if (id === 'show-mate' && sid) ui.dispatch({ op: 'show_overlay', overlay: 'INTERFACES' });
+    else if (id === 'show-evidence') ui.openHud('inspector');
+    else if (id === 'close') {
+      ui.clearMechanical();
+      ui.dispatch({ op: 'restore_display' });
+    }
   }
 
   function onPalette(item: PaletteItem) {
@@ -451,7 +557,9 @@ export default function App() {
       ui.setHudOpen(true);
     } else {
       if (item.focusId) ui.setFocusId(item.focusId);
-      ui.setSelected(item.id);
+      const target = item.id;
+      ui.revealEntity(target, ancestorIds(target, doc?.parts ?? [], doc?.assemblies ?? []));
+      if (item.focusId && item.focusId !== target) ui.setFocusId(item.focusId);
       if (item.kind === 'FEATURE' || item.kind === 'JOINT') ui.setOverlay('DATUMS');
     }
   }
@@ -467,7 +575,7 @@ export default function App() {
   const humanMode = fromWorkstationMode(mode);
 
   return (
-    <div className={`app ${workbenchOpen ? 'app--bench' : ''}`}>
+    <div className={`app ${workbenchOpen ? 'app--bench' : ''} ${railExpanded ? 'app--rail-expanded' : 'app--rail-collapsed'}`}>
       <header className="topbar">
         <div className="brand">
           <img className="brand__mark" src="/archeon.png" alt="" />
@@ -487,13 +595,14 @@ export default function App() {
               <option key={p.folder} value={p.folder}>{p.name}</option>
             ))}
           </select>
+          <button type="button" className="top-btn project-new" onClick={() => setNewProjectOpen(true)}>+ NEW</button>
         </div>
         <div className="views">
           <span>EXPLODE</span>
           <input type="range" min={0} max={1} step={0.01} value={explosion} onChange={(e) => {
             const n = Number(e.target.value);
             useUi.getState().dispatch({ op: 'set_explosion', progress: n });
-          }} onPointerUp={() => useUi.getState().bumpFit()} />
+          }} />
           <select value={spread} onChange={(e) => useUi.getState().setSpread(e.target.value as SpreadPreset)} title="Explosion spread">
             {(['COMPACT', 'NORMAL', 'ENGINEERING', 'WIDE', 'EXTREME'] as SpreadPreset[]).map((s) => <option key={s}>{s}</option>)}
           </select>
@@ -540,11 +649,23 @@ export default function App() {
             proposalIds={proposalIds}
           />
         </div>
-        <ObjectHud kind={contextKind === 'proposal' ? (selected ? 'part' : 'assembly') : contextKind} name={contextName} onAction={onContextAction} />
-        <RadialMenu onAction={onContextAction} />
-        <ContextMenu kind={contextKind} onAction={onContextAction} />
+        <ObjectHud name={contextName} actions={contextActions} summary={reason} onAction={onContextAction} />
+        <RadialMenu actions={primaryActions(contextActions, 8)} onAction={onContextAction} />
+        <ContextMenu actions={contextActions} onAction={onContextAction} />
+        {partWorkbenchOpen && selected && doc && (
+          <PartWorkbench
+            part={selected}
+            contextParts={doc.parts.filter((part) => part.parent === selected.parent)}
+            materials={doc.materials}
+            features={doc.features}
+            interfaces={doc.interfaces}
+            ports={doc.ports}
+            onClose={() => useUi.getState().setPartWorkbenchOpen(false)}
+            onSaveLibrary={saveSelectedPartToLibrary}
+          />
+        )}
         {doc && (
-          <FloatingHud id="project" title="PROJECT BROWSER">
+          <FloatingHud id="project" title="PROJECT INTELLIGENCE" workspace>
             <ProjectBrowser document={doc} />
           </FloatingHud>
         )}
@@ -552,6 +673,7 @@ export default function App() {
           <Inspector
             selectedId={selectedId}
             part={selected}
+            parts={doc?.parts ?? []}
             assemblies={doc?.assemblies ?? []}
             features={doc?.features ?? []}
             interfaces={doc?.interfaces ?? []}
@@ -607,6 +729,9 @@ export default function App() {
         <FloatingHud id="history" title="HISTORY">
           <div className="notes">Revision {doc?.project.revision_id}. Hash {meta?.hash}. {meta?.provider?.note}</div>
         </FloatingHud>
+        <FloatingHud id="library" title="ENGINEERING LIBRARY" wide>
+          <EngineeringLibrary />
+        </FloatingHud>
         <FloatingHud id="bom" title="BOM" wide>
           <table>
             <thead><tr><th>NAME</th><th>ID</th><th>QTY</th></tr></thead>
@@ -653,9 +778,22 @@ export default function App() {
           variants={variants}
           onStop={() => { useUi.getState().setAgentWorking(false); setBusy(false); void postJson('/api/live-design/cancel', {}); }}
           onAction={onContextAction}
+          quickActions={primaryActions(contextActions, 6)}
         />
       </section>
       <CommandPalette catalog={paletteCatalog} onCommand={onPalette} />
+
+      {newProjectOpen && (
+        <div className="part-lab-backdrop" role="dialog" aria-modal="true" aria-label="Create engineering project">
+          <section className="new-project-dialog">
+            <header><div><small>NEW DESIGNIR WORKSPACE</small><strong>START AN ENGINEERING PROJECT</strong></div><button onClick={() => setNewProjectOpen(false)}>×</button></header>
+            <label>PROJECT NAME<input autoFocus value={newProjectName} onChange={(event) => setNewProjectName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void createProject(); }} /></label>
+            <label>STARTING MODEL<select value={newProjectTemplate} onChange={(event) => setNewProjectTemplate(event.target.value)}><option value="blank">BLANK SPATIAL SYSTEM</option><option value="serial_mechanism">SERIAL MECHANISM</option><option value="architecture">ARCHITECTURAL ASSEMBLY</option></select></label>
+            <p>Creates a clean revision-controlled project. Agents inherit reusable component and material references, but no geometry or engineering conclusion is silently copied.</p>
+            <footer><button onClick={() => setNewProjectOpen(false)}>CANCEL</button><button className="primary" disabled={!newProjectName.trim() || busy} onClick={() => void createProject()}>{busy ? 'CREATING…' : 'CREATE PROJECT'}</button></footer>
+          </section>
+        </div>
+      )}
 
       <Workbench
         doc={doc}

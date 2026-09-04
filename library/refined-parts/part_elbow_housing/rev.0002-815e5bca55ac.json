@@ -1,0 +1,215 @@
+{
+  "features": [],
+  "interfaces": [
+    {
+      "a": "port.upper.j3",
+      "b": "port.elbow.j3",
+      "id": "iface.j3a",
+      "kind": "mechanical",
+      "name": "Upper-to-elbow",
+      "provenance": {
+        "agent_id": "assembly-designer",
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "evidence_ids": [],
+        "reason": "J3 in.",
+        "requirement_ids": [
+          "req.dof"
+        ],
+        "revision_id": "rev.0001",
+        "tools": [],
+        "user_approved": true
+      },
+      "semantic_role": "revolute_j3"
+    },
+    {
+      "a": "port.elbow.j3out",
+      "b": "port.forearm.j3",
+      "id": "iface.j3b",
+      "kind": "mechanical",
+      "name": "Elbow-to-forearm",
+      "provenance": {
+        "agent_id": "assembly-designer",
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "evidence_ids": [],
+        "reason": "J3 out.",
+        "requirement_ids": [
+          "req.dof"
+        ],
+        "revision_id": "rev.0001",
+        "tools": [],
+        "user_approved": true
+      },
+      "semantic_role": "revolute_j3_out"
+    }
+  ],
+  "material": {
+    "appearance": "machined_aluminum",
+    "density_kg_m3": 2700.0,
+    "id": "mat.al6061",
+    "name": "Aluminium 6061-T6 (handbook density)",
+    "notes": "Density is a published handbook value (SOURCE). Application of this alloy to the prototype is ASSUMED. No allowables, no fatigue data, no FEA.",
+    "provenance": {
+      "agent_id": "cad-designer",
+      "class": "SOURCE",
+      "created_by": "cad-designer",
+      "evidence_ids": [],
+      "reason": "Handbook density only.",
+      "requirement_ids": [],
+      "revision_id": "rev.0001",
+      "tools": [],
+      "user_approved": true
+    }
+  },
+  "part": {
+    "catalog_ref": null,
+    "component_class": null,
+    "detail_tier": "primary",
+    "id": "part.elbow.housing",
+    "material": "mat.al6061",
+    "name": "Elbow housing",
+    "parent": "asm.elbow",
+    "provenance": {
+      "agent_id": "cad-designer",
+      "class": "GENERATED",
+      "created_by": "cad-designer",
+      "evidence_ids": [],
+      "reason": "Elbow joint body.",
+      "requirement_ids": [
+        "req.service"
+      ],
+      "revision_id": "rev.0001",
+      "tools": [
+        "box"
+      ],
+      "user_approved": true
+    },
+    "qty": 1,
+    "semantic_role": "elbow_housing",
+    "spatial": {
+      "assembly_stage": 6,
+      "cad": {
+        "coordinate_frame": "CAD_LOCAL",
+        "format": "step",
+        "forward_axis": "X",
+        "geometry_class": "GENERATED_EXACT",
+        "geometry_revision": "rev.0002",
+        "handedness": "RIGHT_HANDED",
+        "local_origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "note": "Kernel STEP. Spatial view uses STL tessellation if present. Frame CAD_LOCAL, world Z-UP, units m. Viewer does not rotate to Y-up.",
+        "path": "generated/part_elbow_housing.step",
+        "preview": "generated/part_elbow_housing.stl",
+        "source": "GENERATED",
+        "truth": "GENERATED",
+        "units": "m",
+        "up_axis": "Z"
+      },
+      "explosion_distance_m": 0.2,
+      "explosion_vector": [
+        1.0,
+        0.2,
+        0.2
+      ],
+      "origin_m": [
+        0.42,
+        0.0,
+        0.2
+      ],
+      "parent_axis": "datum.j3",
+      "primitive": {
+        "kind": "box",
+        "sx": 0.09,
+        "sy": 0.08,
+        "sz": 0.08
+      },
+      "radial_group": "arm",
+      "rpy_rad": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "service_path": [
+        [
+          0.42,
+          0.0,
+          0.2
+        ],
+        [
+          0.42,
+          0.2,
+          0.2
+        ]
+      ]
+    },
+    "system": "sys.arm"
+  },
+  "ports": [
+    {
+      "datum": "datum.j3",
+      "host": "part.elbow.housing",
+      "id": "port.elbow.j3",
+      "origin_m": [
+        -0.02,
+        0.0,
+        0.0
+      ],
+      "provenance": {
+        "agent_id": "assembly-designer",
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "evidence_ids": [],
+        "reason": "Elbow in.",
+        "requirement_ids": [
+          "req.dof"
+        ],
+        "revision_id": "rev.0001",
+        "tools": [],
+        "user_approved": true
+      },
+      "role": "revolute_input"
+    },
+    {
+      "datum": "datum.j3",
+      "host": "part.elbow.housing",
+      "id": "port.elbow.j3out",
+      "origin_m": [
+        0.02,
+        0.0,
+        0.0
+      ],
+      "provenance": {
+        "agent_id": "assembly-designer",
+        "class": "GENERATED",
+        "created_by": "assembly-designer",
+        "evidence_ids": [],
+        "reason": "Elbow out.",
+        "requirement_ids": [
+          "req.dof"
+        ],
+        "revision_id": "rev.0001",
+        "tools": [],
+        "user_approved": true
+      },
+      "role": "revolute_output"
+    }
+  ],
+  "saved_at": "2026-09-04T13:58:09.457361300+00:00",
+  "schema": "archeon.refined-part-context.v1",
+  "source": {
+    "design_hash": "815e5bca55acfcc07263973b15ab4248baae9ca8aebd2747decf76ff4d6f660a",
+    "project_folder": "archeon-arm",
+    "project_id": "project.archeon-arm",
+    "project_name": "ARCHEON Arm",
+    "revision_id": "rev.0002"
+  },
+  "truth": "REVISION_LINKED_CONTEXT",
+  "validation": {
+    "note": "Snapshot preserves source evidence. Revalidate fits, loads, cost, chemistry, and CAD geometry before reuse.",
+    "status": "UNVERIFIED"
+  }
+}

@@ -100,6 +100,16 @@ interface Ui {
   radialOpen: boolean;
   renderDebug: RenderDebug;
   meshBounds: Record<string, MeshLocalBounds>;
+  jointPositions: Record<string, number>;
+  partWorkbenchOpen: boolean;
+  railExpanded: boolean;
+  expandedNodeIds: string[];
+  revealNonce: number;
+  openId: string | null;
+  stackIds: string[];
+  loadPathIds: string[];
+  serviceIds: string[];
+  axisJointId: string | null;
   renderStats: RenderStats;
   setSelected: (id: string | null) => void;
   toggleSelected: (id: string) => void;
@@ -155,6 +165,14 @@ interface Ui {
   setRadialOpen: (v: boolean) => void;
   toggleRenderDebug: (k: keyof RenderDebug) => void;
   setMeshBounds: (id: string, b: MeshLocalBounds) => void;
+  setJointPosition: (id: string, value: number) => void;
+  resetJointPositions: () => void;
+  setPartWorkbenchOpen: (open: boolean) => void;
+  setRailExpanded: (expanded: boolean) => void;
+  revealEntity: (id: string, ancestors: string[]) => void;
+  toggleExpanded: (id: string) => void;
+  setMechanical: (patch: Partial<Pick<Ui, 'openId' | 'stackIds' | 'loadPathIds' | 'serviceIds' | 'axisJointId' | 'neighborhoodIds' | 'ghostOthers' | 'ghostRoles'>>) => void;
+  clearMechanical: () => void;
   setRenderStats: (s: RenderStats) => void;
 }
 
@@ -215,6 +233,16 @@ export const useUi = create<Ui>((set) => ({
   radialOpen: false,
   renderDebug: DEFAULT_RENDER_DEBUG,
   meshBounds: {},
+  jointPositions: {},
+  partWorkbenchOpen: false,
+  railExpanded: true,
+  expandedNodeIds: [],
+  revealNonce: 0,
+  openId: null,
+  stackIds: [],
+  loadPathIds: [],
+  serviceIds: [],
+  axisJointId: null,
   renderStats: {
     visibleParts: 0,
     cadMeshes: 0,
@@ -321,7 +349,12 @@ export const useUi = create<Ui>((set) => ({
   setExplodeContext: (explodeContext) => set({ explodeContext }),
   setTreeTab: (treeTab) => set({ treeTab }),
   setDockTab: (dockTab) => set({ dockTab }),
-  setIsolate: (isolate) => set({ isolate, spatial: isolate ? 'ISOLATE' : 'ASSEMBLED', view: isolate ? 'ISOLATE' : 'ASSEMBLED' }),
+  setIsolate: (isolate) => set({
+    isolate,
+    spatial: isolate ? 'ISOLATE' : 'ASSEMBLED',
+    view: isolate ? 'ISOLATE' : 'ASSEMBLED',
+    partWorkbenchOpen: !!isolate && isolate.startsWith('part.')
+  }),
   setConnected: (connected) => set({ connected }),
   setSectionOn: (sectionOn) =>
     set((s) => {
@@ -364,7 +397,13 @@ export const useUi = create<Ui>((set) => ({
       fitNonce: s.fitNonce + 1,
       fitCenter: [0.4, 0, 0.15],
       fitRadius: 1.4,
-      cameraAxis: null as Ui['cameraAxis']
+      cameraAxis: null as Ui['cameraAxis'],
+      openId: null,
+      stackIds: [],
+      loadPathIds: [],
+      serviceIds: [],
+      axisJointId: null,
+      ghostRoles: []
     })),
   clearProjectSelection: () =>
     set({
@@ -378,7 +417,9 @@ export const useUi = create<Ui>((set) => ({
       trackedIds: [],
       recentIds: [],
       variantMode: 'NONE',
-      activeVariant: null
+      activeVariant: null,
+      jointPositions: {},
+      partWorkbenchOpen: false
     }),
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
   setInspectSection: (inspectSection) => set({ inspectSection }),
@@ -418,6 +459,33 @@ export const useUi = create<Ui>((set) => ({
   setRadialOpen: (radialOpen) => set({ radialOpen, contextMenu: null }),
   toggleRenderDebug: (k) => set((s) => ({ renderDebug: { ...s.renderDebug, [k]: !s.renderDebug[k] } })),
   setMeshBounds: (id, b) => set((s) => ({ meshBounds: { ...s.meshBounds, [id]: b } })),
+  setJointPosition: (id, value) => set((s) => ({ jointPositions: { ...s.jointPositions, [id]: value } })),
+  resetJointPositions: () => set({ jointPositions: {} }),
+  setPartWorkbenchOpen: (partWorkbenchOpen) => set({ partWorkbenchOpen }),
+  setRailExpanded: (railExpanded) => set({ railExpanded }),
+  revealEntity: (id, ancestors) =>
+    set((s) => ({
+      selectedId: id,
+      expandedNodeIds: [...new Set([...s.expandedNodeIds, ...ancestors, id])],
+      revealNonce: s.revealNonce + 1,
+      treeTab: ancestors.some((a) => a.startsWith('asm.')) || id.startsWith('asm.') ? 'ASSEMBLY' : s.treeTab
+    })),
+  toggleExpanded: (id) =>
+    set((s) => ({
+      expandedNodeIds: s.expandedNodeIds.includes(id) ? s.expandedNodeIds.filter((x) => x !== id) : [...s.expandedNodeIds, id]
+    })),
+  setMechanical: (patch) => set(patch),
+  clearMechanical: () =>
+    set({
+      openId: null,
+      stackIds: [],
+      loadPathIds: [],
+      serviceIds: [],
+      axisJointId: null,
+      ghostRoles: [],
+      ghostOthers: false,
+      sectionOn: false
+    }),
   setRenderStats: (renderStats) => set({ renderStats }),
   spatialUndo: () =>
     set((s) => {
@@ -455,13 +523,23 @@ export const useUi = create<Ui>((set) => ({
         huds = inspectorAfterSelection(s.huds, next.selectedId);
         saveHuds(huds);
       }
+      const resetMech = cmd.op === 'restore_display' || cmd.op === 'home_view';
       return {
         ...fromSnap(next),
         overlays,
         overlay: primaryOverlayName(overlays),
         huds,
         spatialHistory: record ? [...s.spatialHistory, snap].slice(-16) : s.spatialHistory,
-        fitEpoch: next.fitRequest !== 'none' ? s.fitEpoch + 1 : s.fitEpoch
+        fitEpoch: next.fitRequest !== 'none' ? s.fitEpoch + 1 : s.fitEpoch,
+        partWorkbenchOpen:
+          cmd.op === 'isolate_entity'
+            ? !!next.isolate && next.isolate.startsWith('part.')
+            : resetMech
+              ? false
+              : s.partWorkbenchOpen,
+        ...(resetMech
+          ? { openId: null, stackIds: [], loadPathIds: [], serviceIds: [], axisJointId: null, ghostRoles: [] }
+          : {})
       };
     })
 }));

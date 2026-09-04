@@ -14,9 +14,11 @@ import {
   hierarchicalOffsets,
   overlayVisible,
   partsInScope,
+  resolveExplosionClearance,
   focusOffset,
   getFinalRenderTransform,
   resolveFitIntent,
+  solveKinematics,
   sanitizeEdgeSegments,
   validateAabb,
   worldPortFromLocal
@@ -242,6 +244,8 @@ function Solid({
   provenanceOverlay,
   proposal,
   offset,
+  position,
+  quaternion,
   debug
 }: {
   part: Part;
@@ -256,9 +260,11 @@ function Solid({
   provenanceOverlay: boolean;
   proposal: boolean;
   offset: [number, number, number];
+  position?: [number, number, number];
+  quaternion?: [number, number, number, number];
   debug: RenderDebug;
 }) {
-  const pos = getFinalRenderTransform(part.spatial.origin_m, { explosion: offset });
+  const pos = position ?? getFinalRenderTransform(part.spatial.origin_m, { explosion: offset });
   const prim = part.spatial.primitive;
   const physical = pbr(matClass(part), provenanceOverlay ? provenanceTint(part.provenance.class) : undefined);
   const material = physical;
@@ -290,10 +296,13 @@ function Solid({
   return (
     <group
       position={pos}
-      rotation={rot}
+      rotation={quaternion ? undefined : rot}
+      quaternion={quaternion ? new THREE.Quaternion(...quaternion) : undefined}
       onClick={(e) => {
         e.stopPropagation();
-        useUi.getState().toggleSelected(part.id);
+        const ui = useUi.getState();
+        if (ui.spatial === 'ISOLATE' && ui.isolate === part.id) ui.setPartWorkbenchOpen(true);
+        else ui.toggleSelected(part.id);
       }}
       onContextMenu={(e) => {
         e.stopPropagation();
@@ -470,21 +479,31 @@ export function ArmScene({
   const debug = useUi((s) => s.renderDebug);
   const meshBounds = useUi((s) => s.meshBounds);
   const geomRev = useUi((s) => s.geomRev);
+  const openId = useUi((s) => s.openId);
+  const stackIds = useUi((s) => s.stackIds);
+  const loadPathIds = useUi((s) => s.loadPathIds);
+  const serviceIds = useUi((s) => s.serviceIds);
+  const axisJointId = useUi((s) => s.axisJointId);
+  const jointPositions = useUi((s) => s.jointPositions);
+  const kinematic = useMemo(
+    () => solveKinematics(parts, assemblies, joints, jointPositions),
+    [parts, assemblies, joints, jointPositions]
+  );
   const projectGround = useMemo(() => {
     const boxes = parts.map((p) => {
       const cadUrl = meshUrl(p);
       const mode = geometryMode(!!cadUrl, debug);
       const meshLocal = mode === 'cad' && meshBounds[p.id] ? { min: meshBounds[p.id].min, max: meshBounds[p.id].max } : null;
       const rb = getRenderedEntityBounds({
-        origin: p.spatial.origin_m,
-        rpy: p.spatial.rpy_rad,
+        origin: kinematic.parts[p.id]?.position ?? p.spatial.origin_m,
+        rpy: kinematic.parts[p.id]?.rpy ?? p.spatial.rpy_rad,
         primitive: p.spatial.primitive,
         meshLocal
       });
       return { min: rb.min, max: rb.max };
     });
     return engineeringGroundFromBounds(boxes);
-  }, [parts, meshBounds, debug, geomRev]);
+  }, [parts, meshBounds, debug, geomRev, kinematic]);
   const xray = style === 'XRAY';
   const wire = style === 'WIREFRAME' || style === 'HIDDEN_LINE';
   const cutaway = sectionOn;
@@ -513,37 +532,69 @@ export function ArmScene({
   const world = useMemo(() => {
     const spatialParts = visible.map((p) => ({
       id: p.id,
-      origin_m: p.spatial.origin_m,
+      origin_m: kinematic.parts[p.id]?.position ?? p.spatial.origin_m,
       explosion_vector: p.spatial.explosion_vector,
       explosion_distance_m: p.spatial.explosion_distance_m,
       assembly_stage: p.spatial.assembly_stage,
       parentId: p.parent,
       servicePath: p.spatial.service_path
     }));
-    const map = hierarchicalOffsets(spatialParts, strategy, explosion, spread, assemblies, explodeContext);
+    const rawMap = hierarchicalOffsets(spatialParts, strategy, explosion, spread, assemblies, explodeContext);
+    const clearanceScale = {
+      COMPACT: 0.7,
+      NORMAL: 0.9,
+      ENGINEERING: 1.15,
+      WIDE: 1.45,
+      EXTREME: 1.8
+    }[spread];
+    const bodies = visible.map((p) => {
+      const cadUrl = meshUrl(p);
+      const mode = geometryMode(!!cadUrl, debug);
+      const meshLocal = mode === 'cad' && meshBounds[p.id] ? { min: meshBounds[p.id].min, max: meshBounds[p.id].max } : null;
+      const bounds = getRenderedEntityBounds({
+        origin: kinematic.parts[p.id]?.position ?? p.spatial.origin_m,
+        rpy: kinematic.parts[p.id]?.rpy ?? p.spatial.rpy_rad,
+        primitive: p.spatial.primitive,
+        meshLocal
+      });
+      return {
+        id: p.id,
+        bounds: { min: bounds.min, max: bounds.max },
+        offset: rawMap[p.id] ?? [0, 0, 0] as [number, number, number],
+        direction: p.spatial.explosion_vector,
+        assemblyStage: p.spatial.assembly_stage,
+        movable: !scopeSet || scopeSet.has(p.id)
+      };
+    });
+    const map = explosion > 0.02
+      ? resolveExplosionClearance(bodies, clearanceScale).offsets
+      : rawMap;
     return visible.map((p) => {
       const explosionOff = map[p.id] ?? [0, 0, 0];
       const focus = focusOffset(p.id, p.parent, exploding ? null : focusId, exploding);
-      const pos = getFinalRenderTransform(p.spatial.origin_m, { explosion: explosionOff, focus });
+      const pose = kinematic.parts[p.id];
+      const pos = getFinalRenderTransform(pose?.position ?? p.spatial.origin_m, { explosion: explosionOff, focus });
       const cadUrl = meshUrl(p);
       const mode = geometryMode(!!cadUrl, debug);
       const meshLocal = mode === 'cad' && meshBounds[p.id] ? { min: meshBounds[p.id].min, max: meshBounds[p.id].max } : null;
       const rb = getRenderedEntityBounds({
         origin: pos,
-        rpy: p.spatial.rpy_rad,
+        rpy: pose?.rpy ?? p.spatial.rpy_rad,
         primitive: p.spatial.primitive,
         meshLocal
       });
-      return { part: p, off: explosionOff, pos, box: { min: rb.min, max: rb.max }, rb, mode };
+      return { part: p, pose, off: explosionOff, pos, box: { min: rb.min, max: rb.max }, rb, mode };
     });
-  }, [visible, explosion, strategy, spread, explodeContext, assemblies, focusId, exploding, meshBounds, debug, geomRev]);
+  }, [visible, explosion, strategy, spread, explodeContext, assemblies, focusId, exploding, meshBounds, debug, geomRev, scopeSet, kinematic]);
 
   const worldRef = useRef(world);
   worldRef.current = world;
   const fitEpoch = useUi((s) => s.fitEpoch);
   const variantMode = useUi((s) => s.variantMode);
   const meshBoundCount = Object.keys(meshBounds).length;
-  const fitSig = `${spatial}|${explodeContext}|${isolate}|${focusId}|${variantMode}|${fitEpoch}|${meshBoundCount}|${geomRev}`;
+  // Interactive explosion never owns the camera. Semantic commands increment
+  // fitEpoch when a fit is wanted; retracting the slider therefore stays put.
+  const fitSig = `${fitEpoch}|${meshBoundCount}|${geomRev}`;
 
   useEffect(() => {
     const w = worldRef.current;
@@ -677,15 +728,19 @@ export function ArmScene({
       <CameraRig />
       <DrawCallProbe />
       <Suspense fallback={null}>
-        {world.map(({ part: p, pos }) => {
+        {world.map(({ part: p, pose, pos }) => {
           const roleGhost = ghostRoles.includes(p.semantic_role) || (ghostRoles.length > 0 && ghostRoles.some((r) => p.semantic_role.includes(r) || p.id.includes(r)));
+          const openGhost = !!openId && (p.id === openId || /hous|cover|shell/.test(`${p.semantic_role} ${p.id}`)) && (p.parent === parts.find((x) => x.id === openId)?.parent || p.id === openId);
+          const stackGhost = stackIds.length > 0 && !stackIds.includes(p.id) && !stackIds.includes(p.parent ?? '');
           const ghosted =
             roleGhost ||
+            openGhost ||
+            stackGhost ||
             (ghostOthers && selected != null && p.id !== selected && p.parent !== selected && !neighborhood.includes(p.id));
           const delta: [number, number, number] = [
-            pos[0] - p.spatial.origin_m[0],
-            pos[1] - p.spatial.origin_m[1],
-            pos[2] - p.spatial.origin_m[2]
+            pos[0] - (pose?.position[0] ?? p.spatial.origin_m[0]),
+            pos[1] - (pose?.position[1] ?? p.spatial.origin_m[1]),
+            pos[2] - (pose?.position[2] ?? p.spatial.origin_m[2])
           ];
           return (
             <Solid
@@ -702,6 +757,8 @@ export function ArmScene({
               provenanceOverlay={overlays.provenance}
               proposal={false}
               offset={delta}
+              position={pos}
+              quaternion={pose?.quaternion}
               debug={debug}
             />
           );
@@ -763,10 +820,10 @@ export function ArmScene({
             if (scopeSet) return scopeSet.has(p.id);
             return true;
           })
-          .map(({ part: p, pos }) => (
+          .map(({ part: p, pose, pos }) => (
             <Line
               key={`trail-${p.id}`}
-              points={[p.spatial.origin_m, pos]}
+              points={[pose?.position ?? p.spatial.origin_m, pos]}
               color={selected === p.id ? GOLD : GOLD_DIM}
               lineWidth={selected === p.id ? 1.3 : 0.7}
               transparent
@@ -779,7 +836,7 @@ export function ArmScene({
           .map((port) => {
             const host = world.find((w) => w.part.id === port.host);
             const pos = host
-              ? worldPortFromLocal(port.origin_m, host.pos, host.part.spatial.rpy_rad)
+              ? worldPortFromLocal(port.origin_m, host.pos, host.pose?.rpy ?? host.part.spatial.rpy_rad)
               : port.origin_m;
             return (
               <mesh key={port.id} position={pos}>
@@ -797,8 +854,8 @@ export function ArmScene({
             if (!a || !b) return null;
             const ha = world.find((w) => w.part.id === a.host);
             const hb = world.find((w) => w.part.id === b.host);
-            const pa = ha ? worldPortFromLocal(a.origin_m, ha.pos, ha.part.spatial.rpy_rad) : a.origin_m;
-            const pb = hb ? worldPortFromLocal(b.origin_m, hb.pos, hb.part.spatial.rpy_rad) : b.origin_m;
+            const pa = ha ? worldPortFromLocal(a.origin_m, ha.pos, ha.pose?.rpy ?? ha.part.spatial.rpy_rad) : a.origin_m;
+            const pb = hb ? worldPortFromLocal(b.origin_m, hb.pos, hb.pose?.rpy ?? hb.part.spatial.rpy_rad) : b.origin_m;
             const hot = selected === a.host || selected === b.host || selected === iface.id;
             const color = overlays.agentDiff
               ? LAVENDER
@@ -821,7 +878,7 @@ export function ArmScene({
           .filter((port) => localGraph.portIds.has(port.id))
           .map((port) => {
             const host = world.find((w) => w.part.id === port.host);
-            const pos = host ? worldPortFromLocal(port.origin_m, host.pos, host.part.spatial.rpy_rad) : port.origin_m;
+            const pos = host ? worldPortFromLocal(port.origin_m, host.pos, host.pose?.rpy ?? host.part.spatial.rpy_rad) : port.origin_m;
             return (
               <mesh key={`datum-${port.id}`} position={pos}>
                 <sphereGeometry args={[0.004, 8, 8]} />
@@ -829,19 +886,72 @@ export function ArmScene({
               </mesh>
             );
           })}
-      {showDatums &&
+      {loadPathIds.length > 1 &&
+        loadPathIds.slice(1).map((id, i) => {
+          const a = world.find((w) => w.part.id === loadPathIds[i] || w.part.parent === loadPathIds[i]);
+          const b = world.find((w) => w.part.id === id || w.part.parent === id);
+          if (!a || !b) return null;
+          return (
+            <Line key={`load-${id}-${i}`} points={[a.pos, b.pos]} color={LAVENDER} lineWidth={1.4} transparent opacity={0.7} />
+          );
+        })}
+      {serviceIds.map((id) => {
+        const part = parts.find((p) => p.id === id);
+        const host = world.find((w) => w.part.id === id);
+        if (!part || !host || part.spatial.service_path.length < 2) return null;
+        return (
+          <Line
+            key={`service-${id}`}
+            points={part.spatial.service_path}
+            color={GOLD}
+            lineWidth={1.2}
+            transparent
+            opacity={0.7}
+          />
+        );
+      })}
+      {(showDatums || axisJointId) &&
         joints
-          .filter((joint) => joint.id === selected)
+          .filter((joint) => joint.id === selected || joint.id === axisJointId)
           .map((joint) => {
+            const frame = kinematic.joints[joint.id];
+            const origin = frame?.origin ?? joint.origin_m;
+            const axis = frame?.axis ?? joint.axis;
             const end: [number, number, number] = [
-              joint.origin_m[0] + joint.axis[0] * 0.16,
-              joint.origin_m[1] + joint.axis[1] * 0.16,
-              joint.origin_m[2] + joint.axis[2] * 0.16
+              origin[0] + axis[0] * 0.16,
+              origin[1] + axis[1] * 0.16,
+              origin[2] + axis[2] * 0.16
             ];
+            const normal = new THREE.Vector3(...axis).normalize();
+            const helper = Math.abs(normal.z) < 0.9 ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(1, 0, 0);
+            const u = new THREE.Vector3().crossVectors(normal, helper).normalize();
+            const v = new THREE.Vector3().crossVectors(normal, u).normalize();
+            const lower = joint.limits?.lower ?? -Math.PI;
+            const upper = joint.limits?.upper ?? Math.PI;
+            const envelope = Array.from({ length: 49 }, (_, i) => {
+              const a = lower + (upper - lower) * (i / 48);
+              return new THREE.Vector3(...origin)
+                .addScaledVector(u, Math.cos(a) * 0.11)
+                .addScaledVector(v, Math.sin(a) * 0.11)
+                .toArray();
+            });
             return (
               <group key={`joint-axis-${joint.id}`}>
-                <Line points={[joint.origin_m, end]} color={LAVENDER_HI} lineWidth={2.2} />
-                <mesh position={joint.origin_m}>
+                <Line points={[origin, end]} color={LAVENDER_HI} lineWidth={2.2} />
+                {joint.joint_type === 'REVOLUTE' && (
+                  <Line points={envelope} color={LAVENDER} lineWidth={0.8} transparent opacity={0.55} />
+                )}
+                {joint.joint_type === 'PRISMATIC' && joint.limits && (
+                  <Line
+                    points={[
+                      [origin[0] + axis[0] * joint.limits.lower, origin[1] + axis[1] * joint.limits.lower, origin[2] + axis[2] * joint.limits.lower],
+                      [origin[0] + axis[0] * joint.limits.upper, origin[1] + axis[1] * joint.limits.upper, origin[2] + axis[2] * joint.limits.upper]
+                    ]}
+                    color={LAVENDER}
+                    lineWidth={1.2}
+                  />
+                )}
+                <mesh position={origin}>
                   <sphereGeometry args={[0.008, 12, 12]} />
                   <meshBasicMaterial color={LAVENDER} />
                 </mesh>
@@ -855,11 +965,11 @@ export function ArmScene({
             const host = world.find((entry) => entry.part.id === feature.part);
             if (!host) return null;
             const origin = new THREE.Vector3(...feature.frame.origin_m)
-              .applyEuler(new THREE.Euler(...host.part.spatial.rpy_rad, 'XYZ'))
+              .applyEuler(new THREE.Euler(...(host.pose?.rpy ?? host.part.spatial.rpy_rad), 'XYZ'))
               .add(new THREE.Vector3(...host.pos));
             const axis = new THREE.Vector3(...feature.frame.axis)
               .applyEuler(new THREE.Euler(...feature.frame.rpy_rad, 'XYZ'))
-              .applyEuler(new THREE.Euler(...host.part.spatial.rpy_rad, 'XYZ'))
+              .applyEuler(new THREE.Euler(...(host.pose?.rpy ?? host.part.spatial.rpy_rad), 'XYZ'))
               .normalize();
             const end = origin.clone().addScaledVector(axis, 0.1);
             return (

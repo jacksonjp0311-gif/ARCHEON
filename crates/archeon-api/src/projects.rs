@@ -1,9 +1,13 @@
 //! Project discovery, load, and CAD import. Geometry files are attachments to DesignIR.
 use archeon_design_ir::{
-    load_project_dir, CadRef, DesignDocument, EntityId, GeometryClass, Part, Primitive, Spatial,
+    load_project_dir, save_project_dir, Assembly, CadRef, DesignDocument, EntityId, FidelityLevel,
+    GeometryClass, Part, Primitive, Project, Revision, Spatial, System,
 };
 use archeon_provenance::{Provenance, ProvenanceClass};
-use serde::Serialize;
+use chrono::Utc;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use std::io;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Serialize)]
@@ -13,6 +17,209 @@ pub struct ProjectSummary {
     pub revision: String,
     pub folder: String,
     pub parts: usize,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreateProjectIn {
+    pub name: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub template: String,
+}
+
+pub fn project_slug(name: &str) -> Option<String> {
+    let mut slug = String::new();
+    let mut dash = false;
+    for ch in name.trim().chars() {
+        if ch.is_ascii_alphanumeric() {
+            slug.push(ch.to_ascii_lowercase());
+            dash = false;
+        } else if !dash && !slug.is_empty() {
+            slug.push('-');
+            dash = true;
+        }
+    }
+    while slug.ends_with('-') {
+        slug.pop();
+    }
+    (!slug.is_empty()).then_some(slug)
+}
+
+/// Creates the minimum valid DesignIR workspace. Shared parametric components,
+/// materials, and detail budgets are inherited as engineering context, while no
+/// geometry or conclusions are copied into the new design.
+pub fn create_project(
+    repo: &Path,
+    input: &CreateProjectIn,
+    context: &DesignDocument,
+) -> io::Result<(PathBuf, DesignDocument)> {
+    let slug = project_slug(&input.name).ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "project name must contain letters or numbers",
+        )
+    })?;
+    let dir = projects_root(repo).join(&slug);
+    if dir.exists() {
+        return Err(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            format!("project folder {slug} already exists"),
+        ));
+    }
+    let mut provenance = Provenance::generated("operator", "New DesignIR engineering workspace");
+    provenance.user_approved = true;
+    let system_id = EntityId::new(format!("sys.{slug}"));
+    let assembly_id = EntityId::new(format!("asm.{slug}"));
+    let project_id = EntityId::new(format!("project.{slug}"));
+    let template = if input.template.trim().is_empty() {
+        "blank"
+    } else {
+        input.template.trim()
+    };
+    let doc = DesignDocument {
+        schema_version: archeon_design_ir::SCHEMA_VERSION.into(),
+        project: Project {
+            id: project_id,
+            name: input.name.trim().into(),
+            description: if input.description.trim().is_empty() {
+                format!("Adaptive {template} engineering project")
+            } else {
+                input.description.trim().into()
+            },
+            revision_id: "rev.0001".into(),
+            branch: "main".into(),
+            kernel: "primitive".into(),
+            domain: "spatial_engineering".into(),
+            fidelity: FidelityLevel::Engineering,
+            provenance: provenance.clone(),
+        },
+        systems: vec![System {
+            id: system_id.clone(),
+            name: input.name.trim().into(),
+            parent: None,
+            provenance: provenance.clone(),
+        }],
+        assemblies: vec![Assembly {
+            id: assembly_id,
+            name: format!("{} Root Assembly", input.name.trim()),
+            parent: None,
+            system: Some(system_id),
+            children: vec![],
+            semantic_role: "root_machine".into(),
+            provenance: provenance.clone(),
+        }],
+        parts: vec![],
+        features: vec![],
+        datums: vec![],
+        ports: vec![],
+        interfaces: vec![],
+        mates: vec![],
+        joints: vec![],
+        constraints: vec![],
+        functions: vec![],
+        flows: vec![],
+        loads: vec![],
+        materials: context.materials.clone(),
+        requirements: vec![],
+        analyses: vec![],
+        evidence: vec![],
+        decisions: vec![],
+        revisions: vec![Revision {
+            id: "rev.0001".into(),
+            parent_revision: None,
+            transaction_id: None,
+            timestamp: Utc::now().to_rfc3339(),
+            author: "operator".into(),
+            agent: None,
+            message: format!("Create {template} engineering workspace"),
+            geometry_hash: None,
+            design_hash: None,
+        }],
+        parameters: Default::default(),
+        assembly_sequence: vec![],
+        fastener_groups: vec![],
+        assembly_plans: vec![],
+        fit_relations: vec![],
+        component_library: context.component_library.clone(),
+        detail_budget: context.detail_budget.clone(),
+    };
+    std::fs::create_dir_all(&dir)?;
+    save_project_dir(&doc, &dir)?;
+    Ok((dir, doc))
+}
+
+pub fn save_refined_part_context(
+    repo: &Path,
+    project_dir: &Path,
+    doc: &DesignDocument,
+    part_id: &str,
+) -> io::Result<PathBuf> {
+    let part = doc.part(part_id).ok_or_else(|| {
+        io::Error::new(io::ErrorKind::NotFound, format!("unknown part {part_id}"))
+    })?;
+    let ports = doc
+        .ports
+        .iter()
+        .filter(|item| item.host == part.id)
+        .cloned()
+        .collect::<Vec<_>>();
+    let port_ids = ports
+        .iter()
+        .map(|item| item.id.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    let interfaces = doc
+        .interfaces
+        .iter()
+        .filter(|item| port_ids.contains(item.a.as_str()) || port_ids.contains(item.b.as_str()))
+        .cloned()
+        .collect::<Vec<_>>();
+    let features = doc
+        .features
+        .iter()
+        .filter(|item| item.part == part.id)
+        .cloned()
+        .collect::<Vec<_>>();
+    let material = part
+        .material
+        .as_ref()
+        .and_then(|id| doc.materials.iter().find(|item| &item.id == id))
+        .cloned();
+    let hash = doc.design_hash();
+    let safe = safe_filename(part.id.as_str()).replace('.', "_");
+    let dir = repo.join("library").join("refined-parts").join(&safe);
+    std::fs::create_dir_all(&dir)?;
+    let path = dir.join(format!(
+        "{}-{}.json",
+        safe_filename(&doc.project.revision_id),
+        &hash[..12]
+    ));
+    let payload = json!({
+        "schema": "archeon.refined-part-context.v1",
+        "saved_at": Utc::now().to_rfc3339(),
+        "source": {
+            "project_id": doc.project.id,
+            "project_name": doc.project.name,
+            "project_folder": project_dir.file_name().and_then(|v| v.to_str()),
+            "revision_id": doc.project.revision_id,
+            "design_hash": hash
+        },
+        "truth": "REVISION_LINKED_CONTEXT",
+        "part": part,
+        "features": features,
+        "ports": ports,
+        "interfaces": interfaces,
+        "material": material,
+        "validation": {
+            "status": "UNVERIFIED",
+            "note": "Snapshot preserves source evidence. Revalidate fits, loads, cost, chemistry, and CAD geometry before reuse."
+        }
+    });
+    let mut bytes = serde_json::to_vec_pretty(&payload)
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+    bytes.push(b'\n');
+    std::fs::write(&path, bytes)?;
+    Ok(path)
 }
 
 pub fn projects_root(repo: &Path) -> PathBuf {
@@ -341,5 +548,15 @@ mod tests {
         let bb = stl_bbox(stl).unwrap();
         assert!((bb[0] - 1.0).abs() < 1e-9);
         assert!((bb[1] - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn project_slug_is_path_safe_and_deterministic() {
+        assert_eq!(
+            project_slug("  Lunar Elbow / Mk II  ").as_deref(),
+            Some("lunar-elbow-mk-ii")
+        );
+        assert_eq!(project_slug("../../"), None);
+        assert_eq!(project_slug("A__B").as_deref(), Some("a-b"));
     }
 }

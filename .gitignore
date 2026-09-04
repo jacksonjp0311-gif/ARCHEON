@@ -10,6 +10,7 @@
 !.env.example
 *.log
 /logs/
+/memory/*.jsonl
 /workers/cad-occt/.venv
 /workers/cad-occt/**/__pycache__/
 /workers/cad-occt/**/*.pyc

@@ -155,6 +155,18 @@ function inferAssemblies(parts: SpatialPart[]): AssemblyRef[] {
 }
 
 /**
+ * Reverse-install sequencing inspired by HELIX's staged disassembly, but driven
+ * entirely by DesignIR assembly_stage values. Later-installed parts move first;
+ * the overlap between windows keeps the motion readable instead of popping.
+ */
+function reverseSequenceWeight(progress: number, stage: number, minStage: number, maxStage: number): number {
+  const span = Math.max(1, maxStage - minStage);
+  const reverseRank = (maxStage - stage) / span;
+  const start = reverseRank * 0.62;
+  return stageWeight(progress, start, Math.min(1, start + 0.32));
+}
+
+/**
  * Recursive explosion: assembly offset + child assembly offset + part offset.
  * Out-of-scope parts receive [0,0,0] — no residual drift.
  */
@@ -176,6 +188,29 @@ export function recursiveExplosionOffsets(
   const scopeParts = partsInScope(scopeId, parts, asms);
   const profile = SPREAD[preset];
   const worldC = centroidOf(parts);
+
+  if (strategy === 'SEQUENCE') {
+    const active = scopeParts ? parts.filter((p) => scopeParts.has(p.id)) : parts;
+    const minStage = active.length ? Math.min(...active.map((p) => Math.max(1, p.assembly_stage))) : 1;
+    const maxStage = active.length ? Math.max(...active.map((p) => Math.max(1, p.assembly_stage))) : 1;
+    for (const p of parts) {
+      if (scopeParts && !scopeParts.has(p.id)) {
+        out[p.id] = [0, 0, 0];
+        continue;
+      }
+      const base = p.explosion_distance_m > 0 ? p.explosion_distance_m : 0.08;
+      const stage = Math.max(1, p.assembly_stage);
+      const stagedK = reverseSequenceWeight(k, stage, minStage, maxStage);
+      if (stagedK <= 0) {
+        out[p.id] = [0, 0, 0];
+        continue;
+      }
+      const mag = base * profile.spreadScale * 0.32 * stagedK;
+      out[p.id] = scale3(norm3(p.explosion_vector), mag);
+    }
+    return out;
+  }
+
   if (strategy === 'STACK') {
     for (const p of parts) {
       if (scopeParts && !scopeParts.has(p.id)) {
@@ -209,6 +244,12 @@ export function recursiveExplosionOffsets(
     if (hit) return hit;
     const a = asms.find((x) => x.id === asmId);
     const parentOff = a?.parent ? offsetOf(a.parent) : ([0, 0, 0] as Vec3);
+    // A local explode opens the selected assembly in place. Moving the scope
+    // itself creates a false disconnect from the rest of the mechanism.
+    if (scopeId && asmId === scopeId) {
+      asmMemo.set(asmId, [0, 0, 0]);
+      return [0, 0, 0];
+    }
     if (scopeId) {
       const scopedAsms = assemblyDescendants(scopeId, asms);
       if (!scopedAsms.has(asmId) && asmId !== scopeId) {

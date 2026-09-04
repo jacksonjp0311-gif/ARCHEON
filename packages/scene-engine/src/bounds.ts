@@ -16,6 +16,21 @@ export interface RenderedBounds {
   rejected?: string;
 }
 
+export interface ExplodedBody {
+  id: string;
+  bounds: LocalAabb;
+  offset: Vec3;
+  direction: Vec3;
+  assemblyStage: number;
+  movable?: boolean;
+}
+
+export interface ExplosionClearanceResult {
+  offsets: Record<string, Vec3>;
+  resolvedPairs: number;
+  unresolvedPairs: number;
+}
+
 function sub(a: Vec3, b: Vec3): Vec3 {
   return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 }
@@ -26,12 +41,101 @@ function len(v: Vec3): number {
   return Math.hypot(v[0], v[1], v[2]);
 }
 
+function scale(v: Vec3, n: number): Vec3 {
+  return [v[0] * n, v[1] * n, v[2] * n];
+}
+
+function normalize(v: Vec3): Vec3 {
+  const n = len(v);
+  return n > 1e-9 ? scale(v, 1 / n) : [0, 0, 1];
+}
+
 export function aabbSize(b: LocalAabb): Vec3 {
   return sub(b.max, b.min);
 }
 
 export function aabbCenter(b: LocalAabb): Vec3 {
   return [(b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2];
+}
+
+export function translateAabb(b: LocalAabb, offset: Vec3): LocalAabb {
+  return { min: add(b.min, offset), max: add(b.max, offset) };
+}
+
+export function aabbsOverlap(a: LocalAabb, b: LocalAabb, buffer = 0): boolean {
+  return [0, 1, 2].every((axis) => a.min[axis] < b.max[axis] + buffer && a.max[axis] + buffer > b.min[axis]);
+}
+
+function adaptiveClearance(a: LocalAabb, b: LocalAabb, scaleFactor: number): number {
+  const aDiag = len(aabbSize(a));
+  const bDiag = len(aabbSize(b));
+  return Math.min(0.04, Math.max(0.006, Math.min(aDiag, bDiag) * 0.12)) * Math.max(0.5, scaleFactor);
+}
+
+function clearanceAlongDirection(moving: LocalAabb, fixed: LocalAabb, direction: Vec3, buffer: number): number {
+  const distances: number[] = [];
+  for (let axis = 0; axis < 3; axis++) {
+    const d = direction[axis];
+    if (Math.abs(d) < 1e-8) continue;
+    const distance = d > 0
+      ? (fixed.max[axis] + buffer - moving.min[axis]) / d
+      : (moving.max[axis] + buffer - fixed.min[axis]) / -d;
+    if (distance > 1e-9 && Number.isFinite(distance)) distances.push(distance);
+  }
+  return distances.length ? Math.min(...distances) + 1e-6 : buffer + 1e-6;
+}
+
+/**
+ * Deterministic geometry-aware exploded layout. Parts retain their declared
+ * engineering direction while being pushed only far enough to clear every
+ * previously placed rendered AABB plus an adaptive physical buffer.
+ */
+export function resolveExplosionClearance(
+  bodies: ExplodedBody[],
+  bufferScale = 1
+): ExplosionClearanceResult {
+  const offsets: Record<string, Vec3> = {};
+  const placed: { body: ExplodedBody; box: LocalAabb }[] = [];
+  let resolvedPairs = 0;
+
+  const ordered = [...bodies].sort((a, b) => {
+    const fixedOrder = Number(a.movable !== false) - Number(b.movable !== false);
+    if (fixedOrder !== 0) return fixedOrder;
+    return a.assemblyStage - b.assemblyStage || a.id.localeCompare(b.id);
+  });
+
+  for (const body of ordered) {
+    let offset: Vec3 = [...body.offset];
+    let box = translateAabb(body.bounds, offset);
+    if (body.movable !== false) {
+      const direction = normalize(body.direction);
+      for (let guard = 0; guard < placed.length + 2; guard++) {
+        const conflict = placed.find((candidate) => {
+          const buffer = adaptiveClearance(box, candidate.box, bufferScale);
+          return aabbsOverlap(box, candidate.box, buffer);
+        });
+        if (!conflict) break;
+        const buffer = adaptiveClearance(box, conflict.box, bufferScale);
+        const distance = clearanceAlongDirection(box, conflict.box, direction, buffer);
+        const correction = scale(direction, distance);
+        offset = add(offset, correction);
+        box = translateAabb(box, correction);
+        resolvedPairs += 1;
+      }
+    }
+    offsets[body.id] = offset;
+    placed.push({ body, box });
+  }
+
+  let unresolvedPairs = 0;
+  for (let i = 0; i < placed.length; i++) {
+    for (let j = i + 1; j < placed.length; j++) {
+      if (placed[i].body.movable === false && placed[j].body.movable === false) continue;
+      const buffer = adaptiveClearance(placed[i].box, placed[j].box, bufferScale);
+      if (aabbsOverlap(placed[i].box, placed[j].box, buffer)) unresolvedPairs += 1;
+    }
+  }
+  return { offsets, resolvedPairs, unresolvedPairs };
 }
 
 /** Engineering envelope for ARCHEON Arm-scale machines. Not a general CAD limit. */

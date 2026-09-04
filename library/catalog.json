@@ -1,0 +1,42 @@
+{
+  "schema": "archeon.engineering-library.v1",
+  "policy": "References and patterns are candidates, never design authority. Source, size, fit, load, environment, cost, and availability must be revalidated in project context.",
+  "patterns": [
+    {
+      "id": "pattern.revolute.bearing_pair",
+      "name": "Bearing-supported revolute joint",
+      "domains": ["mechanical", "kinematics"],
+      "intent": "Carry radial load and overturning moment through a spaced bearing pair.",
+      "required_inputs": ["radial load", "axial load", "moment", "speed", "life target", "shaft diameter", "housing material", "temperature"],
+      "checks": ["bearing life", "shaft bending", "fits", "preload/endplay", "housing clearance", "retention", "lubrication", "assembly path"],
+      "truth": "ENGINEERING_PATTERN"
+    },
+    {
+      "id": "pattern.shaft.retained_stack",
+      "name": "Coaxial retained shaft stack",
+      "domains": ["mechanical", "assembly"],
+      "intent": "Organize shaft, bearings, spacers, seals, and retainers in one serviceable coaxial lane.",
+      "required_inputs": ["stack datum", "fit classes", "axial load direction", "service side", "thermal range"],
+      "checks": ["tolerance stack", "tool access", "service extraction", "shoulder radii", "retainer capacity"],
+      "truth": "ENGINEERING_PATTERN"
+    },
+    {
+      "id": "pattern.interface.invariant_redesign",
+      "name": "Interface-preserving redesign",
+      "domains": ["mechanical", "architectural", "agent_design"],
+      "intent": "Generate alternatives while locking datums, joint axes, envelopes, and required connections.",
+      "required_inputs": ["locked interfaces", "goal metric", "design variables", "constraints", "evidence policy"],
+      "checks": ["interface diff", "reach", "mass", "clearance", "requirements", "unsupported analyses"],
+      "truth": "ENGINEERING_PATTERN"
+    },
+    {
+      "id": "pattern.fastened_service_cover",
+      "name": "Serviceable fastened cover",
+      "domains": ["mechanical", "serviceability"],
+      "intent": "Provide repeatable access without disturbing primary alignment datums.",
+      "required_inputs": ["pressure/environment", "material", "fastener size", "thread engagement", "tool corridor", "cycle count"],
+      "checks": ["preload", "bearing stress", "edge distance", "pattern access", "seal compression", "removal path"],
+      "truth": "ENGINEERING_PATTERN"
+    }
+  ]
+}

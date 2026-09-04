@@ -2,6 +2,14 @@
 
 Status language: **shipped**, **partial**, **not started**. Nothing here is a claim that a robot or CAD kernel is production-qualified.
 
+## v0.6.1 — Human-first mechanical intelligence — this tree
+
+- One context-action generator for object HUD, radial, right-click, Agent HUD
+- `expandedNodeIds` + `revealEntity` (search/select/tree/3D)
+- Shared `HudShell` (Agent HUD included) + viewport preservation
+- OPEN / stack / load path / service / axis as declared spatial projections
+- Empty search does not auto-select; results stay grouped
+
 ## v0.6.0 — Executable Mechanical Intelligence — shipped in this tree
 
 - Real DTP execution for ports, interfaces, mates, datums, sketches, extrudes, and bounded analyses; typed unsupported errors

@@ -336,15 +336,25 @@ pub struct Variant {
     pub agent: String,
     pub preview: DesignDocument,
     pub geometry_refs: Vec<GeometryIdentity>,
+    pub dtp_operations: Vec<Operation>,
+    pub changed_interfaces: Vec<String>,
+    pub changed_features: Vec<String>,
     pub requirement_results: Vec<String>,
     pub validation_results: serde_json::Value,
     pub metrics: VariantMetrics,
+    pub assumptions: Vec<String>,
+    pub unsupported_checks: Vec<String>,
+    pub approval_action: String,
     pub status: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VariantMetrics {
     pub reach_m: Option<f64>,
+    pub mass_kg: Option<f64>,
+    pub mass_status: String,
+    pub clearance_m: Option<f64>,
+    pub clearance_status: String,
     pub changed_parameters: Vec<String>,
     pub note: String,
 }
@@ -364,6 +374,10 @@ pub fn variant_from_ops(
     let preview = archeon_transactions::dry_run(base, &tx).map_err(|e| e.to_string())?;
     let report = validate(&preview);
     let reach = preview.derived_reach_m();
+    let mass = primitive_envelope_mass_kg(&preview);
+    let changed_features = changed_entity_ids(&base.features, &preview.features);
+    let changed_interfaces = changed_entity_ids(&base.interfaces, &preview.interfaces);
+    let approval_action = format!("propose_variant:{label}");
     Ok(Variant {
         id: label.into(),
         label: label.into(),
@@ -382,13 +396,30 @@ pub fn variant_from_ops(
                 )
             })
             .collect(),
+        dtp_operations: tx.operations.clone(),
+        changed_interfaces,
+        changed_features,
         requirement_results: tx.requirements.clone(),
         validation_results: serde_json::to_value(&report).unwrap_or(serde_json::json!({})),
         metrics: VariantMetrics {
             reach_m: reach,
+            mass_kg: mass,
+            mass_status: "ASSUMED".into(),
+            clearance_m: None,
+            clearance_status: "UNSUPPORTED".into(),
             changed_parameters: tx.affected_entities.clone(),
-            note: "Envelope preview from DesignIR parameters. Not exact BREP.".into(),
+            note: "Reach is DERIVED from link parameters. Mass is ASSUMED from solid primitive envelopes and declared density. Clearance requires motion-sweep context.".into(),
         },
+        assumptions: vec![
+            "Primitive envelopes are treated as solid for mass estimation.".into(),
+            "Unchanged joint axes and interfaces are preserved by the parameter-only DTP operation.".into(),
+        ],
+        unsupported_checks: vec![
+            "Exact BREP mass properties".into(),
+            "Mesh/BREP collision narrow phase".into(),
+            "FEA, fatigue, bearing life, and manufacturing cost".into(),
+        ],
+        approval_action,
         preview,
         status: if report.ok() {
             "READY".into()
@@ -396,6 +427,54 @@ pub fn variant_from_ops(
             "INVALID".into()
         },
     })
+}
+
+fn changed_entity_ids<T: Serialize>(before: &[T], after: &[T]) -> Vec<String> {
+    let a = serde_json::to_value(before).unwrap_or_default();
+    let b = serde_json::to_value(after).unwrap_or_default();
+    let aa = a.as_array().cloned().unwrap_or_default();
+    let bb = b.as_array().cloned().unwrap_or_default();
+    let mut ids = Vec::new();
+    for item in &bb {
+        let Some(id) = item.get("id").and_then(|value| value.as_str()) else {
+            continue;
+        };
+        if aa
+            .iter()
+            .find(|old| old.get("id").and_then(|value| value.as_str()) == Some(id))
+            != Some(item)
+        {
+            ids.push(id.to_string());
+        }
+    }
+    ids
+}
+
+fn primitive_envelope_mass_kg(doc: &DesignDocument) -> Option<f64> {
+    let mut total = 0.0;
+    let mut found = false;
+    for part in &doc.parts {
+        let Some(material_id) = part.material.as_ref() else {
+            continue;
+        };
+        let Some(density) = doc
+            .materials
+            .iter()
+            .find(|material| &material.id == material_id)
+            .and_then(|material| material.density_kg_m3)
+        else {
+            continue;
+        };
+        let volume = match part.spatial.primitive {
+            Primitive::Box { sx, sy, sz } => sx * sy * sz,
+            Primitive::Cylinder { radius, height } => {
+                std::f64::consts::PI * radius * radius * height
+            }
+        };
+        total += volume * density * part.qty as f64;
+        found = true;
+    }
+    found.then_some(total)
 }
 
 /// Three upper-arm length alternatives. Wrist-named requests still use a real parameter if present.

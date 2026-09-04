@@ -10,7 +10,7 @@ interface Props {
 export function Breadcrumbs({ projectName, parts, assemblies }: Props) {
   const selectedId = useUi((s) => s.selectedId);
   const setSelected = useUi((s) => s.setSelected);
-  const agentContext = useUi((s) => s.hudOpen || s.agentWorking);
+  const agentContext = useUi((s) => s.agentWorking);
   const crumbs = breadcrumbs(selectedId, projectName, parts, assemblies);
   return (
     <nav className={`crumbs ${agentContext ? 'crumbs--agent' : ''}`} aria-label="location">
