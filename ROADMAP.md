@@ -2,7 +2,14 @@
 
 Status language: **shipped**, **partial**, **not started**. Nothing here is a claim that a robot or CAD kernel is production-qualified.
 
-## v0.6.1 — Human-first mechanical intelligence — this tree
+## v0.6.2 — Identity of operations — this tree
+
+- One mechanical executor (`applyMechanicalOp`) for click, radial, menus, palette, and language
+- Local parser emits `ViewCommand::Mechanical { op, id }` for OPEN / what-rotates / stack / load path / fasteners / service / restore
+- Language OPEN does not force the Agent HUD
+- “Make this bearing larger” is a `ChangeDimension` DTP proposal (envelope only — not catalog, not ISO, not COMMIT)
+
+## v0.6.1 — Human-first mechanical intelligence — shipped in this tree
 
 - One context-action generator for object HUD, radial, right-click, Agent HUD
 - `expandedNodeIds` + `revealEntity` (search/select/tree/3D)

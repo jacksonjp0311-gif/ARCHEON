@@ -1,6 +1,6 @@
 # ARCHEON architecture
 
-Version 0.6.0 — Executable Mechanical Intelligence.
+Version 0.6.2 — Identity of operations.
 
 > Geometry is only one projection of an engineered system.
 

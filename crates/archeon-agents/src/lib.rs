@@ -1,6 +1,6 @@
 //! Bounded agents. They propose transactions; they never write DesignIR themselves.
 use archeon_assembly::ExplosionStrategy;
-use archeon_design_ir::DesignDocument;
+use archeon_design_ir::{DesignDocument, Primitive};
 use archeon_provenance::ProvenanceClass;
 use archeon_transactions::{Authority, DesignTransaction, Operation, TxError};
 use serde::{Deserialize, Serialize};
@@ -275,13 +275,17 @@ pub fn execute_tool(
                 format!("DOF={}", joint.dof()),
                 format!("axis={:?}", joint.axis),
             ];
-            out.views.push(ViewCommand::ShowJoint {
-                id: joint.id.0.clone(),
+            out.views.push(ViewCommand::Mechanical {
+                op: "show-motion".into(),
+                id: Some(joint.id.0.clone()),
             });
         }
         EngineeringToolCall::InspectLoadPath { id } => {
             out.facts = graph::get_load_path(doc, &id);
-            out.views.push(ViewCommand::ShowLoadPath { id });
+            out.views.push(ViewCommand::Mechanical {
+                op: "show-load".into(),
+                id: Some(id),
+            });
         }
         EngineeringToolCall::InspectConnections { id } => {
             out.facts = graph::get_interface_neighbors(doc, &id);
@@ -290,10 +294,10 @@ pub fn execute_tool(
         EngineeringToolCall::ExplodeScope {
             id,
             strategy: _,
-            factor,
-        } => out.views.push(ViewCommand::ExplodeContext {
+            factor: _,
+        } => out.views.push(ViewCommand::Mechanical {
+            op: "explode".into(),
             id: Some(id),
-            factor: factor.clamp(0.0, 1.5),
         }),
         EngineeringToolCall::FocusEntity { id } => {
             if !doc.id_set().contains(&id) {
@@ -606,6 +610,10 @@ pub enum ViewCommand {
         id: String,
     },
     ShowAffected,
+    Mechanical {
+        op: String,
+        id: Option<String>,
+    },
     Ask {
         prompt: String,
     },
@@ -703,27 +711,23 @@ pub fn parse_command_ctx(text: &str, doc: &DesignDocument, ctx: &OperatorContext
 
     // Mechanism-agnostic inspection commands route through first-class graph
     // entities. Names are resolved from DesignIR, never from product aliases.
-    if lower.starts_with("open ") || lower.starts_with("open the ") {
+    // Language emits the same mechanical ops as click / radial / menus.
+    if lower.starts_with("open ") || lower.trim() == "open" {
         if let Some(id) = resolved.clone() {
-            views.push(ViewCommand::Select { id: id.clone() });
-            views.push(ViewCommand::Focus { id: id.clone() });
-            views.push(ViewCommand::Cutaway { enabled: true });
-            views.push(ViewCommand::ExplodeStack {
-                id: Some(id.clone()),
-            });
-            views.push(ViewCommand::OpenHud);
+            views.push(mechanical_view("open", Some(id.clone())));
             notes.push(format!(
-                "Opened {} from its DesignIR assembly context. View only.",
+                "Opened {} from its DesignIR assembly context. View only. Agent HUD not forced.",
                 human_name(doc, &id)
             ));
         }
     }
-    if lower.contains("what rotates") || (lower.contains("show") && lower.contains("joint")) {
+    if lower.contains("what rotates")
+        || lower.contains("show me what rotates")
+        || (lower.contains("show") && lower.contains("joint"))
+    {
         if let Some(id) = resolved.clone().or(ctx_id.clone()) {
             if let Some(joint) = graph::joint_for_context(doc, &id) {
-                views.push(ViewCommand::ShowJoint {
-                    id: joint.id.0.clone(),
-                });
+                views.push(mechanical_view("show-motion", Some(joint.id.0.clone())));
                 notes.push(format!(
                     "{}: {:?}, DOF {}, axis {:?}; rotating group: {}.",
                     joint.name,
@@ -735,6 +739,31 @@ pub fn parse_command_ctx(text: &str, doc: &DesignDocument, ctx: &OperatorContext
             } else {
                 notes.push(format!("No first-class joint is declared for {id}."));
             }
+        }
+    }
+    if lower.contains("bearing stack")
+        || (lower.contains("show") && lower.contains("stack"))
+        || lower.contains("show internals")
+    {
+        if let Some(id) = resolved.clone().or(ctx_id.clone()) {
+            views.push(mechanical_view("show-stack", Some(id.clone())));
+            notes.push(format!(
+                "Declared component stack for {}. View only.",
+                human_name(doc, &id)
+            ));
+        }
+    }
+    if lower.contains("what holds")
+        || lower.contains("holds this")
+        || lower.contains("hold this cover")
+        || lower.contains("show fastener")
+    {
+        if let Some(id) = resolved.clone().or(ctx_id.clone()) {
+            views.push(mechanical_view("show-fasteners", Some(id.clone())));
+            notes.push(
+                "Declared fastener group / cover host. Threads are ASSUMED, not ISO qualified."
+                    .into(),
+            );
         }
     }
     if lower.contains("bearing support") {
@@ -765,6 +794,10 @@ pub fn parse_command_ctx(text: &str, doc: &DesignDocument, ctx: &OperatorContext
     }
     if (lower.contains("give me") || lower.contains("show me the") || lower.starts_with("get the"))
         && !lower.contains("variant")
+        && !lower.contains("joint")
+        && !lower.contains("load")
+        && !lower.contains("stack")
+        && !lower.contains("rotates")
         && !matches!(
             lower.trim(),
             "give me a" | "give me b" | "give me c" | "give me the best one" | "give me best"
@@ -913,21 +946,21 @@ pub fn parse_command_ctx(text: &str, doc: &DesignDocument, ctx: &OperatorContext
         || lower.contains("load carrying")
         || lower.contains("show the load")
         || lower.contains("show load path")
+        || lower.contains("supports the load")
+        || lower.contains("what supports")
+        || lower.contains("declared load")
     {
         let scope = resolved.clone().or(ctx_id.clone());
         if let Some(id) = scope {
-            views.push(ViewCommand::ShowLoadPath { id: id.clone() });
+            views.push(mechanical_view("show-load", Some(id.clone())));
             notes.push(format!(
                 "Declared DesignIR load path: {}. This is not FEA.",
                 graph::get_load_path(doc, &id).join(" → ")
             ));
         } else {
-            views.push(ViewCommand::ShowLoadPaths);
+            views.push(mechanical_view("show-load", None));
             notes.push("All declared load paths shown. This is not FEA.".into());
         }
-        views.push(ViewCommand::Show {
-            layer: "interfaces".into(),
-        });
     }
     if lower.contains("simplify") || lower.contains("reduce part count") {
         notes.push("CONCEPT fidelity would hide fasteners/cover/retainers. Request is view+parameter; DTP required to delete parts.".into());
@@ -953,14 +986,16 @@ pub fn parse_command_ctx(text: &str, doc: &DesignDocument, ctx: &OperatorContext
         || lower.contains("service view")
         || lower.trim() == "service"
         || lower.contains("extraction path")
+        || lower.contains("service the")
+        || (lower.contains("service") && (lower.contains("motor") || lower.contains("cover")))
     {
-        views.push(ViewCommand::SetMode {
-            mode: "SERVICE".into(),
-        });
-        views.push(ViewCommand::Explode {
-            factor: 0.85,
-            strategy: ExplosionStrategy::Service,
-        });
+        views.push(mechanical_view(
+            "service",
+            resolved.clone().or(ctx_id.clone()),
+        ));
+        notes.push(
+            "Declared service cover / extraction path. Not a trajectory or collision study.".into(),
+        );
     }
 
     if lower.contains("put it back")
@@ -970,7 +1005,7 @@ pub fn parse_command_ctx(text: &str, doc: &DesignDocument, ctx: &OperatorContext
         || lower.contains("restore display")
         || lower.contains("back together")
     {
-        views.push(ViewCommand::RestoreDisplay);
+        views.push(mechanical_view("restore", None));
         notes.push("Spatial Director: assembled view restored. DesignIR unchanged.".into());
     }
     if lower == "more" || lower.trim() == "spread farther" || lower == "farther" {
@@ -986,11 +1021,11 @@ pub fn parse_command_ctx(text: &str, doc: &DesignDocument, ctx: &OperatorContext
         notes.push("Spatial Director: decrease explosion spread.".into());
     }
     if lower.contains("previous view") || lower == "back view" || lower == "undo view" {
-        views.push(ViewCommand::PreviousView);
+        views.push(mechanical_view("previous", None));
         notes.push("VIEW UNDO — camera history. Not a design rollback.".into());
     }
     if lower == "home" || lower.contains("home view") {
-        views.push(ViewCommand::HomeView);
+        views.push(mechanical_view("home", None));
     }
     if lower.contains("run the check") || lower == "run checks" || lower.contains("run validation")
     {
@@ -1079,6 +1114,96 @@ pub fn parse_command_ctx(text: &str, doc: &DesignDocument, ctx: &OperatorContext
         action = Some("commit".into());
         notes.push("COMMIT still requires operator authority and a valid DTP transaction.".into());
     }
+    if (lower.contains("make this bearing")
+        || lower.contains("make the bearing")
+        || (lower.contains("bearing") && (lower.contains("larger") || lower.contains("bigger"))))
+        && tx.is_none()
+    {
+        let bearing_id = resolve_all(&lower, doc)
+            .into_iter()
+            .find(|id| is_bearing(doc, id))
+            .or_else(|| ctx_id.clone().filter(|id| is_bearing(doc, id)))
+            .or_else(|| {
+                ctx_id.as_ref().and_then(|id| {
+                    graph::get_child_parts(doc, id)
+                        .into_iter()
+                        .find(|child| is_bearing(doc, child))
+                })
+            });
+        if let Some(id) = bearing_id {
+            if let Some(part) = doc.part(&id) {
+                match part.spatial.primitive {
+                    Primitive::Cylinder { radius, .. } => {
+                        let delta_m = extract_mm(&lower)
+                            .map(|mm| mm / 1000.0)
+                            .unwrap_or(radius * 0.1);
+                        let next = radius + delta_m;
+                        let mut proposed = DesignTransaction::propose(
+                            "cad-designer",
+                            &format!(
+                                "{} envelope radius {:.1} mm → {:.1} mm",
+                                part.name,
+                                radius * 1000.0,
+                                next * 1000.0
+                            ),
+                            "Operator requested a larger bearing envelope. PARAMETRIC_REFERENCE only. Not a catalog swap. Not ISO fit. Collision NOT CHECKED. FEA not run. Proposal only — canonical DesignIR unchanged until human COMMIT.",
+                            vec![Operation::ChangeDimension {
+                                part: id.clone(),
+                                field: "radius".into(),
+                                value: next,
+                            }],
+                        );
+                        proposed.requirements = vec!["req.bearings".into()];
+                        proposed.confidence = 0.4;
+                        tx = Some(proposed);
+                        views.push(ViewCommand::SetMode {
+                            mode: "AGENT_PROPOSAL".into(),
+                        });
+                        views.push(ViewCommand::OpenHud);
+                        notes.push(format!(
+                            "CAD Designer: proposed {} radius {:.1} → {:.1} mm. Envelope only. Not a catalog bearing. Canonical untouched.",
+                            human_name(doc, &id),
+                            radius * 1000.0,
+                            next * 1000.0
+                        ));
+                        card = Some(ReplyCard {
+                            kind: "proposal".into(),
+                            title: part.name.clone(),
+                            happened: format!(
+                                "Envelope radius {:.1} → {:.1} mm",
+                                radius * 1000.0,
+                                next * 1000.0
+                            ),
+                            why: "Operator asked to make this bearing larger.".into(),
+                            changed: "DesignIR preview only. Canonical untouched.".into(),
+                            attention: "Not a catalog swap. Not ISO fit. Collision NOT CHECKED. FEA not run.".into(),
+                            actions: vec![
+                                ReplyAction {
+                                    id: "compare".into(),
+                                    label: "VIEW CHANGE".into(),
+                                },
+                                ReplyAction {
+                                    id: "validate".into(),
+                                    label: "VALIDATE".into(),
+                                },
+                                ReplyAction {
+                                    id: "reject".into(),
+                                    label: "REJECT".into(),
+                                },
+                            ],
+                        });
+                    }
+                    _ => notes.push(
+                        "Bearing envelope is not a cylinder primitive; no dimension invented."
+                            .into(),
+                    ),
+                }
+            }
+        } else {
+            notes.push("No bearing in selection or utterance. Select a bearing first.".into());
+        }
+    }
+
     if (lower.contains("make this longer")
         || lower.contains("make it longer")
         || lower.contains("lengthen this")
@@ -1087,6 +1212,7 @@ pub fn parse_command_ctx(text: &str, doc: &DesignDocument, ctx: &OperatorContext
         || lower.contains("50 mm"))
         && tx.is_none()
         && !lower.contains("increase upper")
+        && !lower.contains("bearing")
     {
         let delta = extract_mm(&lower).unwrap_or(50.0);
         let parameter = length_parameter_for(doc, resolved.as_deref().or(ctx_id.as_deref()))
@@ -1276,13 +1402,50 @@ fn is_pronoun(s: &str) -> bool {
 
 fn resolve_entity_ctx(s: &str, doc: &DesignDocument, ctx: &OperatorContext) -> Option<String> {
     let named = resolve_entity(s, doc);
-    if named.is_some() && !is_pronoun(s) {
-        return named;
+    if let Some(id) = named.clone() {
+        if !is_pronoun(s) || names_entity(s, doc, &id) {
+            return Some(id);
+        }
     }
     if is_pronoun(s) {
         return ctx.selected_id.clone().or(ctx.focused_id.clone()).or(named);
     }
     named.or(ctx.selected_id.clone())
+}
+
+fn names_entity(s: &str, doc: &DesignDocument, id: &str) -> bool {
+    if let Some(part) = doc.part(id) {
+        let name = part.name.to_lowercase();
+        let role = part.semantic_role.replace('_', " ").to_lowercase();
+        if (!name.is_empty() && s.contains(&name)) || (!role.is_empty() && s.contains(&role)) {
+            return true;
+        }
+    }
+    if let Some(assembly) = doc
+        .assemblies
+        .iter()
+        .find(|assembly| assembly.id.as_str() == id)
+    {
+        let name = assembly.name.to_lowercase();
+        let role = assembly.semantic_role.replace('_', " ").to_lowercase();
+        if (!name.is_empty() && s.contains(&name)) || (!role.is_empty() && s.contains(&role)) {
+            return true;
+        }
+    }
+    false
+}
+
+fn is_bearing(doc: &DesignDocument, id: &str) -> bool {
+    doc.part(id).is_some_and(|part| {
+        part.component_class.as_deref() == Some("bearing") || part.semantic_role.contains("bearing")
+    })
+}
+
+fn mechanical_view(op: &str, id: Option<String>) -> ViewCommand {
+    ViewCommand::Mechanical {
+        op: op.to_string(),
+        id,
+    }
 }
 
 fn human_name(doc: &DesignDocument, id: &str) -> String {
@@ -1423,12 +1586,14 @@ mod tests {
         let p = parse_command("open the shoulder", &doc());
         assert!(p.views.iter().any(|v| matches!(
             v,
-            ViewCommand::ExplodeStack { id: Some(id) } if id == "asm.shoulder"
+            ViewCommand::Mechanical { op, id: Some(id) }
+                if op == "open" && id == "asm.shoulder"
         )));
-        assert!(p
+        assert!(!p.views.iter().any(|v| matches!(v, ViewCommand::OpenHud)));
+        assert!(!p
             .views
             .iter()
-            .any(|v| matches!(v, ViewCommand::Cutaway { enabled: true })));
+            .any(|v| matches!(v, ViewCommand::ExplodeStack { .. })));
     }
 
     #[test]
@@ -1501,10 +1666,80 @@ mod tests {
     #[test]
     fn restore_display_command() {
         let p = parse_command("put it back together", &doc());
-        assert!(p
-            .views
-            .iter()
-            .any(|v| matches!(v, ViewCommand::RestoreDisplay)));
+        assert!(p.views.iter().any(|v| matches!(
+            v,
+            ViewCommand::Mechanical { op, .. } if op == "restore"
+        )));
+    }
+
+    #[test]
+    fn shoulder_conversation_uses_one_mechanical_op() {
+        let doc = doc();
+        let housing = OperatorContext {
+            selected_id: Some("part.shoulder.housing".into()),
+            focused_id: None,
+            tracked_ids: vec![],
+        };
+        let open = parse_command_ctx("open it", &doc, &housing);
+        assert!(open.views.iter().any(|v| matches!(
+            v,
+            ViewCommand::Mechanical { op, id: Some(id) }
+                if op == "open" && id == "part.shoulder.housing"
+        )));
+        assert!(!open.views.iter().any(|v| matches!(v, ViewCommand::OpenHud)));
+
+        let rotates = parse_command_ctx("show me what rotates", &doc, &housing);
+        assert!(rotates.views.iter().any(|v| matches!(
+            v,
+            ViewCommand::Mechanical { op, .. } if op == "show-motion"
+        )));
+
+        let stack = parse_command("show the bearing stack", &doc);
+        assert!(stack.views.iter().any(|v| matches!(
+            v,
+            ViewCommand::Mechanical { op, .. } if op == "show-stack"
+        )));
+
+        let load = parse_command_ctx("what supports the load", &doc, &housing);
+        assert!(load.views.iter().any(|v| matches!(
+            v,
+            ViewCommand::Mechanical { op, .. } if op == "show-load"
+        )));
+        assert!(load.notes.iter().any(|note| note.contains("not FEA")));
+
+        let cover = parse_command("what holds this cover", &doc);
+        assert!(cover.views.iter().any(|v| matches!(
+            v,
+            ViewCommand::Mechanical { op, .. } if op == "show-fasteners"
+        )));
+
+        let service = parse_command("service the motor", &doc);
+        assert!(service.views.iter().any(|v| matches!(
+            v,
+            ViewCommand::Mechanical { op, .. } if op == "service"
+        )));
+    }
+
+    #[test]
+    fn make_bearing_larger_is_dimension_proposal_not_commit() {
+        use archeon_transactions::{TxStatus, UserDecision};
+        let ctx = OperatorContext {
+            selected_id: Some("part.shoulder.bearing.a".into()),
+            focused_id: None,
+            tracked_ids: vec![],
+        };
+        let p = parse_command_ctx("make this bearing larger", &doc(), &ctx);
+        let tx = p.tx.expect("bearing envelope proposal");
+        assert_eq!(tx.status, TxStatus::Proposed);
+        assert_eq!(tx.user_decision, UserDecision::Pending);
+        assert!(p.action.is_none());
+        assert!(matches!(
+            tx.operations.first(),
+            Some(Operation::ChangeDimension { part, field, value })
+                if part == "part.shoulder.bearing.a" && field == "radius" && *value > 0.0235
+        ));
+        assert!(tx.reason.to_lowercase().contains("catalog"));
+        assert!(tx.reason.to_lowercase().contains("commit"));
     }
 
     #[test]

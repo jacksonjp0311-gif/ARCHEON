@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { type ViewMode } from '@archeon/spatial-grammar';
 import { neighborhoodOf, type DesignDocument, type Part } from '@archeon/design-protocol';
-import { resolveExplodeContext, type SpreadPreset } from '@archeon/scene-engine';
+import { type SpreadPreset } from '@archeon/scene-engine';
+import { applyMechanicalOp, mechanicalOpFromView } from './services/mechanicalOps';
 import { ArmScene } from './scene/ArmScene';
 import { AgentHud } from './components/AgentHud';
 import { Breadcrumbs } from './components/Breadcrumbs';
@@ -23,16 +24,9 @@ import { semanticCatalog, type PaletteItem } from './services/palette';
 import {
   ancestorIds,
   classifyEntity,
-  componentStack,
   contextActionsFor,
-  declaredLoadPath,
-  fastenerHosts,
-  jointFor,
-  openTargets,
   primaryActions,
-  reasoningSummary,
-  rotatingGroup,
-  serviceSequence
+  reasoningSummary
 } from './services/context';
 import { fromWorkstationMode, HUMAN_MODES, loadHuds, toWorkstationMode } from './services/hudManager';
 import { getJson, postJson } from './api';
@@ -67,7 +61,7 @@ interface ProjectMeta {
 
 interface ChatOut {
   reply: string;
-  views?: { kind: string; factor?: number; id?: string; layer?: string; mode?: string; enabled?: boolean; strategy?: string; spread?: string; prompt?: string }[];
+  views?: { kind: string; factor?: number; id?: string; op?: string; layer?: string; mode?: string; enabled?: boolean; strategy?: string; spread?: string; prompt?: string }[];
   notes?: string[];
   transaction?: { transaction_id: string };
   card?: { kind: string; title: string; happened: string; why: string; changed: string; attention: string; actions: { id: string; label: string }[] } | null;
@@ -195,34 +189,30 @@ export default function App() {
   function applyViews(views: ChatOut['views'], design: DesignDoc | null) {
     const ui = useUi.getState();
     for (const v of views || []) {
+      if (v.kind === 'mechanical' && v.op) {
+        applyMechanicalOp(v.op, v.id ?? ui.selectedId, design);
+        continue;
+      }
+      const mapped = mechanicalOpFromView(v.kind);
+      if (mapped) {
+        applyMechanicalOp(mapped, v.id ?? ui.selectedId, design);
+        continue;
+      }
       if (v.kind === 'explode') {
         ui.dispatch({ op: 'explode_system', factor: v.factor ?? 0.7 });
         if (v.strategy) ui.setStrategy(v.strategy as 'SEQUENCE' | 'RADIAL' | 'AXIAL' | 'SYSTEM' | 'BOM_FOCUS' | 'SERVICE' | 'GRAPH' | 'CUSTOM');
       }
       if (v.kind === 'isolate' && v.id) ui.dispatch({ op: 'isolate_entity', entity_id: v.id });
       if (v.kind === 'select' && v.id) ui.dispatch({ op: 'select_entity', entity_id: v.id });
-      if (v.kind === 'reset_view' || v.kind === 'home_view') {
-        ui.dispatch({ op: 'home_view' });
-        ui.setGhostRoles([]);
-        ui.setSectionOn(false);
-      }
       if (v.kind === 'set_mode' && v.mode) ui.setView(v.mode as ViewMode);
       if (v.kind === 'show' && v.layer === 'interfaces') ui.dispatch({ op: 'show_overlay', overlay: 'INTERFACES' });
       if (v.kind === 'focus' && v.id) {
-        ui.dispatch({ op: 'focus_entity', entity_id: v.id, ghost_others: true });
-        ui.setHudOpen(true);
+        applyMechanicalOp('focus', v.id, design);
       }
       if (v.kind === 'ghost') ui.dispatch({ op: 'ghost_others', enabled: v.enabled !== false });
       if (v.kind === 'clear_selection') ui.dispatch({ op: 'clear_selection' });
       if (v.kind === 'track' && v.id) ui.dispatch({ op: 'track_entity', entity_id: v.id });
       if (v.kind === 'open_hud') ui.setHudOpen(true);
-      if (v.kind === 'explode_context') {
-        const scope = resolveExplodeContext(v.id || ui.selectedId, design?.parts ?? [], design?.assemblies ?? []);
-        ui.setStrategy('SYSTEM');
-        ui.dispatch({ op: 'explode_entity', entity_id: scope, factor: v.factor ?? 0.85 });
-      }
-      if (v.kind === 'restore_display') ui.dispatch({ op: 'restore_display' });
-      if (v.kind === 'previous_view') ui.dispatch({ op: 'previous_view' });
       if (v.kind === 'set_explosion') ui.dispatch({ op: 'set_explosion', progress: v.factor ?? 0.7 });
       if (v.kind === 'set_spread' && v.spread) ui.dispatch({ op: 'set_explosion_spread', spread: v.spread as 'COMPACT' });
       if (v.kind === 'compare_variants' && v.mode) ui.dispatch({ op: 'compare_variants', mode: v.mode as 'SPREAD' });
@@ -233,7 +223,7 @@ export default function App() {
         if (seed && design) {
           const seeds = [seed, ...design.parts.filter((p) => p.parent === seed).map((p) => p.id)];
           const ids = [...new Set(seeds.flatMap((s) => neighborhoodOf(s, design.ports, design.interfaces)))];
-          ui.setSelected(seed);
+          ui.revealEntity(seed, ancestorIds(seed, design.parts, design.assemblies));
           ui.setNeighborhood(ids);
           ui.setOverlay('INTERFACES');
           ui.setGhostOthers(true);
@@ -247,39 +237,8 @@ export default function App() {
         ui.setOverlay('PROVENANCE');
         ui.setHudOpen(true);
       }
-      if (v.kind === 'show_joint' && v.id) {
-        ui.setSelected(v.id);
-        ui.setOverlay('DATUMS');
-        ui.setHudOpen(true);
-      }
-      if (v.kind === 'show_load_path' && v.id && design) {
-        const scopeId = v.id;
-        const joint = design.joints.find((candidate) =>
-          candidate.id === scopeId || candidate.parent === scopeId || candidate.child === scopeId || candidate.rotating_group.includes(scopeId)
-        );
-        ui.setNeighborhood(joint?.load_path ?? []);
-        ui.setGhostOthers(true);
-        ui.setOverlay('INTERFACES');
-      }
-      if (v.kind === 'explode_stack') {
-        const scope = v.id || ui.selectedId;
-        if (scope) {
-          ui.setStrategy('STACK');
-          ui.dispatch({ op: 'explode_entity', entity_id: scope, factor: v.factor ?? 0.9 });
-        }
-      }
       if (v.kind === 'cutaway') {
         ui.setSectionOn(v.enabled !== false);
-        ui.setView('CUTAWAY');
-      }
-      if (v.kind === 'show_load_paths') {
-        ui.setOverlay('INTERFACES');
-        ui.setNeighborhood([...(design?.joints ?? []).flatMap((joint) => joint.load_path)]);
-        ui.setGhostOthers(true);
-      }
-      if (v.kind === 'restore_display') {
-        ui.setGhostRoles([]);
-        ui.setSectionOn(false);
       }
     }
   }
@@ -467,90 +426,44 @@ export default function App() {
   function onContextAction(id: string) {
     const ui = useUi.getState();
     const sid = ui.selectedId;
-    if (id === 'focus' && sid) ui.dispatch({ op: 'focus_entity', entity_id: sid, ghost_others: true });
-    else if (id === 'isolate' && sid) ui.dispatch({ op: 'isolate_entity', entity_id: sid });
-    else if (id === 'track' && sid) ui.dispatch({ op: 'track_entity', entity_id: sid });
-    else if (id === 'explode') {
-      const scope = resolveExplodeContext(sid, doc?.parts ?? [], doc?.assemblies ?? []);
-      ui.setStrategy('SYSTEM');
-      ui.dispatch({ op: 'explode_entity', entity_id: scope, factor: 0.85 });
-    }
-    else if (id === 'xray') ui.setView('X_RAY');
-    else if (id === 'interfaces') ui.dispatch({ op: 'show_overlay', overlay: 'INTERFACES' });
-    else if (id === 'affected') ui.dispatch({ op: 'show_affected' });
-    else if (id === 'home') ui.dispatch({ op: 'home_view' });
-    else if (id === 'fit') ui.dispatch({ op: 'fit_scene' });
-    else if (id === 'compare') ui.setView('DIFF');
-    else if (id === 'validate') void send('validate proposal');
-    else if (id === 'approve') void decide('commit');
-    else if (id === 'reject') void decide('reject');
-    else if (id === 'restore') ui.dispatch({ op: 'restore_display' });
-    else if (id.startsWith('variant:')) ui.dispatch({ op: 'select_variant', id: id.slice(8) });
-    else if (id.startsWith('propose_variant:')) void proposeVariant(id.slice('propose_variant:'.length));
-    else if (id === 'measure') ui.openHud('measure');
-    else if (id === 'section') {
-      ui.setSectionOn(true);
-      ui.openHud('section');
-    }
-    else if (id === 'ask') {
+    if (id === 'ask') {
       ui.setHudOpen(true);
       if (sid) setMsg('what is this');
+      return;
     }
-    else if (id === 'more') ui.openHud('inspector');
-    else if (id === 'open' && sid && doc) {
-      const shells = openTargets(doc, sid);
-      ui.setMechanical({ openId: sid, ghostRoles: ['housing', 'cover', 'shell'], ghostOthers: false });
-      ui.setSectionOn(true);
-      const scope = selected?.parent ?? selectedAsm?.id ?? sid;
-      ui.dispatch({ op: 'focus_entity', entity_id: scope, ghost_others: false });
-      if (shells.length) ui.setNeighborhood(doc.parts.filter((p) => p.parent === scope && !shells.includes(p.id)).map((p) => p.id));
+    if (id === 'compare') {
+      ui.setView('DIFF');
+      return;
     }
-    else if (id === 'show-stack' && sid && doc) {
-      const stack = componentStack(doc, sid);
-      ui.setMechanical({ stackIds: stack, neighborhoodIds: stack, ghostOthers: true, ghostRoles: [] });
-      ui.dispatch({ op: 'focus_entity', entity_id: sid, ghost_others: true });
+    if (id === 'validate') {
+      void send('validate proposal');
+      return;
     }
-    else if (id === 'show-load' && sid && doc) {
-      const path = declaredLoadPath(doc, sid);
-      ui.setMechanical({ loadPathIds: path, neighborhoodIds: path, ghostOthers: true });
-      ui.dispatch({ op: 'show_overlay', overlay: 'INTERFACES' });
+    if (id === 'approve') {
+      void decide('commit');
+      return;
     }
-    else if (id === 'show-axis' && sid && doc) {
-      const joint = jointFor(doc, sid);
-      ui.setMechanical({ axisJointId: joint?.id ?? sid, neighborhoodIds: rotatingGroup(doc, sid) });
-      ui.dispatch({ op: 'show_overlay', overlay: 'DATUMS' });
+    if (id === 'reject') {
+      void decide('reject');
+      return;
     }
-    else if (id === 'show-motion' && sid && doc) {
-      const group = rotatingGroup(doc, sid);
-      ui.setMechanical({ neighborhoodIds: group, ghostOthers: true, axisJointId: jointFor(doc, sid)?.id ?? null });
+    if (id.startsWith('variant:')) {
+      ui.dispatch({ op: 'select_variant', id: id.slice(8) });
+      return;
     }
-    else if (id === 'service' && sid && doc) {
-      const seq = serviceSequence(doc, sid);
-      ui.setMechanical({ serviceIds: seq, neighborhoodIds: seq, ghostOthers: true });
-      ui.setSpatial('SERVICE');
+    if (id.startsWith('propose_variant:')) {
+      void proposeVariant(id.slice('propose_variant:'.length));
+      return;
     }
-    else if (id === 'show-fasteners' && sid && doc) {
-      const ids = fastenerHosts(doc, sid);
-      ui.setMechanical({ neighborhoodIds: ids, ghostOthers: true });
-    }
-    else if (id === 'show-mate' && sid) ui.dispatch({ op: 'show_overlay', overlay: 'INTERFACES' });
-    else if (id === 'show-evidence') ui.openHud('inspector');
-    else if (id === 'close') {
-      ui.clearMechanical();
-      ui.dispatch({ op: 'restore_display' });
-    }
+    applyMechanicalOp(id, sid, doc ?? null);
   }
 
   function onPalette(item: PaletteItem) {
     const ui = useUi.getState();
     if (item.kind === 'COMMAND') {
-      if (item.id === 'cmd.explode') {
-        const scope = resolveExplodeContext(ui.selectedId, doc?.parts ?? [], doc?.assemblies ?? []);
-        ui.setStrategy('SYSTEM');
-        ui.dispatch({ op: 'explode_entity', entity_id: scope, factor: 0.85 });
-      }
-      else if (item.id === 'cmd.restore') ui.dispatch({ op: 'restore_display' });
-      else if (item.id === 'cmd.home') ui.dispatch({ op: 'home_view' });
+      if (item.id === 'cmd.explode') applyMechanicalOp('explode', ui.selectedId, doc ?? null);
+      else if (item.id === 'cmd.restore') applyMechanicalOp('restore', ui.selectedId, doc ?? null);
+      else if (item.id === 'cmd.home') applyMechanicalOp('home', ui.selectedId, doc ?? null);
     } else if (item.kind === 'VIEW') {
       ui.setSectionOn(true);
     } else if (item.kind === 'AGENT') {
