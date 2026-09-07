@@ -6,6 +6,26 @@ import { applyClose, applyOpen, applyPin, emptyHuds, inspectorAfterSelection, sa
 
 export type DisplayState = 'VISIBLE' | 'HIDDEN' | 'GHOSTED' | 'ISOLATED';
 
+export interface MechanicalFrame {
+  op: string;
+  entityId: string | null;
+  selectedId: string | null;
+  openId: string | null;
+  stackIds: string[];
+  loadPathIds: string[];
+  serviceIds: string[];
+  axisJointId: string | null;
+  neighborhoodIds: string[];
+  ghostOthers: boolean;
+  ghostRoles: string[];
+  sectionOn: boolean;
+  spatial: SpatialView;
+  overlay: Overlay;
+  isolate: string | null;
+  explosion: number;
+  explodeContext: string | null;
+}
+
 export interface RenderDebug {
   edges: boolean;
   grid: boolean;
@@ -110,6 +130,8 @@ interface Ui {
   loadPathIds: string[];
   serviceIds: string[];
   axisJointId: string | null;
+  mechanicalOp: string | null;
+  mechanicalHistory: MechanicalFrame[];
   renderStats: RenderStats;
   setSelected: (id: string | null) => void;
   toggleSelected: (id: string) => void;
@@ -171,8 +193,11 @@ interface Ui {
   setRailExpanded: (expanded: boolean) => void;
   revealEntity: (id: string, ancestors: string[]) => void;
   toggleExpanded: (id: string) => void;
-  setMechanical: (patch: Partial<Pick<Ui, 'openId' | 'stackIds' | 'loadPathIds' | 'serviceIds' | 'axisJointId' | 'neighborhoodIds' | 'ghostOthers' | 'ghostRoles'>>) => void;
+  setMechanical: (patch: Partial<Pick<Ui, 'openId' | 'stackIds' | 'loadPathIds' | 'serviceIds' | 'axisJointId' | 'neighborhoodIds' | 'ghostOthers' | 'ghostRoles' | 'mechanicalOp'>>) => void;
   clearMechanical: () => void;
+  pushMechanicalFrame: (frame: MechanicalFrame) => void;
+  popMechanicalFrame: () => MechanicalFrame | null;
+  applyMechanicalFrame: (frame: MechanicalFrame) => void;
   setRenderStats: (s: RenderStats) => void;
 }
 
@@ -243,6 +268,8 @@ export const useUi = create<Ui>((set) => ({
   loadPathIds: [],
   serviceIds: [],
   axisJointId: null,
+  mechanicalOp: null,
+  mechanicalHistory: [],
   renderStats: {
     visibleParts: 0,
     cadMeshes: 0,
@@ -403,7 +430,9 @@ export const useUi = create<Ui>((set) => ({
       loadPathIds: [],
       serviceIds: [],
       axisJointId: null,
-      ghostRoles: []
+      ghostRoles: [],
+      mechanicalOp: null,
+      mechanicalHistory: []
     })),
   clearProjectSelection: () =>
     set({
@@ -484,7 +513,45 @@ export const useUi = create<Ui>((set) => ({
       axisJointId: null,
       ghostRoles: [],
       ghostOthers: false,
-      sectionOn: false
+      sectionOn: false,
+      neighborhoodIds: [],
+      mechanicalOp: null,
+      mechanicalHistory: []
+    }),
+  pushMechanicalFrame: (frame) =>
+    set((s) => ({ mechanicalHistory: [...s.mechanicalHistory, frame].slice(-16) })),
+  popMechanicalFrame: () => {
+    let frame: MechanicalFrame | null = null;
+    set((s) => {
+      if (!s.mechanicalHistory.length) return s;
+      frame = s.mechanicalHistory[s.mechanicalHistory.length - 1];
+      return { mechanicalHistory: s.mechanicalHistory.slice(0, -1) };
+    });
+    return frame;
+  },
+  applyMechanicalFrame: (frame) =>
+    set((s) => {
+      let overlays = frame.overlay && frame.overlay !== 'NONE' ? enableOverlay(emptyOverlays(), frame.overlay) : emptyOverlays();
+      if (frame.sectionOn) overlays = { ...overlays, analysis: true };
+      return {
+        mechanicalOp: frame.op || null,
+        selectedId: frame.selectedId ?? s.selectedId,
+        openId: frame.openId,
+        stackIds: frame.stackIds,
+        loadPathIds: frame.loadPathIds,
+        serviceIds: frame.serviceIds,
+        axisJointId: frame.axisJointId,
+        neighborhoodIds: frame.neighborhoodIds,
+        ghostOthers: frame.ghostOthers,
+        ghostRoles: frame.ghostRoles,
+        sectionOn: frame.sectionOn,
+        spatial: frame.spatial,
+        overlay: primaryOverlayName(overlays),
+        overlays,
+        isolate: frame.isolate,
+        explosion: frame.explosion,
+        explodeContext: frame.explodeContext
+      };
     }),
   setRenderStats: (renderStats) => set({ renderStats }),
   spatialUndo: () =>
@@ -538,7 +605,17 @@ export const useUi = create<Ui>((set) => ({
               ? false
               : s.partWorkbenchOpen,
         ...(resetMech
-          ? { openId: null, stackIds: [], loadPathIds: [], serviceIds: [], axisJointId: null, ghostRoles: [] }
+          ? {
+              openId: null,
+              stackIds: [],
+              loadPathIds: [],
+              serviceIds: [],
+              axisJointId: null,
+              ghostRoles: [],
+              mechanicalOp: null,
+              mechanicalHistory: [] as MechanicalFrame[],
+              neighborhoodIds: []
+            }
           : {})
       };
     })

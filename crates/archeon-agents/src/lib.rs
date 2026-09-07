@@ -289,7 +289,10 @@ pub fn execute_tool(
         }
         EngineeringToolCall::InspectConnections { id } => {
             out.facts = graph::get_interface_neighbors(doc, &id);
-            out.views.push(ViewCommand::Neighborhood { id });
+            out.views.push(ViewCommand::Mechanical {
+                op: "neighborhood".into(),
+                id: Some(id),
+            });
         }
         EngineeringToolCall::ExplodeScope {
             id,
@@ -303,8 +306,10 @@ pub fn execute_tool(
             if !doc.id_set().contains(&id) {
                 return Err(format!("unknown entity {id}"));
             }
-            out.views.push(ViewCommand::Select { id: id.clone() });
-            out.views.push(ViewCommand::Focus { id });
+            out.views.push(ViewCommand::Mechanical {
+                op: "focus".into(),
+                id: Some(id),
+            });
         }
         EngineeringToolCall::ProposeDimensionChange {
             parameter,
@@ -804,10 +809,7 @@ pub fn parse_command_ctx(text: &str, doc: &DesignDocument, ctx: &OperatorContext
         )
     {
         if let Some(id) = resolved.clone() {
-            views.push(ViewCommand::Select { id: id.clone() });
-            views.push(ViewCommand::Focus { id: id.clone() });
-            views.push(ViewCommand::Ghost { enabled: true });
-            views.push(ViewCommand::OpenHud);
+            views.push(mechanical_view("focus", Some(id.clone())));
             let name = human_name(doc, &id);
             notes.push(format!(
                 "{name} isolated.\nInspector follows selection. Other systems ghosted."
@@ -841,8 +843,10 @@ pub fn parse_command_ctx(text: &str, doc: &DesignDocument, ctx: &OperatorContext
         || (lower.contains("break") && lower.contains("assembly") && lower.contains("apart"))
         || lower.contains("explode this")
     {
-        let factor = extract_percent(&lower).unwrap_or(0.85);
-        views.push(ViewCommand::ExplodeContext { id: None, factor });
+        views.push(mechanical_view(
+            "explode",
+            resolved.clone().or(ctx_id.clone()),
+        ));
         notes.push("Spatial Director: explode selected assembly context only.".into());
     }
     if lower.contains("what this connects")
@@ -854,10 +858,10 @@ pub fn parse_command_ctx(text: &str, doc: &DesignDocument, ctx: &OperatorContext
         || lower.contains("show connection")
     {
         let id = resolved.clone().or(ctx_id.clone()).unwrap_or_default();
-        views.push(ViewCommand::Neighborhood { id: id.clone() });
-        views.push(ViewCommand::Show {
-            layer: "interfaces".into(),
-        });
+        views.push(mechanical_view(
+            "neighborhood",
+            if id.is_empty() { None } else { Some(id) },
+        ));
         notes.push("Local interface neighborhood only. Not the full machine graph.".into());
         card = Some(ReplyCard {
             kind: "spatial".into(),
@@ -1614,15 +1618,12 @@ mod tests {
     #[test]
     fn local_parser_focuses_shoulder_assembly() {
         let p = parse_command("give me the shoulder", &doc());
-        assert!(p
-            .views
-            .iter()
-            .any(|v| matches!(v, ViewCommand::Select { id } if id == "asm.shoulder")));
-        assert!(p
-            .views
-            .iter()
-            .any(|v| matches!(v, ViewCommand::Focus { .. })));
-        assert!(p.views.iter().any(|v| matches!(v, ViewCommand::OpenHud)));
+        assert!(p.views.iter().any(|v| matches!(
+            v,
+            ViewCommand::Mechanical { op, id: Some(id) }
+                if op == "focus" && id == "asm.shoulder"
+        )));
+        assert!(!p.views.iter().any(|v| matches!(v, ViewCommand::OpenHud)));
     }
 
     #[test]
@@ -1643,10 +1644,10 @@ mod tests {
     #[test]
     fn local_parser_break_apart_is_context_explode() {
         let p = parse_command("break it apart", &doc());
-        assert!(p
-            .views
-            .iter()
-            .any(|v| matches!(v, ViewCommand::ExplodeContext { .. })));
+        assert!(p.views.iter().any(|v| matches!(
+            v,
+            ViewCommand::Mechanical { op, .. } if op == "explode"
+        )));
     }
 
     #[test]
@@ -1657,10 +1658,11 @@ mod tests {
             tracked_ids: vec![],
         };
         let p = parse_command_ctx("what connects here", &doc(), &ctx);
-        assert!(p
-            .views
-            .iter()
-            .any(|v| matches!(v, ViewCommand::Neighborhood { id } if id == "asm.shoulder")));
+        assert!(p.views.iter().any(|v| matches!(
+            v,
+            ViewCommand::Mechanical { op, id: Some(id) }
+                if op == "neighborhood" && id == "asm.shoulder"
+        )));
     }
 
     #[test]

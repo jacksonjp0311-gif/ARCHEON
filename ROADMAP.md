@@ -2,7 +2,14 @@
 
 Status language: **shipped**, **partial**, **not started**. Nothing here is a claim that a robot or CAD kernel is production-qualified.
 
-## v0.6.2 — Identity of operations — this tree
+## v0.6.3 — Reversible spatial conversation — this tree
+
+- Mechanical conversation stack: OPEN → stack → load → service pops via PREVIOUS / ← VIEW
+- Restore / home still dump the conversation (assembled, not one step)
+- Agent HUD opens for propose / explain / ask — not inspect, focus, or OPEN
+- Leftover language views (isolate, neighborhood, cutaway, track, break-apart) fold into `applyMechanicalOp`
+
+## v0.6.2 — Identity of operations — shipped in this tree
 
 - One mechanical executor (`applyMechanicalOp`) for click, radial, menus, palette, and language
 - Local parser emits `ViewCommand::Mechanical { op, id }` for OPEN / what-rotates / stack / load path / fasteners / service / restore

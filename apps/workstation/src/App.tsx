@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { type ViewMode } from '@archeon/spatial-grammar';
-import { neighborhoodOf, type DesignDocument, type Part } from '@archeon/design-protocol';
+import { type DesignDocument, type Part } from '@archeon/design-protocol';
 import { type SpreadPreset } from '@archeon/scene-engine';
 import { applyMechanicalOp, mechanicalOpFromView } from './services/mechanicalOps';
 import { ArmScene } from './scene/ArmScene';
@@ -202,43 +202,21 @@ export default function App() {
         ui.dispatch({ op: 'explode_system', factor: v.factor ?? 0.7 });
         if (v.strategy) ui.setStrategy(v.strategy as 'SEQUENCE' | 'RADIAL' | 'AXIAL' | 'SYSTEM' | 'BOM_FOCUS' | 'SERVICE' | 'GRAPH' | 'CUSTOM');
       }
-      if (v.kind === 'isolate' && v.id) ui.dispatch({ op: 'isolate_entity', entity_id: v.id });
       if (v.kind === 'select' && v.id) ui.dispatch({ op: 'select_entity', entity_id: v.id });
       if (v.kind === 'set_mode' && v.mode) ui.setView(v.mode as ViewMode);
-      if (v.kind === 'show' && v.layer === 'interfaces') ui.dispatch({ op: 'show_overlay', overlay: 'INTERFACES' });
-      if (v.kind === 'focus' && v.id) {
-        applyMechanicalOp('focus', v.id, design);
-      }
+      if (v.kind === 'show' && v.layer === 'interfaces') applyMechanicalOp('interfaces', v.id ?? ui.selectedId, design);
       if (v.kind === 'ghost') ui.dispatch({ op: 'ghost_others', enabled: v.enabled !== false });
       if (v.kind === 'clear_selection') ui.dispatch({ op: 'clear_selection' });
-      if (v.kind === 'track' && v.id) ui.dispatch({ op: 'track_entity', entity_id: v.id });
       if (v.kind === 'open_hud') ui.setHudOpen(true);
       if (v.kind === 'set_explosion') ui.dispatch({ op: 'set_explosion', progress: v.factor ?? 0.7 });
       if (v.kind === 'set_spread' && v.spread) ui.dispatch({ op: 'set_explosion_spread', spread: v.spread as 'COMPACT' });
       if (v.kind === 'compare_variants' && v.mode) ui.dispatch({ op: 'compare_variants', mode: v.mode as 'SPREAD' });
       if (v.kind === 'select_variant' && v.id) ui.dispatch({ op: 'select_variant', id: v.id });
       if (v.kind === 'show_affected') ui.dispatch({ op: 'show_affected' });
-      if (v.kind === 'neighborhood') {
-        const seed = v.id || ui.selectedId;
-        if (seed && design) {
-          const seeds = [seed, ...design.parts.filter((p) => p.parent === seed).map((p) => p.id)];
-          const ids = [...new Set(seeds.flatMap((s) => neighborhoodOf(s, design.ports, design.interfaces)))];
-          ui.revealEntity(seed, ancestorIds(seed, design.parts, design.assemblies));
-          ui.setNeighborhood(ids);
-          ui.setOverlay('INTERFACES');
-          ui.setGhostOthers(true);
-        } else if (seed) {
-          ui.setSelected(seed);
-          ui.setOverlay('INTERFACES');
-        }
-      }
       if (v.kind === 'weakest_assumption' && v.id) {
         ui.setSelected(v.id);
         ui.setOverlay('PROVENANCE');
         ui.setHudOpen(true);
-      }
-      if (v.kind === 'cutaway') {
-        ui.setSectionOn(v.enabled !== false);
       }
     }
   }
@@ -266,7 +244,6 @@ export default function App() {
       if (out.best) useUi.getState().setActiveVariant(out.best);
       if (out.preview_parts) setPreview({ ...(doc as DesignDoc), parts: out.preview_parts });
       if (out.cad_job) setCadStatus(out.cad_job.status);
-      if (out.views?.some((v) => v.kind === 'open_hud' || v.kind === 'focus')) useUi.getState().setHudOpen(true);
       await refresh();
     } catch (e) {
       setChat((c) => [...c, { who: 'ERROR', text: String(e) }]);
@@ -401,7 +378,11 @@ export default function App() {
     () => classifyEntity(selectedId, doc ?? null, !!meta?.proposal && !selectedId),
     [selectedId, doc, meta?.proposal]
   );
-  const contextActions = useMemo(() => contextActionsFor(entityCtx, doc ?? null), [entityCtx, doc]);
+  const canGoBack = useUi((s) => s.mechanicalHistory.length > 0);
+  const contextActions = useMemo(
+    () => contextActionsFor(entityCtx, doc ?? null, { canGoBack }),
+    [entityCtx, doc, canGoBack]
+  );
   const contextName = entityCtx.name || selected?.name || selectedAsm?.name || selectedReq?.id || selectedIface?.name;
   const reason = useMemo(() => (entityCtx.kind === 'none' ? null : reasoningSummary(entityCtx, doc ?? null)), [entityCtx, doc]);
   const reachMm = meta?.reach_m != null ? Math.round(meta.reach_m * 1000) : '—';

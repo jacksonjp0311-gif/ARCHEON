@@ -54,6 +54,10 @@ describe('identity of mechanical operations', () => {
     expect(mechanicalOpFromView('restore_display')).toBe('restore');
     expect(mechanicalOpFromView('home_view')).toBe('home');
     expect(mechanicalOpFromView('previous_view')).toBe('previous');
+    expect(mechanicalOpFromView('isolate')).toBe('isolate');
+    expect(mechanicalOpFromView('focus')).toBe('focus');
+    expect(mechanicalOpFromView('neighborhood')).toBe('neighborhood');
+    expect(mechanicalOpFromView('cutaway')).toBe('section');
   });
 
   it('housing click actions are the same ops language OPEN / stack / load use', () => {
@@ -81,5 +85,52 @@ describe('identity of mechanical operations', () => {
     expect(useUi.getState().openId).toBeNull();
     expect(useUi.getState().stackIds).toEqual([]);
     expect(useUi.getState().loadPathIds).toEqual([]);
+  });
+
+  it('OPEN → stack → load pops back through the conversation', () => {
+    useUi.getState().clearMechanical();
+    applyMechanicalOp('open', 'part.shoulder.housing', doc);
+    expect(useUi.getState().mechanicalOp).toBe('open');
+    expect(useUi.getState().mechanicalHistory.length).toBe(1);
+
+    applyMechanicalOp('show-stack', 'part.shoulder.bearing.a', doc);
+    expect(useUi.getState().mechanicalOp).toBe('show-stack');
+    expect(useUi.getState().openId).toBeNull();
+
+    applyMechanicalOp('show-load', 'part.shoulder.bearing.a', doc);
+    expect(useUi.getState().mechanicalOp).toBe('show-load');
+    expect(useUi.getState().loadPathIds).toEqual(doc.joints[0].load_path);
+
+    applyMechanicalOp('previous', null, doc);
+    expect(useUi.getState().mechanicalOp).toBe('show-stack');
+    expect(useUi.getState().stackIds[0]).toBe('part.shoulder.mount.upper');
+    expect(useUi.getState().loadPathIds).toEqual([]);
+
+    applyMechanicalOp('previous', null, doc);
+    expect(useUi.getState().mechanicalOp).toBe('open');
+    expect(useUi.getState().openId).toBe('part.shoulder.housing');
+    expect(useUi.getState().sectionOn).toBe(true);
+
+    applyMechanicalOp('previous', null, doc);
+    expect(useUi.getState().openId).toBeNull();
+    expect(useUi.getState().mechanicalOp).toBeNull();
+    expect(useUi.getState().mechanicalHistory).toEqual([]);
+  });
+
+  it('restore dumps the conversation; OPEN does not open the Agent HUD', () => {
+    useUi.setState({ hudOpen: false });
+    useUi.getState().clearMechanical();
+    applyMechanicalOp('open', 'part.shoulder.housing', doc);
+    applyMechanicalOp('show-load', 'part.shoulder.bearing.a', doc);
+    expect(useUi.getState().hudOpen).toBe(false);
+    applyMechanicalOp('restore', null, doc);
+    expect(useUi.getState().mechanicalHistory).toEqual([]);
+    expect(useUi.getState().openId).toBeNull();
+    expect(useUi.getState().loadPathIds).toEqual([]);
+  });
+
+  it('PREVIOUS appears once a spatial step exists', () => {
+    const ids = contextActionsFor(classifyEntity('part.shoulder.housing', doc), doc, { canGoBack: true }).map((a) => a.id);
+    expect(ids[0]).toBe('previous');
   });
 });

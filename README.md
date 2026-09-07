@@ -5,12 +5,12 @@
 <h1 align="center">ARCHEON</h1>
 
 <p align="center">
-  <strong>v0.6.2 — Identity of operations</strong><br />
+  <strong>v0.6.3 — Reversible spatial conversation</strong><br />
   Governed mechanism reasoning over DesignIR.
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.6.2-D9A441?style=for-the-badge&labelColor=050505" alt="0.6.2" />
+  <img src="https://img.shields.io/badge/version-0.6.3-D9A441?style=for-the-badge&labelColor=050505" alt="0.6.3" />
   <img src="https://img.shields.io/badge/license-MIT-ff981b?style=for-the-badge&labelColor=050b12" alt="MIT" />
   <img src="https://img.shields.io/badge/kernel-DesignIR-6ce391?style=for-the-badge&labelColor=050b12" alt="DesignIR" />
   <img src="https://img.shields.io/badge/CAD-STEP%20%2B%20STL-8ec8de?style=for-the-badge&labelColor=050b12" alt="CAD" />
@@ -33,7 +33,7 @@ off-the-shelf bearings, and a parts budget below $2,000.
 
 …and get a semantic assembly, interfaces, parametric features, exact solids, critique, visual diffs, and a human commit gate.
 
-This repository is **ARCHEON v0.6.2 — Identity of operations**. Click, radial, menus, and language share one mechanical executor (`open` / `reveal` / `restore` and the declared stack, load-path, fastener, and service views). First-class joints, typed mates, explicit feature frames, graph-query tools, validation contracts, and real DTP dry-runs allow the same deterministic runtime to inspect the arm’s shoulder and elbow. Three.js primitives remain a viewport fallback. Agents can READ and PROPOSE; only a human can COMMIT, and committed DesignIR is persisted to the project files.
+This repository is **ARCHEON v0.6.3 — Reversible spatial conversation**. OPEN → stack → load → service is one push/pop conversation; previous steps back, restore dumps it. Click, radial, menus, and language share one mechanical executor. The Agent HUD opens for proposals and explanations, not for inspect/OPEN. First-class joints, typed mates, explicit feature frames, graph-query tools, validation contracts, and real DTP dry-runs allow the same deterministic runtime to inspect the arm’s shoulder and elbow. Three.js primitives remain a viewport fallback. Agents can READ and PROPOSE; only a human can COMMIT, and committed DesignIR is persisted to the project files.
 
 It does **not** claim a full geometric constraint solver, dynamics, FEA, trajectory collision, manufacturer catalogs, CAM, production qualification, or ISO fit validation.
 

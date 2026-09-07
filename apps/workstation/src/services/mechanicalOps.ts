@@ -1,6 +1,6 @@
 import { resolveExplodeContext } from '@archeon/scene-engine';
-import type { DesignDocument } from '@archeon/design-protocol';
-import { useUi } from '../store';
+import { neighborhoodOf, type DesignDocument } from '@archeon/design-protocol';
+import { useUi, type MechanicalFrame } from '../store';
 import {
   ancestorIds,
   componentStack,
@@ -11,6 +11,54 @@ import {
   rotatingGroup,
   serviceSequence
 } from './context';
+
+const CONVERSATION_OPS = new Set([
+  'open',
+  'show-stack',
+  'show-load',
+  'show-motion',
+  'show-axis',
+  'service',
+  'show-fasteners',
+  'explode',
+  'isolate',
+  'focus',
+  'interfaces',
+  'show-mate',
+  'neighborhood',
+  'section'
+]);
+
+function snapshotMechanical(): MechanicalFrame {
+  const ui = useUi.getState();
+  return {
+    op: ui.mechanicalOp ?? '',
+    entityId: ui.selectedId,
+    selectedId: ui.selectedId,
+    openId: ui.openId,
+    stackIds: [...ui.stackIds],
+    loadPathIds: [...ui.loadPathIds],
+    serviceIds: [...ui.serviceIds],
+    axisJointId: ui.axisJointId,
+    neighborhoodIds: [...ui.neighborhoodIds],
+    ghostOthers: ui.ghostOthers,
+    ghostRoles: [...ui.ghostRoles],
+    sectionOn: ui.sectionOn,
+    spatial: ui.spatial,
+    overlay: ui.overlay,
+    isolate: ui.isolate,
+    explosion: ui.explosion,
+    explodeContext: ui.explodeContext
+  };
+}
+
+function remember(op: string, entityId: string | null): void {
+  if (!CONVERSATION_OPS.has(op)) return;
+  const ui = useUi.getState();
+  const target = entityId ?? ui.selectedId;
+  if (ui.mechanicalOp === op && ui.selectedId === target) return;
+  ui.pushMechanicalFrame(snapshotMechanical());
+}
 
 /** Single spatial/mechanical operation used by click, radial, menus, and language views. */
 export function applyMechanicalOp(op: string, entityId: string | null, doc: DesignDocument | null): void {
@@ -29,16 +77,27 @@ export function applyMechanicalOp(op: string, entityId: string | null, doc: Desi
     return;
   }
   if (op === 'previous') {
+    const frame = ui.popMechanicalFrame();
+    if (frame) {
+      ui.applyMechanicalFrame(frame);
+      if (frame.selectedId) reveal(frame.selectedId);
+      return;
+    }
     ui.dispatch({ op: 'previous_view' });
     return;
   }
+
   if (op === 'focus' && sid) {
+    remember(op, sid);
     reveal(sid);
+    ui.setMechanical({ mechanicalOp: 'focus' });
     ui.dispatch({ op: 'focus_entity', entity_id: sid, ghost_others: true });
     return;
   }
   if (op === 'isolate' && sid) {
+    remember(op, sid);
     reveal(sid);
+    ui.setMechanical({ mechanicalOp: 'isolate' });
     ui.dispatch({ op: 'isolate_entity', entity_id: sid });
     return;
   }
@@ -47,7 +106,9 @@ export function applyMechanicalOp(op: string, entityId: string | null, doc: Desi
     return;
   }
   if (op === 'explode') {
+    remember(op, sid);
     const scope = resolveExplodeContext(sid, parts, assemblies);
+    ui.setMechanical({ mechanicalOp: 'explode' });
     ui.setStrategy('SYSTEM');
     ui.dispatch({ op: 'explode_entity', entity_id: scope, factor: 0.85 });
     return;
@@ -56,8 +117,19 @@ export function applyMechanicalOp(op: string, entityId: string | null, doc: Desi
     ui.dispatch({ op: 'fit_scene' });
     return;
   }
+  if (op === 'neighborhood' && sid && doc) {
+    remember(op, sid);
+    reveal(sid);
+    const seeds = [sid, ...doc.parts.filter((p) => p.parent === sid).map((p) => p.id)];
+    const ids = [...new Set(seeds.flatMap((s) => neighborhoodOf(s, doc.ports, doc.interfaces)))];
+    ui.setMechanical({ mechanicalOp: 'neighborhood', neighborhoodIds: ids, ghostOthers: true });
+    ui.dispatch({ op: 'show_overlay', overlay: 'INTERFACES' });
+    return;
+  }
   if (op === 'interfaces' || op === 'show-mate') {
+    remember(op, sid);
     if (sid) reveal(sid);
+    ui.setMechanical({ mechanicalOp: op });
     ui.dispatch({ op: 'show_overlay', overlay: 'INTERFACES' });
     return;
   }
@@ -67,6 +139,8 @@ export function applyMechanicalOp(op: string, entityId: string | null, doc: Desi
     return;
   }
   if (op === 'section') {
+    remember(op, sid);
+    ui.setMechanical({ mechanicalOp: 'section' });
     ui.setSectionOn(true);
     ui.openHud('section');
     return;
@@ -87,12 +161,14 @@ export function applyMechanicalOp(op: string, entityId: string | null, doc: Desi
   if (!sid || !doc) return;
 
   if (op === 'open') {
+    remember(op, sid);
     reveal(sid);
     const shells = openTargets(doc, sid);
     const part = doc.parts.find((p) => p.id === sid);
     const asm = doc.assemblies.find((a) => a.id === sid);
     const scope = part?.parent ?? asm?.id ?? sid;
     ui.setMechanical({
+      mechanicalOp: 'open',
       openId: sid,
       ghostRoles: ['housing', 'cover', 'shell'],
       ghostOthers: false,
@@ -109,9 +185,11 @@ export function applyMechanicalOp(op: string, entityId: string | null, doc: Desi
   }
 
   if (op === 'show-stack') {
+    remember(op, sid);
     const stack = componentStack(doc, sid);
     reveal(sid);
     ui.setMechanical({
+      mechanicalOp: 'show-stack',
       stackIds: stack,
       neighborhoodIds: stack,
       ghostOthers: true,
@@ -125,9 +203,11 @@ export function applyMechanicalOp(op: string, entityId: string | null, doc: Desi
   }
 
   if (op === 'show-load') {
+    remember(op, sid);
     const path = declaredLoadPath(doc, sid);
     reveal(sid);
     ui.setMechanical({
+      mechanicalOp: 'show-load',
       loadPathIds: path,
       neighborhoodIds: path,
       ghostOthers: true,
@@ -139,9 +219,11 @@ export function applyMechanicalOp(op: string, entityId: string | null, doc: Desi
   }
 
   if (op === 'show-axis') {
+    remember(op, sid);
     const joint = jointFor(doc, sid);
     reveal(joint?.id ?? sid);
     ui.setMechanical({
+      mechanicalOp: 'show-axis',
       axisJointId: joint?.id ?? sid,
       neighborhoodIds: rotatingGroup(doc, sid)
     });
@@ -150,10 +232,12 @@ export function applyMechanicalOp(op: string, entityId: string | null, doc: Desi
   }
 
   if (op === 'show-motion') {
+    remember(op, sid);
     const joint = jointFor(doc, sid);
     const group = rotatingGroup(doc, sid);
     reveal(joint?.id ?? sid);
     ui.setMechanical({
+      mechanicalOp: 'show-motion',
       neighborhoodIds: group,
       ghostOthers: true,
       axisJointId: joint?.id ?? null,
@@ -165,9 +249,11 @@ export function applyMechanicalOp(op: string, entityId: string | null, doc: Desi
   }
 
   if (op === 'service') {
+    remember(op, sid);
     const seq = serviceSequence(doc, sid);
     reveal(sid);
     ui.setMechanical({
+      mechanicalOp: 'service',
       serviceIds: seq,
       neighborhoodIds: seq,
       ghostOthers: true,
@@ -179,9 +265,10 @@ export function applyMechanicalOp(op: string, entityId: string | null, doc: Desi
   }
 
   if (op === 'show-fasteners') {
+    remember(op, sid);
     const ids = fastenerHosts(doc, sid);
     reveal(sid);
-    ui.setMechanical({ neighborhoodIds: ids, ghostOthers: true, serviceIds: ids });
+    ui.setMechanical({ mechanicalOp: 'show-fasteners', neighborhoodIds: ids, ghostOthers: true, serviceIds: ids });
     return;
   }
 
@@ -212,6 +299,16 @@ export function mechanicalOpFromView(kind: string): string | null {
       return 'home';
     case 'previous_view':
       return 'previous';
+    case 'isolate':
+      return 'isolate';
+    case 'focus':
+      return 'focus';
+    case 'neighborhood':
+      return 'neighborhood';
+    case 'cutaway':
+      return 'section';
+    case 'track':
+      return 'track';
     default:
       return null;
   }

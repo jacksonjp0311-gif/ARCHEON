@@ -1,6 +1,6 @@
 # ARCHEON architecture
 
-Version 0.6.2 — Identity of operations.
+Version 0.6.3 — Reversible spatial conversation.
 
 > Geometry is only one projection of an engineered system.
 

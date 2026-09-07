@@ -70,7 +70,14 @@ function ask(): ContextAction {
   return { id: 'ask', label: 'ASK ARCHEON', title: 'Ask ARCHEON about this object.', ask: true };
 }
 
-export function contextActionsFor(ctx: EntityContext, doc: DesignDocument | null): ContextAction[] {
+export function contextActionsFor(
+  ctx: EntityContext,
+  doc: DesignDocument | null,
+  opts?: { canGoBack?: boolean }
+): ContextAction[] {
+  const back: ContextAction[] = opts?.canGoBack
+    ? [{ id: 'previous', label: 'PREVIOUS', title: 'Last spatial step. Not a design rollback.' }]
+    : [];
   if (ctx.kind === 'proposal') {
     return [
       { id: 'compare', label: 'COMPARE', title: 'Overlay proposal geometry.' },
@@ -80,14 +87,16 @@ export function contextActionsFor(ctx: EntityContext, doc: DesignDocument | null
     ];
   }
   if (ctx.kind === 'none' || !ctx.id) {
-    return [
+    return unique([
+      ...back,
       { id: 'home', label: 'HOME', title: 'Assembled home view.' },
       { id: 'fit', label: 'FIT', title: 'Fit the whole machine.' },
       ask()
-    ];
+    ]);
   }
   if (ctx.kind === 'joint') {
     return unique([
+      ...back,
       { id: 'show-axis', label: 'SHOW AXIS', title: 'Draw the declared joint axis. DECLARED, not solved kinematics.' },
       { id: 'show-motion', label: 'SHOW MOTION', title: 'Highlight the rotating group. DECLARED.' },
       { id: 'show-load', label: 'SHOW LOAD PATH', title: 'Declared load path. Not FEA.' },
@@ -99,6 +108,7 @@ export function contextActionsFor(ctx: EntityContext, doc: DesignDocument | null
   }
   if (ctx.kind === 'requirement') {
     return unique([
+      ...back,
       { id: 'affected', label: 'SHOW AFFECTED', title: 'Ghost unrelated systems.' },
       { id: 'show-evidence', label: 'SHOW EVIDENCE', title: 'Open provenance / evidence.' },
       { id: 'track', label: 'TRACK', title: 'Watch this requirement.' },
@@ -107,6 +117,7 @@ export function contextActionsFor(ctx: EntityContext, doc: DesignDocument | null
   }
   if (ctx.kind === 'interface' || ctx.kind === 'mate') {
     return unique([
+      ...back,
       { id: 'interfaces', label: 'CONNECTIONS', title: 'Show the local interface neighborhood.' },
       { id: 'show-mate', label: 'SHOW MATE', title: 'Highlight connected hosts.' },
       { id: 'track', label: 'TRACK', title: 'Watch this connection.' },
@@ -115,6 +126,7 @@ export function contextActionsFor(ctx: EntityContext, doc: DesignDocument | null
   }
   if (ctx.kind === 'assembly') {
     return unique([
+      ...back,
       { id: 'focus', label: 'FOCUS', title: 'Frame this assembly.' },
       { id: 'explode', label: 'EXPLODE', title: 'Explode this assembly only.' },
       { id: 'open', label: 'OPEN', title: 'Ghost the housing and reveal internals. Display only.' },
@@ -128,6 +140,7 @@ export function contextActionsFor(ctx: EntityContext, doc: DesignDocument | null
   const part = doc?.parts.find((p) => p.id === ctx.id);
   const hay = part ? roleOf(part) : ctx.role.toLowerCase();
   const actions: ContextAction[] = [
+    ...back,
     { id: 'focus', label: 'FOCUS', title: 'Frame selected object.' },
     { id: 'isolate', label: 'ISOLATE', title: 'Hide unrelated objects temporarily.' }
   ];
